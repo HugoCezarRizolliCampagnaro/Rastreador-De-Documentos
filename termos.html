@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<!-- Termos de Uso — mesmo design system, texto jurídico preservado -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<meta name="theme-color" content="#0B0E14">
+<title>Termos de Uso — Rastreador de Documentos</title>
+<script>
+  if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --marca: #3D4FE0; --bg: #F7F8FA; --superficie: #FFFFFF;
+    --texto: #14161A; --texto-muted: #6B7280; --borda: #E3E5E9;
+  }
+
+  html.escuro {
+    --bg: #0B0E14; --superficie: #141821;
+    --texto: #F1F2F4; --texto-muted: #8A93A3; --borda: #232833;
+    --marca: #5B6EF5;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg); color: var(--texto);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    animation: entrada 0.3s ease;
+  }
+
+  @keyframes entrada { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  svg.icone { display: block; flex-shrink: 0; }
+
+  .glow-fundo {
+    position: fixed; top: -180px; left: 15%;
+    width: 560px; height: 560px;
+    background: radial-gradient(circle, rgba(91, 110, 245, 0.3), transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  html:not(.escuro) .glow-fundo { display: none; }
+
+  .topo { position: relative; z-index: 1; max-width: 680px; margin: 0 auto; padding: 24px 20px 0; }
+
+  .link-voltar { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; color: var(--texto-muted); text-decoration: none; margin-bottom: 20px; }
+  .link-voltar:hover { color: var(--marca); }
+
+  .cabecalho-doc { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .cabecalho-icone { width: 42px; height: 42px; border-radius: 12px; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+  h1 { font-size: 23px; font-weight: 700; margin: 0; }
+  .atualizado { font-size: 12.5px; color: var(--texto-muted); margin: 10px 0 0 56px; }
+
+  .conteudo {
+    position: relative; z-index: 1;
+    max-width: 680px; margin: 0 auto;
+    padding: 28px 20px 70px;
+    font-size: 14.5px;
+  }
+
+  .conteudo > p:first-child { color: var(--texto-muted); margin-top: 0; }
+
+  .secao-legal { background: var(--superficie); border: 1px solid var(--borda); border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; }
+  .secao-legal h2 { font-size: 15.5px; font-weight: 700; margin: 0 0 10px; color: var(--texto); }
+  .secao-legal p, .secao-legal li { color: var(--texto-muted); }
+  .secao-legal ul { padding-left: 20px; margin: 8px 0 0; }
+  .secao-legal p:last-child, .secao-legal ul:last-child { margin-bottom: 0; }
+
+  .link-cruzado {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    text-align: center; font-size: 13px; font-weight: 600;
+    color: var(--marca); text-decoration: none;
+    margin-top: 24px;
+  }
+</style>
+</head>
+<body>
+
+  <div class="glow-fundo"></div>
+
+  <div class="topo">
+    <a href="perfil.html" class="link-voltar"><span id="icone-voltar"></span> Voltar</a>
+    <div class="cabecalho-doc">
+      <span class="cabecalho-icone" id="cabecalho-icone"></span>
+      <h1>Termos de Uso</h1>
+    </div>
+    <p class="atualizado">Última atualização: setembro de 2026</p>
+  </div>
+
+  <div class="conteudo">
+    <p>Ao usar o Rastreador de Documentos, você concorda com estes termos.</p>
+
+    <div class="secao-legal">
+      <h2>1. O que é o serviço</h2>
+      <p>O Rastreador de Documentos é uma ferramenta para organizar documentos pessoais ou profissionais, controlar datas de vencimento e receber lembretes. Ele está em desenvolvimento ativo — funcionalidades podem mudar sem aviso prévio.</p>
+    </div>
+
+    <div class="secao-legal">
+      <h2>2. Sua conta</h2>
+      <ul>
+        <li>Você é responsável por manter sua senha em segurança.</li>
+        <li>Você é responsável pela veracidade dos dados que cadastra.</li>
+        <li>Uma conta é de uso pessoal e não deve ser compartilhada.</li>
+      </ul>
+    </div>
+
+    <div class="secao-legal">
+      <h2>3. Uso aceitável</h2>
+      <p>Não é permitido usar o serviço para armazenar conteúdo ilegal, malicioso ou que viole direitos de terceiros.</p>
+    </div>
+
+    <div class="secao-legal">
+      <h2>4. Disponibilidade</h2>
+      <p>Por estar em fase de desenvolvimento, não garantimos disponibilidade contínua (uptime) do serviço. Fazemos o possível para manter seus dados seguros e acessíveis, mas recomendamos manter cópias importantes fora do app enquanto ele evolui.</p>
+    </div>
+
+    <div class="secao-legal">
+      <h2>5. Planos e cobrança</h2>
+      <p>Atualmente todos os recursos estão liberados gratuitamente. Quando a cobrança for ativada, os termos de cada plano serão detalhados na tela de Planos antes de qualquer pagamento.</p>
+    </div>
+
+    <div class="secao-legal">
+      <h2>6. Cancelamento</h2>
+      <p>Você pode parar de usar o serviço e solicitar a exclusão da sua conta e dados a qualquer momento, pelo contato de suporte.</p>
+    </div>
+
+    <div class="secao-legal">
+      <h2>7. Limitação de responsabilidade</h2>
+      <p>O Rastreador de Documentos é uma ferramenta de apoio à organização. Prazos legais, exigências de renovação e validade de documentos são de responsabilidade do usuário — o app ajuda a lembrar, mas não substitui a verificação junto aos órgãos competentes.</p>
+    </div>
+
+    <div class="secao-legal">
+      <h2>8. Alterações nestes termos</h2>
+      <p>Podemos atualizar estes termos conforme o app evolui. Mudanças relevantes serão avisadas dentro do próprio app.</p>
+    </div>
+
+    <div class="secao-legal">
+      <h2>9. Contato</h2>
+      <p>Dúvidas: <a href="mailto:suporte@rastreadordedocumentos.com.br" style="color: var(--marca);">suporte@rastreadordedocumentos.com.br</a></p>
+    </div>
+
+    <a href="privacidade.html" class="link-cruzado">Ver Política de Privacidade <span id="icone-seta"></span></a>
+  </div>
+
+  <script>
+    const CORPOS_ICONE = {
+      fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+      arrowLeft: '<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+      chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+    };
+    function icone(nome, tamanho, corTraco) {
+      const tam = tamanho || 18;
+      const cor = corTraco || 'currentColor';
+      return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
+    }
+    document.getElementById('icone-voltar').innerHTML = icone('arrowLeft', 15);
+    document.getElementById('cabecalho-icone').innerHTML = icone('fileText', 19, '#FFFFFF');
+    document.getElementById('icone-seta').innerHTML = icone('chevronRight', 14);
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<!-- Calendário — mesmo design system do dashboard e gastos: sidebar, ícones SVG, sem barra inferior -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<meta name="theme-color" content="#0B0E14">
+<title>Calendário — Rastreador de Documentos</title>
+<script>
+  if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --marca: #3D4FE0;
+    --marca-hover: #2E3FC0;
+    --bg: #F7F8FA;
+    --superficie: #FFFFFF;
+    --texto: #14161A;
+    --texto-muted: #6B7280;
+    --borda: #E3E5E9;
+    --status-verde: #1F9D55;
+    --status-amarelo: #F5A623;
+    --status-vermelho: #E5484D;
+  }
+
+  html.escuro {
+    --bg: #0B0E14;
+    --superficie: #141821;
+    --texto: #F1F2F4;
+    --texto-muted: #8A93A3;
+    --borda: #232833;
+    --marca: #5B6EF5;
+    --marca-hover: #4457E0;
+    --status-verde: #22C55E;
+    --status-amarelo: #F5A623;
+    --status-vermelho: #F2555C;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--texto);
+    -webkit-font-smoothing: antialiased;
+    animation: entrada 0.3s ease;
+  }
+
+  @keyframes entrada { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes subir { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  svg.icone { display: block; flex-shrink: 0; }
+
+  .glow-fundo {
+    position: fixed; top: -180px; left: 15%;
+    width: 560px; height: 560px;
+    background: radial-gradient(circle, rgba(91, 110, 245, 0.35), transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  html:not(.escuro) .glow-fundo { display: none; }
+
+  /* ---------- estrutura (idêntica às outras telas) ---------- */
+
+  .app-shell { display: flex; min-height: 100vh; position: relative; z-index: 1; }
+
+  .sidebar {
+    position: fixed; top: 0; left: 0; height: 100vh; width: 250px;
+    display: flex; flex-direction: column;
+    padding: 22px 14px;
+    background: var(--superficie);
+    border-right: 1px solid var(--borda);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 40;
+  }
+
+  .sidebar.aberta { transform: translateX(0); }
+
+  .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 35; display: none; }
+  .sidebar-backdrop.ativo { display: block; }
+
+  @media (min-width: 960px) {
+    .sidebar { position: sticky; transform: none; }
+    .sidebar-backdrop { display: none !important; }
+    .botao-menu { display: none; }
+    .conteudo-principal { flex: 1; min-width: 0; }
+    .cabecalho, .conteudo { max-width: 1040px; padding-left: 32px; padding-right: 32px; }
+  }
+
+  .sidebar-marca { display: flex; align-items: center; gap: 10px; padding: 6px 10px 22px; }
+  .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sidebar-titulo { font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+  .sidebar-subtitulo { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+
+  .sidebar-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: 8px;
+    color: var(--texto-muted); text-decoration: none;
+    font-size: 14px; font-weight: 500;
+  }
+
+  .sidebar-item:hover { background: var(--bg); }
+  .sidebar-item.ativo { background: rgba(91, 110, 245, 0.14); color: var(--marca); font-weight: 600; }
+
+  .sidebar-perfil {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 10px 4px;
+    border-top: 1px solid var(--borda);
+    margin-top: 10px;
+    text-decoration: none; color: var(--texto);
+  }
+
+  .sidebar-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--marca); color: #FFFFFF;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px; flex-shrink: 0;
+  }
+
+  .sidebar-perfil-nome { font-size: 12.5px; font-weight: 600; word-break: break-all; }
+  .sidebar-perfil-sub { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-perfil-seta { margin-left: auto; color: var(--texto-muted); flex-shrink: 0; }
+
+  /* ---------- cabeçalho ---------- */
+
+  .cabecalho { max-width: 1040px; margin: 0 auto; padding: 24px 20px 4px; }
+  .topo-pagina { display: flex; align-items: flex-start; gap: 14px; }
+
+  .botao-menu {
+    width: 38px; height: 38px; border-radius: 10px;
+    border: 1px solid var(--borda);
+    background: var(--superficie); color: var(--texto);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0;
+  }
+
+  .pagina-icone {
+    width: 46px; height: 46px; border-radius: 12px;
+    background: var(--marca); color: #FFFFFF;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .cabecalho h1 { font-size: 24px; font-weight: 700; margin: 0 0 4px; }
+  .pagina-sub { font-size: 13.5px; color: var(--texto-muted); margin: 0; max-width: 52ch; }
+
+  /* ---------- resumo ---------- */
+
+  .resumo-linha { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+
+  .resumo-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 12px;
+    padding: 10px 14px;
+  }
+
+  .resumo-pill-icone { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .resumo-pill-numero { font-size: 16px; font-weight: 700; }
+  .resumo-pill-label { font-size: 11.5px; color: var(--texto-muted); }
+
+  .resumo-texto {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--texto-muted);
+    margin-left: auto;
+  }
+
+  /* ---------- conteúdo ---------- */
+
+  .conteudo { max-width: 1040px; margin: 0 auto; padding: 20px 20px 60px; }
+
+  .layout-calendario { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 960px) { .layout-calendario { grid-template-columns: 1.6fr 1fr; align-items: start; } }
+
+  .secao-card { background: var(--superficie); border: 1px solid var(--borda); border-radius: 14px; padding: 18px; }
+
+  .secao-titulo { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--texto); }
+  .secao-titulo svg.icone { color: var(--marca); }
+
+  /* filtros */
+  .filtros { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin: 14px 0 16px; }
+
+  .filtro-chip {
+    flex-shrink: 0; padding: 7px 14px;
+    font-size: 12.5px; font-weight: 600; font-family: inherit;
+    border-radius: 999px; border: 1.5px solid var(--borda);
+    background: var(--bg); color: var(--texto-muted);
+    cursor: pointer;
+  }
+
+  .filtro-chip.ativo { background: var(--marca); border-color: var(--marca); color: #FFFFFF; }
+
+  /* navegação de mês */
+
+  .mes-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+  .mes-nav-esquerda { display: flex; align-items: center; gap: 10px; }
+
+  .mes-btn {
+    width: 36px; height: 36px; border-radius: 10px;
+    border: 1px solid var(--borda);
+    background: var(--bg); color: var(--texto);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+
+  .mes-btn:hover { border-color: var(--marca); color: var(--marca); }
+
+  .mes-label { font-size: 16px; font-weight: 700; text-transform: capitalize; min-width: 150px; text-align: center; }
+
+  .btn-hoje {
+    padding: 8px 14px; font-family: inherit; font-size: 12.5px; font-weight: 600;
+    border-radius: 999px; border: 1.5px solid var(--borda);
+    background: var(--bg); color: var(--texto);
+    cursor: pointer;
+  }
+
+  .btn-hoje:hover { border-color: var(--marca); color: var(--marca); }
+
+  /* grade */
+
+  .grade-dias-semana { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; color: var(--texto-muted); margin-bottom: 6px; }
+
+  .grade-calendario { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+
+  .dia-cel {
+    aspect-ratio: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px;
+    border-radius: 10px;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    background: var(--bg);
+    border: 1px solid transparent;
+    color: var(--texto);
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .dia-cel:hover { border-color: var(--marca); }
+  .dia-cel.vazio { visibility: hidden; cursor: default; }
+  .dia-cel.hoje { border-color: var(--marca); font-weight: 700; color: var(--marca); }
+  .dia-cel.selecionado { background: var(--marca); border-color: var(--marca); color: #FFFFFF; }
+
+  .dia-cel .pontos { display: flex; gap: 3px; height: 6px; }
+  .dia-cel .ponto { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* painel de detalhes do dia */
+
+  .painel-dia { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--borda); }
+  .painel-dia-titulo { font-size: 13.5px; font-weight: 700; margin: 0 0 12px; }
+
+  .painel-doc-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--bg);
+    text-decoration: none;
+    color: var(--texto);
+    margin-bottom: 8px;
+  }
+
+  .painel-doc-item:last-child { margin-bottom: 0; }
+  .painel-doc-ponto { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .painel-doc-nome { font-size: 13.5px; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .painel-doc-status { font-size: 11.5px; color: var(--texto-muted); flex-shrink: 0; }
+
+  /* próximos vencimentos */
+
+  .proximo-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--borda);
+    text-decoration: none;
+    color: var(--texto);
+  }
+
+  .proximo-item:last-child { border-bottom: none; }
+
+  .proximo-ponto { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .proximo-nome { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .proximo-data { font-size: 11.5px; color: var(--texto-muted); }
+  .proximo-info { flex: 1; min-width: 0; }
+
+  /* estado vazio */
+
+  .estado-vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px 16px; gap: 4px; }
+  .estado-vazio-icone { width: 44px; height: 44px; border-radius: 12px; background: var(--bg); color: var(--status-verde); display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+  .estado-vazio-titulo { font-size: 14px; font-weight: 600; color: var(--texto); }
+  .estado-vazio-sub { font-size: 12.5px; color: var(--texto-muted); max-width: 30ch; }
+
+  /* fab */
+
+  .fab {
+    position: fixed; right: 20px; bottom: 24px;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--marca); color: #FFFFFF;
+    display: flex; align-items: center; justify-content: center;
+    text-decoration: none;
+    box-shadow: 0 6px 20px rgba(91, 110, 245, 0.5);
+    transition: background 0.15s ease, transform 0.15s ease;
+    animation: pulso 2.5s ease-in-out infinite;
+    z-index: 6;
+  }
+
+  @keyframes pulso { 0%, 100% { box-shadow: 0 6px 20px rgba(91,110,245,0.5); } 50% { box-shadow: 0 6px 26px rgba(91,110,245,0.75); } }
+  .fab:hover { background: var(--marca-hover); transform: scale(1.06); }
+</style>
+</head>
+<body>
+
+  <div class="glow-fundo"></div>
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-marca">
+        <span class="sidebar-logo" id="sidebar-logo"></span>
+        <div>
+          <div class="sidebar-titulo">Rastreador</div>
+          <div class="sidebar-subtitulo">de Documentos</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+      <a href="perfil.html" class="sidebar-perfil">
+        <span class="sidebar-avatar" id="sidebar-avatar">?</span>
+        <div>
+          <div class="sidebar-perfil-nome" id="sidebar-email">Carregando...</div>
+          <div class="sidebar-perfil-sub">Minha conta</div>
+        </div>
+        <span class="sidebar-perfil-seta" id="sidebar-perfil-seta"></span>
+      </a>
+    </aside>
+
+    <div class="conteudo-principal">
+      <div class="cabecalho">
+        <div class="topo-pagina">
+          <button type="button" class="botao-menu" id="botao-menu" aria-label="Abrir menu"></button>
+          <div class="pagina-icone" id="pagina-icone"></div>
+          <div>
+            <h1>Calendário</h1>
+            <p class="pagina-sub">Visualize os vencimentos e organize seus próximos prazos.</p>
+          </div>
+        </div>
+
+        <div class="resumo-linha" id="resumo-linha"></div>
+      </div>
+
+      <div class="conteudo">
+        <div class="layout-calendario">
+          <div class="secao-card">
+            <div class="filtros" id="filtros"></div>
+
+            <div class="mes-nav">
+              <div class="mes-nav-esquerda">
+                <button type="button" class="mes-btn" id="mes-anterior" aria-label="Mês anterior"></button>
+                <span class="mes-label" id="mes-label"></span>
+                <button type="button" class="mes-btn" id="mes-proximo" aria-label="Próximo mês"></button>
+              </div>
+              <button type="button" class="btn-hoje" id="btn-hoje">Hoje</button>
+            </div>
+
+            <div class="grade-dias-semana">
+              <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
+            </div>
+
+            <div class="grade-calendario" id="grade-calendario"></div>
+
+            <div class="painel-dia" id="painel-dia" hidden>
+              <p class="painel-dia-titulo" id="painel-dia-titulo"></p>
+              <div id="painel-dia-lista"></div>
+            </div>
+          </div>
+
+          <div class="secao-card">
+            <span class="secao-titulo" id="titulo-proximos"></span>
+            <div id="lista-proximos" style="margin-top: 14px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <a class="fab" href="novo-documento.html" aria-label="Cadastrar documento" id="fab-adicionar"></a>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_brDnSPSCu4ry9QTe-pYwag_zRqB6hkL';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    /* ---------- ícones ---------- */
+
+    const CORPOS_ICONE = {
+      home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+      dollarSign: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+      calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+      messageCircle: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+      fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+      menu: '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',
+      plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+      chevronLeft: '<polyline points="15 18 9 12 15 6"/>',
+      chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+      checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+      clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+      alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    };
+
+    function icone(nome, tamanho, corTraco) {
+      const tam = tamanho || 18;
+      const cor = corTraco || 'currentColor';
+      return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
+    }
+
+    document.getElementById('sidebar-logo').innerHTML = icone('fileText', 18, '#FFFFFF');
+    document.getElementById('botao-menu').innerHTML = icone('menu', 18);
+    document.getElementById('pagina-icone').innerHTML = icone('calendar', 22, '#FFFFFF');
+    document.getElementById('sidebar-perfil-seta').innerHTML = icone('chevronRight', 16);
+    document.getElementById('fab-adicionar').innerHTML = icone('plus', 26, '#FFFFFF');
+    document.getElementById('mes-anterior').innerHTML = icone('chevronLeft', 18);
+    document.getElementById('mes-proximo').innerHTML = icone('chevronRight', 18);
+    document.getElementById('titulo-proximos').innerHTML = icone('clock', 17) + ' Próximos vencimentos';
+
+    document.getElementById('sidebar-nav').innerHTML = [
+      { href: 'index.html', nome: 'home', label: 'Início' },
+      { href: 'gastos.html', nome: 'dollarSign', label: 'Gastos' },
+      { href: 'calendario.html', nome: 'calendar', label: 'Calendário', ativo: true },
+      { href: 'assistente.html', nome: 'messageCircle', label: 'Assistente' },
+    ].map(function (item) {
+      return `<a href="${item.href}" class="sidebar-item${item.ativo ? ' ativo' : ''}">${icone(item.nome, 18)}${item.label}</a>`;
+    }).join('');
+
+    /* ---------- gaveta lateral ---------- */
+
+    const sidebarEl = document.getElementById('sidebar');
+    const backdropEl = document.getElementById('sidebar-backdrop');
+    document.getElementById('botao-menu').addEventListener('click', function () {
+      sidebarEl.classList.add('aberta');
+      backdropEl.classList.add('ativo');
+    });
+    backdropEl.addEventListener('click', function () {
+      sidebarEl.classList.remove('aberta');
+      backdropEl.classList.remove('ativo');
+    });
+
+    /* ---------- dados e categorias ---------- */
+
+    const categoriaLabelMap = { pessoal: 'Pessoal', veiculo: 'Veículo', trabalho: 'Trabalho', casa: 'Casa', outro: 'Outro' };
+
+    function escapeHtml(texto) {
+      const div = document.createElement('div');
+      div.textContent = texto;
+      return div.innerHTML;
+    }
+
+    function diasRestantes(dataStr) {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const alvo = new Date(dataStr + 'T00:00:00');
+      return Math.round((alvo - hoje) / 86400000);
+    }
+
+    function statusPorDias(dias) {
+      if (dias < 7) return 'vermelho';
+      if (dias < 30) return 'amarelo';
+      return 'verde';
+    }
+
+    function statusLabel(status, dias) {
+      if (status === 'vermelho') return dias < 0 ? 'Vencido' : 'Urgente';
+      if (status === 'amarelo') return 'Em atenção';
+      return 'Em dia';
+    }
+
+    function corStatus(status) {
+      return status === 'vermelho' ? 'var(--status-vermelho)' : status === 'amarelo' ? 'var(--status-amarelo)' : 'var(--status-verde)';
+    }
+
+    let todosDocumentos = [];
+    let filtroAtivo = 'todos';
+    let mesAtual = new Date();
+    mesAtual.setDate(1);
+    let diaSelecionado = null;
+    let documentosPorDia = {};
+
+    const nomesMeses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+    const categorias = [
+      { valor: 'todos', label: 'Todos' },
+      { valor: 'pessoal', label: 'Pessoal' },
+      { valor: 'veiculo', label: 'Veículo' },
+      { valor: 'trabalho', label: 'Trabalho' },
+      { valor: 'casa', label: 'Casa' },
+      { valor: 'outro', label: 'Outro' },
+    ];
+
+    function renderFiltros() {
+      document.getElementById('filtros').innerHTML = categorias.map(function (cat) {
+        const ativo = cat.valor === filtroAtivo ? ' ativo' : '';
+        return `<button type="button" class="filtro-chip${ativo}" data-valor="${cat.valor}">${cat.label}</button>`;
+      }).join('');
+
+      document.querySelectorAll('.filtro-chip').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+          filtroAtivo = chip.dataset.valor;
+          renderFiltros();
+          atualizarTudo();
+        });
+      });
+    }
+
+    function documentosFiltrados() {
+      return filtroAtivo === 'todos'
+        ? todosDocumentos
+        : todosDocumentos.filter(function (d) { return d.categoria === filtroAtivo; });
+    }
+
+    /* ---------- resumo ---------- */
+
+    function renderResumo() {
+      const docs = documentosFiltrados();
+      let verdes = 0, amarelos = 0, vermelhos = 0;
+      docs.forEach(function (d) {
+        const status = statusPorDias(diasRestantes(d.data_vencimento));
+        if (status === 'verde') verdes++; else if (status === 'amarelo') amarelos++; else vermelhos++;
+      });
+
+      const vencemEsteMes = docs.filter(function (d) {
+        const dt = new Date(d.data_vencimento + 'T00:00:00');
+        const agora = new Date();
+        return dt.getMonth() === agora.getMonth() && dt.getFullYear() === agora.getFullYear();
+      }).length;
+
+      document.getElementById('resumo-linha').innerHTML = `
+        <div class="resumo-pill">
+          <span class="resumo-pill-icone" style="background: rgba(34,197,94,0.16); color: var(--status-verde);">${icone('checkCircle', 14)}</span>
+          <div><div class="resumo-pill-numero">${verdes}</div><div class="resumo-pill-label">Em dia</div></div>
+        </div>
+        <div class="resumo-pill">
+          <span class="resumo-pill-icone" style="background: rgba(245,166,35,0.18); color: var(--status-amarelo);">${icone('clock', 14)}</span>
+          <div><div class="resumo-pill-numero">${amarelos}</div><div class="resumo-pill-label">Próximos</div></div>
+        </div>
+        <div class="resumo-pill">
+          <span class="resumo-pill-icone" style="background: rgba(242,85,92,0.16); color: var(--status-vermelho);">${icone('alertTriangle', 14)}</span>
+          <div><div class="resumo-pill-numero">${vermelhos}</div><div class="resumo-pill-label">Vencidos</div></div>
+        </div>
+        <div class="resumo-texto">${icone('calendar', 15)} ${vencemEsteMes} documento${vencemEsteMes === 1 ? '' : 's'} vence${vencemEsteMes === 1 ? '' : 'm'} este mês</div>
+      `;
+    }
+
+    /* ---------- calendário ---------- */
+
+    function renderCalendario() {
+      const ano = mesAtual.getFullYear();
+      const mes = mesAtual.getMonth();
+      document.getElementById('mes-label').textContent = `${nomesMeses[mes]} ${ano}`;
+
+      documentosPorDia = {};
+      documentosFiltrados().forEach(function (doc) {
+        if (!documentosPorDia[doc.data_vencimento]) documentosPorDia[doc.data_vencimento] = [];
+        documentosPorDia[doc.data_vencimento].push(doc);
+      });
+
+      const primeiroDiaSemana = new Date(ano, mes, 1).getDay();
+      const totalDias = new Date(ano, mes + 1, 0).getDate();
+      const hojeStr = new Date().toISOString().slice(0, 10);
+
+      let html = '';
+      for (let i = 0; i < primeiroDiaSemana; i++) html += '<div class="dia-cel vazio"></div>';
+
+      for (let dia = 1; dia <= totalDias; dia++) {
+        const dataStr = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+        const docsNoDia = documentosPorDia[dataStr] || [];
+        const ehHoje = dataStr === hojeStr;
+        const ehSelecionado = dataStr === diaSelecionado;
+
+        const pontos = docsNoDia.slice(0, 3).map(function (doc) {
+          const status = statusPorDias(diasRestantes(doc.data_vencimento));
+          return `<span class="ponto" style="background: ${ehSelecionado ? '#FFFFFF' : corStatus(status)};"></span>`;
+        }).join('');
+
+        html += `<div class="dia-cel${ehHoje ? ' hoje' : ''}${ehSelecionado ? ' selecionado' : ''}" data-data="${dataStr}">${dia}<div class="pontos">${pontos}</div></div>`;
+      }
+
+      document.getElementById('grade-calendario').innerHTML = html;
+
+      document.querySelectorAll('.dia-cel[data-data]').forEach(function (cel) {
+        cel.addEventListener('click', function () {
+          diaSelecionado = diaSelecionado === cel.dataset.data ? null : cel.dataset.data;
+          renderCalendario();
+          renderPainelDia();
+        });
+      });
+    }
+
+    function renderPainelDia() {
+      const painel = document.getElementById('painel-dia');
+      if (!diaSelecionado) { painel.hidden = true; return; }
+
+      const docs = documentosPorDia[diaSelecionado] || [];
+      const dataFormatada = new Date(diaSelecionado + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
+      document.getElementById('painel-dia-titulo').textContent = `${dataFormatada} · ${docs.length} documento${docs.length === 1 ? '' : 's'}`;
+
+      document.getElementById('painel-dia-lista').innerHTML = docs.map(function (doc) {
+        const dias = diasRestantes(doc.data_vencimento);
+        const status = statusPorDias(dias);
+        return `
+          <a class="painel-doc-item" href="novo-documento.html?id=${doc.id}">
+            <span class="painel-doc-ponto" style="background: ${corStatus(status)};"></span>
+            <span class="painel-doc-nome">${escapeHtml(doc.nome)}</span>
+            <span class="painel-doc-status">${statusLabel(status, dias)}</span>
+          </a>
+        `;
+      }).join('');
+
+      painel.hidden = false;
+    }
+
+    /* ---------- próximos vencimentos ---------- */
+
+    function renderProximos() {
+      const docs = documentosFiltrados()
+        .filter(function (d) { return diasRestantes(d.data_vencimento) >= 0; })
+        .sort(function (a, b) { return new Date(a.data_vencimento) - new Date(b.data_vencimento); })
+        .slice(0, 8);
+
+      const listaEl = document.getElementById('lista-proximos');
+
+      if (docs.length === 0) {
+        listaEl.innerHTML = `
+          <div class="estado-vazio">
+            <div class="estado-vazio-icone">${icone('checkCircle', 20)}</div>
+            <p class="estado-vazio-titulo">Tudo tranquilo por aqui</p>
+            <p class="estado-vazio-sub">Não existem documentos vencendo neste período.</p>
+          </div>
+        `;
+        return;
+      }
+
+      listaEl.innerHTML = docs.map(function (doc) {
+        const dias = diasRestantes(doc.data_vencimento);
+        const status = statusPorDias(dias);
+        const dataFormatada = new Date(doc.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
+        return `
+          <a class="proximo-item" href="novo-documento.html?id=${doc.id}">
+            <span class="proximo-ponto" style="background: ${corStatus(status)};"></span>
+            <div class="proximo-info">
+              <div class="proximo-nome">${escapeHtml(doc.nome)}</div>
+              <div class="proximo-data">${dias === 0 ? 'Hoje' : dataFormatada}</div>
+            </div>
+          </a>
+        `;
+      }).join('');
+    }
+
+    function atualizarTudo() {
+      renderResumo();
+      renderCalendario();
+      renderPainelDia();
+      renderProximos();
+    }
+
+    /* ---------- navegação de mês ---------- */
+
+    document.getElementById('mes-anterior').addEventListener('click', function () {
+      mesAtual.setMonth(mesAtual.getMonth() - 1);
+      diaSelecionado = null;
+      atualizarTudo();
+    });
+
+    document.getElementById('mes-proximo').addEventListener('click', function () {
+      mesAtual.setMonth(mesAtual.getMonth() + 1);
+      diaSelecionado = null;
+      atualizarTudo();
+    });
+
+    document.getElementById('btn-hoje').addEventListener('click', function () {
+      mesAtual = new Date();
+      mesAtual.setDate(1);
+      diaSelecionado = new Date().toISOString().slice(0, 10);
+      atualizarTudo();
+    });
+
+    /* ---------- carregar ---------- */
+
+    async function carregarDocumentos() {
+      const { data } = await sb.from('documentos').select('id, nome, categoria, data_vencimento').order('data_vencimento');
+      todosDocumentos = data || [];
+      atualizarTudo();
+    }
+
+    sb.auth.getSession().then(function (resultado) {
+      if (!resultado.data.session) {
+        window.location.href = 'login.html';
+        return;
+      }
+      document.getElementById('sidebar-email').textContent = resultado.data.session.user.email;
+      document.getElementById('sidebar-avatar').textContent = resultado.data.session.user.email.charAt(0).toUpperCase();
+      renderFiltros();
+      carregarDocumentos();
+    });
+  </script>
+
+</body>
+</html>

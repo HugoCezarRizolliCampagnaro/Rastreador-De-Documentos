@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<!-- Dashboard — redesign com ícones em SVG, sidebar (fixa no desktop, gaveta no celular), sem barra inferior -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<meta name="theme-color" content="#0B0E14">
+<title>Seus documentos — Rastreador de Documentos</title>
+<script>
+  if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --marca: #3D4FE0;
+    --marca-hover: #2E3FC0;
+    --bg: #F7F8FA;
+    --superficie: #FFFFFF;
+    --texto: #14161A;
+    --texto-muted: #6B7280;
+    --borda: #E3E5E9;
+    --status-verde: #1F9D55;
+    --status-amarelo: #F5A623;
+    --status-vermelho: #E5484D;
+  }
+
+  html.escuro {
+    --bg: #0B0E14;
+    --superficie: #141821;
+    --texto: #F1F2F4;
+    --texto-muted: #8A93A3;
+    --borda: #232833;
+    --marca: #5B6EF5;
+    --marca-hover: #4457E0;
+    --status-verde: #22C55E;
+    --status-amarelo: #F5A623;
+    --status-vermelho: #F2555C;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--texto);
+    -webkit-font-smoothing: antialiased;
+    animation: entrada 0.3s ease;
+  }
+
+  @keyframes entrada {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes subir {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  svg.icone { display: block; flex-shrink: 0; }
+
+  .glow-fundo {
+    position: fixed;
+    top: -180px;
+    left: 15%;
+    width: 560px;
+    height: 560px;
+    background: radial-gradient(circle, rgba(91, 110, 245, 0.35), transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  html:not(.escuro) .glow-fundo { display: none; }
+
+  /* ---------- estrutura geral ---------- */
+
+  .app-shell {
+    display: flex;
+    min-height: 100vh;
+    position: relative;
+    z-index: 1;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 250px;
+    display: flex;
+    flex-direction: column;
+    padding: 22px 14px;
+    background: var(--superficie);
+    border-right: 1px solid var(--borda);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 40;
+  }
+
+  .sidebar.aberta { transform: translateX(0); }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 35;
+    display: none;
+  }
+
+  .sidebar-backdrop.ativo { display: block; }
+
+  @media (min-width: 960px) {
+    .sidebar { position: sticky; transform: none; }
+    .sidebar-backdrop { display: none !important; }
+    .botao-menu { display: none; }
+    .conteudo-principal { flex: 1; min-width: 0; }
+    .cabecalho, .conteudo { max-width: 760px; padding-left: 32px; padding-right: 32px; }
+  }
+
+  .sidebar-marca {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px 22px;
+  }
+
+  .sidebar-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--marca);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .sidebar-titulo { font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+  .sidebar-subtitulo { font-size: 11px; color: var(--texto-muted); }
+
+  .sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    color: var(--texto-muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .sidebar-item:hover { background: var(--bg); }
+
+  .sidebar-item.ativo {
+    background: rgba(91, 110, 245, 0.14);
+    color: var(--marca);
+    font-weight: 600;
+  }
+
+  .sidebar-perfil {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 10px 4px;
+    border-top: 1px solid var(--borda);
+    margin-top: 10px;
+    text-decoration: none;
+    color: var(--texto);
+  }
+
+  .sidebar-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--marca);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .sidebar-perfil-nome { font-size: 12.5px; font-weight: 600; word-break: break-all; }
+  .sidebar-perfil-sub { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-perfil-seta { margin-left: auto; color: var(--texto-muted); flex-shrink: 0; }
+
+  /* ---------- cabeçalho ---------- */
+
+  .cabecalho {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 24px 20px 4px;
+  }
+
+  .topo-dashboard {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .topo-esquerda { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+
+  .botao-menu {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    border: 1px solid var(--borda);
+    background: var(--superficie);
+    color: var(--texto);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .saudacao {
+    font-size: 15px;
+    color: var(--texto-muted);
+    margin: 0 0 2px;
+  }
+
+  .cabecalho h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+
+  .resumo {
+    font-size: 13px;
+    color: var(--texto-muted);
+    margin: 0;
+  }
+
+  .topo-acoes {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .botao-notif {
+    position: relative;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid var(--borda);
+    background: var(--superficie);
+    color: var(--texto);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .notif-ponto {
+    position: absolute;
+    top: 7px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--status-vermelho);
+    border: 2px solid var(--superficie);
+  }
+
+  .botao-relatorio {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 14px;
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    background: var(--superficie);
+    color: var(--texto);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* ---------- estatísticas ---------- */
+
+  .stats-linha {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .stat-card {
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 14px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .stat-icone-circulo {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .stat-numero-grande { font-size: 20px; font-weight: 700; line-height: 1; }
+  .stat-legenda { font-size: 11px; color: var(--texto-muted); }
+
+  .score-card {
+    grid-column: 1 / -1;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 14px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  @media (min-width: 640px) {
+    .stats-linha { grid-template-columns: repeat(3, 1fr) 1.7fr; }
+    .score-card { grid-column: auto; }
+  }
+
+  .gauge { width: 52px; height: 52px; flex-shrink: 0; transform: rotate(-90deg); }
+  .gauge-fundo { fill: none; stroke: var(--borda); stroke-width: 8; }
+  .gauge-progresso { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease, stroke 0.3s ease; }
+
+  .score-label { font-size: 11px; color: var(--texto-muted); }
+  .score-numero-grande { font-size: 17px; font-weight: 700; margin: 1px 0; }
+  .score-sub { font-size: 11px; color: var(--texto-muted); }
+
+  /* ---------- lista de documentos ---------- */
+
+  .conteudo {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 20px 60px;
+  }
+
+  .busca-wrap { position: relative; margin-bottom: 14px; }
+
+  .busca-wrap svg.icone {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--texto-muted);
+  }
+
+  .busca {
+    width: 100%;
+    padding: 11px 14px 11px 40px;
+    font-size: 15px;
+    font-family: inherit;
+    color: var(--texto);
+    background: var(--superficie);
+    border: 1.5px solid var(--borda);
+    border-radius: 10px;
+  }
+
+  .busca:focus {
+    outline: none;
+    border-color: var(--marca);
+    box-shadow: 0 0 0 3px rgba(91, 110, 245, 0.18);
+  }
+
+  .filtros {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    margin-bottom: 16px;
+  }
+
+  .filtro-chip {
+    flex-shrink: 0;
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    border-radius: 999px;
+    border: 1.5px solid var(--borda);
+    background: var(--superficie);
+    color: var(--texto-muted);
+    cursor: pointer;
+  }
+
+  .filtro-chip.ativo {
+    background: var(--marca);
+    border-color: var(--marca);
+    color: #FFFFFF;
+  }
+
+  .lista-documentos {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .doc-card-wrap {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    position: relative;
+  }
+
+  .doc-card {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 12px;
+    padding: 12px 14px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .doc-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  }
+
+  .doc-icone {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .doc-info { flex: 1; min-width: 0; }
+
+  .doc-nome {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--texto);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .doc-meta, .doc-detalhe {
+    font-size: 12px;
+    color: var(--texto-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .doc-detalhe {
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .status-badge.verde { background: rgba(34, 197, 94, 0.16); color: var(--status-verde); }
+  .status-badge.amarelo { background: rgba(245, 166, 35, 0.18); color: var(--status-amarelo); }
+  .status-badge.vermelho { background: rgba(242, 85, 92, 0.16); color: var(--status-vermelho); }
+
+  .doc-menu-btn {
+    width: 32px;
+    flex-shrink: 0;
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    background: var(--superficie);
+    color: var(--texto-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .doc-menu {
+    position: absolute;
+    top: 46px;
+    right: 0;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    z-index: 5;
+    min-width: 140px;
+  }
+
+  .doc-menu[hidden] { display: none; }
+
+  .doc-menu button {
+    display: block;
+    width: 100%;
+    padding: 10px 14px;
+    background: none;
+    border: none;
+    text-align: left;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--texto);
+    cursor: pointer;
+  }
+
+  .doc-menu button:hover { background: var(--bg); }
+  .doc-menu button.perigo { color: var(--status-vermelho); }
+
+  .vazio, .erro {
+    text-align: center;
+    color: var(--texto-muted);
+    font-size: 14px;
+    padding: 48px 20px;
+    line-height: 1.6;
+  }
+
+  /* ---------- fab ---------- */
+
+  .fab {
+    position: fixed;
+    right: 20px;
+    bottom: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--marca);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    box-shadow: 0 6px 20px rgba(91, 110, 245, 0.5);
+    transition: background 0.15s ease, transform 0.15s ease;
+    animation: pulso 2.5s ease-in-out infinite;
+    z-index: 6;
+  }
+
+  @keyframes pulso {
+    0%, 100% { box-shadow: 0 6px 20px rgba(91, 110, 245, 0.5); }
+    50% { box-shadow: 0 6px 26px rgba(91, 110, 245, 0.75); }
+  }
+
+  .fab:hover { background: var(--marca-hover); transform: scale(1.06); }
+
+  /* ---------- onboarding ---------- */
+
+  .onboarding-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 50;
+    animation: entrada 0.2s ease;
+  }
+
+  .onboarding-overlay[hidden] { display: none; }
+
+  .onboarding-card {
+    background: var(--superficie);
+    border-radius: 20px 20px 0 0;
+    padding: 28px 24px calc(24px + env(safe-area-inset-bottom));
+    max-width: 480px;
+    width: 100%;
+    animation: subir 0.3s ease;
+  }
+
+  .onboarding-card h2 { font-size: 20px; margin: 0 0 10px; }
+  .onboarding-card p { font-size: 14px; color: var(--texto-muted); margin: 0 0 14px; }
+
+  .onboarding-lista {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px;
+    font-size: 14px;
+    line-height: 1.8;
+  }
+
+  .onboarding-lista li { display: flex; align-items: center; gap: 10px; }
+
+  #onboarding-fechar {
+    width: 100%;
+    padding: 13px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    color: #FFFFFF;
+    background: var(--marca);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+  <div class="glow-fundo"></div>
+
+  <div id="onboarding" class="onboarding-overlay" hidden>
+    <div class="onboarding-card">
+      <h2>Bem-vindo! 👋</h2>
+      <p>O Rastreador de Documentos te ajuda a nunca mais perder um prazo.</p>
+      <ul class="onboarding-lista" id="onboarding-lista"></ul>
+      <button id="onboarding-fechar">Entendi, vamos lá!</button>
+    </div>
+  </div>
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-marca">
+        <span class="sidebar-logo" id="sidebar-logo"></span>
+        <div>
+          <div class="sidebar-titulo">Rastreador</div>
+          <div class="sidebar-subtitulo">de Documentos</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+
+      <a href="perfil.html" class="sidebar-perfil">
+        <span class="sidebar-avatar" id="sidebar-avatar">?</span>
+        <div>
+          <div class="sidebar-perfil-nome" id="sidebar-email">Carregando...</div>
+          <div class="sidebar-perfil-sub">Minha conta</div>
+        </div>
+        <span class="sidebar-perfil-seta" id="sidebar-perfil-seta"></span>
+      </a>
+    </aside>
+
+    <div class="conteudo-principal">
+      <div class="cabecalho">
+        <div class="topo-dashboard">
+          <div class="topo-esquerda">
+            <button type="button" class="botao-menu" id="botao-menu" aria-label="Abrir menu"></button>
+            <div>
+              <p class="saudacao">Olá! 👋</p>
+              <h1>Seus documentos</h1>
+              <p class="resumo" id="resumo">Carregando...</p>
+            </div>
+          </div>
+          <div class="topo-acoes">
+            <button type="button" class="botao-notif" id="botao-notif" aria-label="Ver documentos urgentes">
+              <span id="icone-notif"></span>
+              <span class="notif-ponto" id="notif-ponto" hidden></span>
+            </button>
+            <a href="relatorio.html" class="botao-relatorio"><span id="icone-relatorio"></span> Relatório</a>
+          </div>
+        </div>
+
+        <div class="stats-linha" id="stats-linha"></div>
+      </div>
+
+      <div class="conteudo">
+        <div class="busca-wrap">
+          <span id="icone-busca"></span>
+          <input type="search" class="busca" id="busca" placeholder="Buscar por nome ou cliente...">
+        </div>
+        <div class="filtros" id="filtros"></div>
+        <div class="lista-documentos" id="lista-documentos"></div>
+      </div>
+    </div>
+  </div>
+
+  <a class="fab" href="novo-documento.html" aria-label="Cadastrar documento" id="fab-adicionar"></a>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_brDnSPSCu4ry9QTe-pYwag_zRqB6hkL';
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    /* ---------- ícones (sem emoji, traço estilo Feather) ---------- */
+
+    const CORPOS_ICONE = {
+      home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+      dollarSign: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+      calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+      messageCircle: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+      user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+      briefcase: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+      truck: '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
+      fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+      checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+      clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+      alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+      bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+      menu: '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',
+      moreHorizontal: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+      plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+      search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+      paperclip: '<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+      chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+    };
+
+    function icone(nome, tamanho, corTraco) {
+      const tam = tamanho || 18;
+      const cor = corTraco || 'currentColor';
+      return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
+    }
+
+    /* ---------- montagem de elementos estáticos com ícone ---------- */
+
+    document.getElementById('sidebar-logo').innerHTML = icone('fileText', 18, '#FFFFFF');
+    document.getElementById('botao-menu').innerHTML = icone('menu', 18);
+    document.getElementById('icone-notif').innerHTML = icone('bell', 17);
+    document.getElementById('icone-relatorio').innerHTML = icone('fileText', 15);
+    document.getElementById('icone-busca').innerHTML = icone('search', 17);
+    document.getElementById('sidebar-perfil-seta').innerHTML = icone('chevronRight', 16);
+    document.getElementById('fab-adicionar').innerHTML = icone('plus', 26, '#FFFFFF');
+
+    document.getElementById('sidebar-nav').innerHTML = [
+      { href: 'index.html', nome: 'home', label: 'Início', ativo: true },
+      { href: 'gastos.html', nome: 'dollarSign', label: 'Gastos' },
+      { href: 'calendario.html', nome: 'calendar', label: 'Calendário' },
+      { href: 'assistente.html', nome: 'messageCircle', label: 'Assistente' },
+    ].map(function (item) {
+      return `<a href="${item.href}" class="sidebar-item${item.ativo ? ' ativo' : ''}">${icone(item.nome, 18)}${item.label}</a>`;
+    }).join('');
+
+    document.getElementById('onboarding-lista').innerHTML = [
+      { nome: 'fileText', texto: 'Cadastre documentos com data de vencimento' },
+      { nome: 'bell', texto: 'Configure quando quer ser avisado' },
+      { nome: 'checkCircle', texto: 'Siga o checklist de renovação de cada um' },
+      { nome: 'dollarSign', texto: 'Acompanhe os gastos relacionados' },
+    ].map(function (item) {
+      return `<li>${icone(item.nome, 17)} ${item.texto}</li>`;
+    }).join('');
+
+    /* ---------- gaveta lateral no celular ---------- */
+
+    const sidebarEl = document.getElementById('sidebar');
+    const backdropEl = document.getElementById('sidebar-backdrop');
+
+    function abrirSidebar() {
+      sidebarEl.classList.add('aberta');
+      backdropEl.classList.add('ativo');
+    }
+    function fecharSidebar() {
+      sidebarEl.classList.remove('aberta');
+      backdropEl.classList.remove('ativo');
+    }
+
+    document.getElementById('botao-menu').addEventListener('click', abrirSidebar);
+    backdropEl.addEventListener('click', fecharSidebar);
+
+    /* ---------- dados e lógica (iguais de antes) ---------- */
+
+    const listaEl = document.getElementById('lista-documentos');
+    const resumoEl = document.getElementById('resumo');
+    const filtrosEl = document.getElementById('filtros');
+    const buscaEl = document.getElementById('busca');
+    const statsEl = document.getElementById('stats-linha');
+
+    let termoBusca = '';
+
+    const categorias = [
+      { valor: 'todos', label: 'Todos' },
+      { valor: 'pessoal', label: 'Pessoal' },
+      { valor: 'veiculo', label: 'Veículo' },
+      { valor: 'trabalho', label: 'Trabalho' },
+      { valor: 'casa', label: 'Casa' },
+      { valor: 'outro', label: 'Outro' },
+    ];
+
+    const categoriaLabelMap = { pessoal: 'Pessoal', veiculo: 'Veículo', trabalho: 'Trabalho', casa: 'Casa', outro: 'Outro' };
+    const tipoLabelMap = { aso: 'ASO', nr: 'NR', alvara: 'Alvará', contrato: 'Contrato', certificacao: 'Certificação', outro: 'Outro' };
+
+    const coresCategoria = {
+      pessoal: { bg: 'rgba(91, 110, 245, 0.16)', cor: '#5B6EF5' },
+      veiculo: { bg: 'rgba(245, 166, 35, 0.18)', cor: '#F5A623' },
+      trabalho: { bg: 'rgba(34, 197, 94, 0.16)', cor: '#22C55E' },
+      casa: { bg: 'rgba(168, 128, 246, 0.18)', cor: '#A880F6' },
+      outro: { bg: 'rgba(138, 147, 163, 0.18)', cor: '#8A93A3' },
+    };
+
+    const iconeCategoria = { pessoal: 'user', veiculo: 'truck', trabalho: 'briefcase', casa: 'home', outro: 'fileText' };
+
+    let documentosCarregados = [];
+    let filtroAtivo = 'todos';
+    let somenteVencidos = false;
+
+    sb.auth.getSession().then(function (resultado) {
+      if (!resultado.data.session) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      const email = resultado.data.session.user.email;
+      document.getElementById('sidebar-email').textContent = email;
+      document.getElementById('sidebar-avatar').textContent = email.charAt(0).toUpperCase();
+
+      carregar();
+
+      if (localStorage.getItem('onboarding-visto') !== 'true') {
+        document.getElementById('onboarding').hidden = false;
+      }
+    });
+
+    document.getElementById('onboarding-fechar').addEventListener('click', function () {
+      localStorage.setItem('onboarding-visto', 'true');
+      document.getElementById('onboarding').hidden = true;
+    });
+
+    function escapeHtml(texto) {
+      const div = document.createElement('div');
+      div.textContent = texto;
+      return div.innerHTML;
+    }
+
+    function diasRestantes(dataStr) {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const alvo = new Date(dataStr + 'T00:00:00');
+      return Math.round((alvo - hoje) / 86400000);
+    }
+
+    function statusPorDias(dias) {
+      if (dias < 7) return 'vermelho';
+      if (dias < 30) return 'amarelo';
+      return 'verde';
+    }
+
+    function textoDias(dias) {
+      if (dias < 0) return `Venceu há ${Math.abs(dias)} dia${Math.abs(dias) === 1 ? '' : 's'}`;
+      if (dias === 0) return 'Vence hoje';
+      return `Vence em ${dias} dia${dias === 1 ? '' : 's'}`;
+    }
+
+    function renderFiltros() {
+      filtrosEl.innerHTML = categorias.map(function (cat) {
+        const ativo = cat.valor === filtroAtivo ? ' ativo' : '';
+        return `<button type="button" class="filtro-chip${ativo}" data-valor="${cat.valor}">${cat.label}</button>`;
+      }).join('');
+
+      filtrosEl.querySelectorAll('.filtro-chip').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+          filtroAtivo = chip.dataset.valor;
+          renderFiltros();
+          renderLista();
+        });
+      });
+    }
+
+    function alternarSomenteVencidos() {
+      somenteVencidos = !somenteVencidos;
+      renderLista();
+      listaEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function toggleDocMenu(id) {
+      document.querySelectorAll('.doc-menu').forEach(function (m) {
+        if (m.id !== 'menu-' + id) m.hidden = true;
+      });
+      const menu = document.getElementById('menu-' + id);
+      menu.hidden = !menu.hidden;
+    }
+
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.doc-card-wrap')) {
+        document.querySelectorAll('.doc-menu').forEach(function (m) { m.hidden = true; });
+      }
+    });
+
+    async function duplicarRapido(id) {
+      document.querySelectorAll('.doc-menu').forEach(function (m) { m.hidden = true; });
+      const { data: original, error } = await sb.from('documentos').select('*').eq('id', id).single();
+      if (error || !original) { alert('Não foi possível duplicar.'); return; }
+      const copia = Object.assign({}, original);
+      delete copia.id;
+      delete copia.criado_em;
+      copia.nome = original.nome + ' (cópia)';
+      const { error: erroInsercao } = await sb.from('documentos').insert([copia]);
+      if (erroInsercao) { alert('Não foi possível duplicar: ' + erroInsercao.message); return; }
+      carregar();
+    }
+
+    async function excluirRapido(id) {
+      document.querySelectorAll('.doc-menu').forEach(function (m) { m.hidden = true; });
+      if (!confirm('Excluir este documento? Essa ação não pode ser desfeita.')) return;
+      const { error } = await sb.from('documentos').delete().eq('id', id);
+      if (error) { alert('Não foi possível excluir: ' + error.message); return; }
+      carregar();
+    }
+
+    function renderLista() {
+      let documentos = filtroAtivo === 'todos'
+        ? documentosCarregados
+        : documentosCarregados.filter(function (doc) { return doc.categoria === filtroAtivo; });
+
+      if (termoBusca) {
+        const termo = termoBusca.toLowerCase();
+        documentos = documentos.filter(function (doc) {
+          return doc.nome.toLowerCase().includes(termo) || (doc.cliente || '').toLowerCase().includes(termo);
+        });
+      }
+
+      if (somenteVencidos) {
+        documentos = documentos.filter(function (doc) { return diasRestantes(doc.data_vencimento) < 0; });
+      }
+
+      if (documentosCarregados.length === 0) {
+        resumoEl.textContent = 'Nenhum documento cadastrado ainda';
+        listaEl.innerHTML = '<p class="vazio">Cadastre seu primeiro documento no botão "+"</p>';
+        return;
+      }
+
+      const vencendo = documentosCarregados.filter(function (doc) { return diasRestantes(doc.data_vencimento) < 30; }).length;
+      resumoEl.textContent = `${documentosCarregados.length} documento${documentosCarregados.length === 1 ? '' : 's'} · ${vencendo} vencendo em breve`;
+
+      if (documentos.length === 0) {
+        listaEl.innerHTML = '<p class="vazio">Nada encontrado</p>';
+        return;
+      }
+
+      listaEl.innerHTML = documentos.map(function (doc, i) {
+        const dias = diasRestantes(doc.data_vencimento);
+        const status = statusPorDias(dias);
+        const dataFormatada = new Date(doc.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
+        const catInfo = coresCategoria[doc.categoria] || coresCategoria.outro;
+        const catIconeNome = iconeCategoria[doc.categoria] || 'fileText';
+        const catLabel = categoriaLabelMap[doc.categoria] || 'Outro';
+        const tipoLabel = tipoLabelMap[doc.tipo] || doc.tipo;
+        const statusTexto = status === 'vermelho' ? (dias < 0 ? 'Vencido' : 'Urgente') : status === 'amarelo' ? 'Em atenção' : 'Em dia';
+        const statusIconeNome = status === 'vermelho' ? 'alertTriangle' : status === 'amarelo' ? 'clock' : 'checkCircle';
+
+        return `
+          <div class="doc-card-wrap" style="animation: subir 0.3s ease ${Math.min(i * 0.04, 0.4)}s both;">
+            <a class="doc-card" href="novo-documento.html?id=${doc.id}">
+              <div class="doc-icone" style="background: ${catInfo.bg}; color: ${catInfo.cor};">${icone(catIconeNome, 17, catInfo.cor)}</div>
+              <div class="doc-info">
+                <div class="doc-nome">${escapeHtml(doc.nome)}${doc.arquivo_path ? icone('paperclip', 12) : ''}</div>
+                <div class="doc-meta">${catLabel} · ${escapeHtml(tipoLabel)}</div>
+                <div class="doc-detalhe">${icone('calendar', 12)} ${textoDias(dias)} · ${dataFormatada}</div>
+              </div>
+              <span class="status-badge ${status}">${icone(statusIconeNome, 12)} ${statusTexto}</span>
+            </a>
+            <button type="button" class="doc-menu-btn" onclick="event.stopPropagation(); toggleDocMenu('${doc.id}')" aria-label="Mais opções">${icone('moreHorizontal', 16)}</button>
+            <div class="doc-menu" id="menu-${doc.id}" hidden>
+              <button type="button" onclick="duplicarRapido('${doc.id}')">Duplicar</button>
+              <button type="button" class="perigo" onclick="excluirRapido('${doc.id}')">Excluir</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function animarNumero(el, valorFinal, sufixo) {
+      const duracao = 600;
+      const inicio = performance.now();
+      function passo(agora) {
+        const progresso = Math.min((agora - inicio) / duracao, 1);
+        el.textContent = Math.round(valorFinal * progresso) + (sufixo || '');
+        if (progresso < 1) requestAnimationFrame(passo);
+      }
+      requestAnimationFrame(passo);
+    }
+
+    function renderStats() {
+      const notifPonto = document.getElementById('notif-ponto');
+
+      if (documentosCarregados.length === 0) {
+        statsEl.innerHTML = '';
+        notifPonto.hidden = true;
+        return;
+      }
+
+      let verdes = 0, amarelos = 0, vermelhos = 0, vencidos = 0;
+
+      documentosCarregados.forEach(function (doc) {
+        const dias = diasRestantes(doc.data_vencimento);
+        const status = statusPorDias(dias);
+        if (status === 'verde') verdes++;
+        else if (status === 'amarelo') amarelos++;
+        else vermelhos++;
+        if (dias < 0) vencidos++;
+      });
+
+      notifPonto.hidden = vermelhos === 0;
+
+      const total = documentosCarregados.length;
+      const score = Math.round(((total - vencidos) / total) * 100);
+      const raio = 34;
+      const circunferencia = 2 * Math.PI * raio;
+      const corGauge = score >= 80 ? 'var(--status-verde)' : score >= 50 ? 'var(--status-amarelo)' : 'var(--status-vermelho)';
+
+      statsEl.innerHTML = `
+        <div class="stat-card">
+          <div class="stat-icone-circulo" style="background: rgba(34, 197, 94, 0.16); color: var(--status-verde);">${icone('checkCircle', 16)}</div>
+          <span class="stat-numero-grande" id="stat-verde">0</span>
+          <span class="stat-legenda">em dia</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icone-circulo" style="background: rgba(245, 166, 35, 0.18); color: var(--status-amarelo);">${icone('clock', 16)}</div>
+          <span class="stat-numero-grande" id="stat-amarelo">0</span>
+          <span class="stat-legenda">atenção</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icone-circulo" style="background: rgba(242, 85, 92, 0.16); color: var(--status-vermelho);">${icone('alertTriangle', 16)}</div>
+          <span class="stat-numero-grande" id="stat-vermelho">0</span>
+          <span class="stat-legenda">urgente</span>
+        </div>
+        <div class="score-card">
+          <svg class="gauge" viewBox="0 0 80 80">
+            <circle class="gauge-fundo" cx="40" cy="40" r="${raio}"></circle>
+            <circle class="gauge-progresso" id="gauge-progresso" cx="40" cy="40" r="${raio}" stroke="${corGauge}"
+              stroke-dasharray="${circunferencia}" stroke-dashoffset="${circunferencia}"></circle>
+          </svg>
+          <div>
+            <div class="score-label">Score de conformidade</div>
+            <div class="score-numero-grande" id="score-numero">0%</div>
+            <div class="score-sub">dos seus documentos em dia</div>
+          </div>
+        </div>
+      `;
+
+      animarNumero(document.getElementById('stat-verde'), verdes);
+      animarNumero(document.getElementById('stat-amarelo'), amarelos);
+      animarNumero(document.getElementById('stat-vermelho'), vermelhos);
+      animarNumero(document.getElementById('score-numero'), score, '%');
+
+      requestAnimationFrame(function () {
+        document.getElementById('gauge-progresso').style.strokeDashoffset = circunferencia * (1 - score / 100);
+      });
+    }
+
+    async function carregar() {
+      const { data, error } = await sb
+        .from('documentos')
+        .select('*')
+        .order('data_vencimento', { ascending: true });
+
+      if (error) {
+        resumoEl.textContent = '';
+        listaEl.innerHTML = `<p class="erro">Não foi possível carregar: ${escapeHtml(error.message)}</p>`;
+        return;
+      }
+
+      documentosCarregados = data || [];
+      renderFiltros();
+      renderStats();
+      renderLista();
+    }
+
+    buscaEl.addEventListener('input', function () {
+      termoBusca = buscaEl.value.trim();
+      renderLista();
+    });
+
+    document.getElementById('botao-notif').addEventListener('click', alternarSomenteVencidos);
+
+  </script>
+
+</body>
+</html>

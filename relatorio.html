@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<!-- Relatório — mesma sidebar do dashboard, dados e impressão preservados -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<meta name="theme-color" content="#0B0E14">
+<title>Relatório — Rastreador de Documentos</title>
+<script>
+  if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --marca: #3D4FE0; --marca-hover: #2E3FC0;
+    --bg: #F7F8FA; --superficie: #FFFFFF;
+    --texto: #14161A; --texto-muted: #6B7280; --borda: #E3E5E9;
+    --status-verde: #1F9D55; --status-amarelo: #F5A623; --status-vermelho: #E5484D;
+  }
+
+  html.escuro {
+    --bg: #0B0E14; --superficie: #141821;
+    --texto: #F1F2F4; --texto-muted: #8A93A3; --borda: #232833;
+    --marca: #5B6EF5; --marca-hover: #4457E0;
+    --status-verde: #22C55E; --status-amarelo: #F5A623; --status-vermelho: #F2555C;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg); color: var(--texto);
+    -webkit-font-smoothing: antialiased;
+    animation: entrada 0.3s ease;
+  }
+
+  @keyframes entrada { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  svg.icone { display: block; flex-shrink: 0; }
+
+  .glow-fundo {
+    position: fixed; top: -180px; left: 15%;
+    width: 560px; height: 560px;
+    background: radial-gradient(circle, rgba(91, 110, 245, 0.35), transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  html:not(.escuro) .glow-fundo { display: none; }
+
+  .app-shell { display: flex; min-height: 100vh; position: relative; z-index: 1; }
+
+  .sidebar {
+    position: fixed; top: 0; left: 0; height: 100vh; width: 250px;
+    display: flex; flex-direction: column;
+    padding: 22px 14px;
+    background: var(--superficie);
+    border-right: 1px solid var(--borda);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 40;
+  }
+
+  .sidebar.aberta { transform: translateX(0); }
+  .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 35; display: none; }
+  .sidebar-backdrop.ativo { display: block; }
+
+  @media (min-width: 960px) {
+    .sidebar { position: sticky; transform: none; }
+    .sidebar-backdrop { display: none !important; }
+    .botao-menu { display: none; }
+    .conteudo-principal { flex: 1; min-width: 0; }
+    .cabecalho, .conteudo { max-width: 860px; padding-left: 32px; padding-right: 32px; }
+  }
+
+  .sidebar-marca { display: flex; align-items: center; gap: 10px; padding: 6px 10px 22px; }
+  .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sidebar-titulo { font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+  .sidebar-subtitulo { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  .sidebar-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; color: var(--texto-muted); text-decoration: none; font-size: 14px; font-weight: 500; }
+  .sidebar-item:hover { background: var(--bg); }
+  .sidebar-perfil { display: flex; align-items: center; gap: 10px; padding: 12px 10px 4px; border-top: 1px solid var(--borda); margin-top: 10px; text-decoration: none; color: var(--texto); }
+  .sidebar-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+  .sidebar-perfil-nome { font-size: 12.5px; font-weight: 600; word-break: break-all; }
+  .sidebar-perfil-sub { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-perfil-seta { margin-left: auto; color: var(--texto-muted); flex-shrink: 0; }
+
+  .cabecalho { max-width: 860px; margin: 0 auto; padding: 24px 20px 4px; }
+  .topo-pagina { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .topo-esquerda { display: flex; align-items: flex-start; gap: 14px; }
+
+  .botao-menu { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--borda); background: var(--superficie); color: var(--texto); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+  .pagina-icone { width: 46px; height: 46px; border-radius: 12px; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+  .cabecalho h1 { font-size: 24px; font-weight: 700; margin: 0 0 4px; }
+  .pagina-sub { font-size: 13px; color: var(--texto-muted); margin: 0; }
+
+  .btn-imprimir {
+    display: flex; align-items: center; gap: 7px;
+    padding: 10px 16px;
+    font-family: inherit; font-size: 13.5px; font-weight: 600;
+    color: #FFFFFF; background: var(--marca);
+    border: none; border-radius: 9px;
+    cursor: pointer; flex-shrink: 0;
+  }
+
+  .btn-imprimir:hover { background: var(--marca-hover); }
+
+  .conteudo { max-width: 860px; margin: 0 auto; padding: 20px 20px 60px; }
+
+  .stats-relatorio { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+  @media (min-width: 560px) { .stats-relatorio { grid-template-columns: repeat(4, 1fr); } }
+
+  .stat-card { background: var(--superficie); border: 1px solid var(--borda); border-radius: 14px; padding: 16px; }
+  .stat-icone-circulo { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+  .stat-numero { font-size: 20px; font-weight: 700; display: block; }
+  .stat-label { font-size: 11.5px; color: var(--texto-muted); }
+
+  .secao-card { background: var(--superficie); border: 1px solid var(--borda); border-radius: 16px; padding: 20px; overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 480px; }
+  th, td { text-align: left; padding: 11px 10px; border-bottom: 1px solid var(--borda); }
+  th { color: var(--texto-muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+
+  .status-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #FFFFFF; }
+
+  .vazio { text-align: center; color: var(--texto-muted); font-size: 14px; padding: 40px 20px; }
+
+  @media print {
+    .glow-fundo, .sidebar, .sidebar-backdrop, .botao-menu, .btn-imprimir { display: none !important; }
+    .app-shell { display: block; }
+    .conteudo-principal { margin-left: 0; }
+    .cabecalho, .conteudo { max-width: 100%; padding-left: 0; padding-right: 0; }
+    body { background: #FFFFFF; color: #14161A; }
+    html.escuro { --bg: #FFFFFF; --superficie: #FFFFFF; --texto: #14161A; --texto-muted: #6B7280; --borda: #E3E5E9; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="glow-fundo"></div>
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-marca">
+        <span class="sidebar-logo" id="sidebar-logo"></span>
+        <div>
+          <div class="sidebar-titulo">Rastreador</div>
+          <div class="sidebar-subtitulo">de Documentos</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+      <a href="perfil.html" class="sidebar-perfil">
+        <span class="sidebar-avatar" id="sidebar-avatar">?</span>
+        <div>
+          <div class="sidebar-perfil-nome" id="sidebar-email">Carregando...</div>
+          <div class="sidebar-perfil-sub">Minha conta</div>
+        </div>
+        <span class="sidebar-perfil-seta" id="sidebar-perfil-seta"></span>
+      </a>
+    </aside>
+
+    <div class="conteudo-principal">
+      <div class="cabecalho">
+        <div class="topo-pagina">
+          <div class="topo-esquerda">
+            <button type="button" class="botao-menu" id="botao-menu" aria-label="Abrir menu"></button>
+            <div class="pagina-icone" id="pagina-icone"></div>
+            <div>
+              <h1>Relatório de documentos</h1>
+              <p class="pagina-sub" id="subtitulo">Gerando...</p>
+            </div>
+          </div>
+          <button type="button" class="btn-imprimir" onclick="window.print()"><span id="icone-imprimir"></span> Imprimir / Salvar PDF</button>
+        </div>
+      </div>
+
+      <div class="conteudo">
+        <div class="stats-relatorio" id="stats-relatorio"></div>
+
+        <div class="secao-card">
+          <table id="tabela" hidden>
+            <thead>
+              <tr><th>Nome</th><th>Categoria</th><th>Vencimento</th><th>Status</th></tr>
+            </thead>
+            <tbody id="tabela-corpo"></tbody>
+          </table>
+          <p class="vazio" id="vazio" hidden>Nenhum documento cadastrado ainda.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_brDnSPSCu4ry9QTe-pYwag_zRqB6hkL';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const CORPOS_ICONE = {
+      home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+      dollarSign: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+      calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+      messageCircle: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+      fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+      menu: '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',
+      chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+      printer: '<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
+      checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+      clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+      alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+      barChart: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+    };
+
+    function icone(nome, tamanho, corTraco) {
+      const tam = tamanho || 18;
+      const cor = corTraco || 'currentColor';
+      return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
+    }
+
+    document.getElementById('sidebar-logo').innerHTML = icone('fileText', 18, '#FFFFFF');
+    document.getElementById('botao-menu').innerHTML = icone('menu', 18);
+    document.getElementById('pagina-icone').innerHTML = icone('barChart', 22, '#FFFFFF');
+    document.getElementById('sidebar-perfil-seta').innerHTML = icone('chevronRight', 16);
+    document.getElementById('icone-imprimir').innerHTML = icone('printer', 15, '#FFFFFF');
+
+    document.getElementById('sidebar-nav').innerHTML = [
+      { href: 'index.html', nome: 'home', label: 'Início' },
+      { href: 'gastos.html', nome: 'dollarSign', label: 'Gastos' },
+      { href: 'calendario.html', nome: 'calendar', label: 'Calendário' },
+      { href: 'assistente.html', nome: 'messageCircle', label: 'Assistente' },
+    ].map(function (item) {
+      return `<a href="${item.href}" class="sidebar-item">${icone(item.nome, 18)}${item.label}</a>`;
+    }).join('');
+
+    const sidebarEl = document.getElementById('sidebar');
+    const backdropEl = document.getElementById('sidebar-backdrop');
+    document.getElementById('botao-menu').addEventListener('click', function () {
+      sidebarEl.classList.add('aberta');
+      backdropEl.classList.add('ativo');
+    });
+    backdropEl.addEventListener('click', function () {
+      sidebarEl.classList.remove('aberta');
+      backdropEl.classList.remove('ativo');
+    });
+
+    const categoriasLabel = { pessoal: 'Pessoal', veiculo: 'Veículo', trabalho: 'Trabalho', casa: 'Casa', outro: 'Outro' };
+
+    function escapeHtml(texto) {
+      const div = document.createElement('div');
+      div.textContent = texto;
+      return div.innerHTML;
+    }
+
+    function diasRestantes(dataStr) {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const alvo = new Date(dataStr + 'T00:00:00');
+      return Math.round((alvo - hoje) / 86400000);
+    }
+
+    function statusPorDias(dias) {
+      if (dias < 7) return 'vermelho';
+      if (dias < 30) return 'amarelo';
+      return 'verde';
+    }
+
+    function statusLabel(status, dias) {
+      if (status === 'vermelho') return dias < 0 ? 'Vencido' : 'Urgente';
+      if (status === 'amarelo') return 'Atenção';
+      return 'Em dia';
+    }
+
+    async function gerar() {
+      const { data: sessao } = await sb.auth.getSession();
+      if (!sessao.session) { window.location.href = 'login.html'; return; }
+
+      const email = sessao.session.user.email;
+      document.getElementById('sidebar-email').textContent = email;
+      document.getElementById('sidebar-avatar').textContent = email.charAt(0).toUpperCase();
+
+      const agora = new Date().toLocaleDateString('pt-BR');
+      document.getElementById('subtitulo').textContent = `${email} · gerado em ${agora}`;
+
+      const { data } = await sb.from('documentos').select('*').order('data_vencimento');
+      const documentos = data || [];
+
+      if (documentos.length === 0) {
+        document.getElementById('vazio').hidden = false;
+        return;
+      }
+
+      let verdes = 0, amarelos = 0, vermelhos = 0;
+      documentos.forEach(function (doc) {
+        const status = statusPorDias(diasRestantes(doc.data_vencimento));
+        if (status === 'verde') verdes++;
+        else if (status === 'amarelo') amarelos++;
+        else vermelhos++;
+      });
+      const score = Math.round((verdes + amarelos) / documentos.length * 100);
+
+      document.getElementById('stats-relatorio').innerHTML = `
+        <div class="stat-card">
+          <div class="stat-icone-circulo" style="background: rgba(34,197,94,0.16); color: var(--status-verde);">${icone('checkCircle', 15)}</div>
+          <span class="stat-numero">${verdes}</span><span class="stat-label">em dia</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icone-circulo" style="background: rgba(245,166,35,0.18); color: var(--status-amarelo);">${icone('clock', 15)}</div>
+          <span class="stat-numero">${amarelos}</span><span class="stat-label">atenção</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icone-circulo" style="background: rgba(242,85,92,0.16); color: var(--status-vermelho);">${icone('alertTriangle', 15)}</div>
+          <span class="stat-numero">${vermelhos}</span><span class="stat-label">urgente/vencido</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icone-circulo" style="background: rgba(91,110,245,0.16); color: var(--marca);">${icone('barChart', 15)}</div>
+          <span class="stat-numero">${score}%</span><span class="stat-label">conformidade</span>
+        </div>
+      `;
+
+      document.getElementById('tabela-corpo').innerHTML = documentos.map(function (doc) {
+        const dias = diasRestantes(doc.data_vencimento);
+        const status = statusPorDias(dias);
+        const dataFormatada = new Date(doc.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
+        const cor = status === 'verde' ? 'var(--status-verde)' : status === 'amarelo' ? 'var(--status-amarelo)' : 'var(--status-vermelho)';
+        return `
+          <tr>
+            <td>${escapeHtml(doc.nome)}</td>
+            <td>${categoriasLabel[doc.categoria] || 'Outro'}</td>
+            <td>${dataFormatada}</td>
+            <td><span class="status-badge" style="background: ${cor}">${statusLabel(status, dias)}</span></td>
+          </tr>
+        `;
+      }).join('');
+
+      document.getElementById('tabela').hidden = false;
+    }
+
+    gerar();
+  </script>
+
+</body>
+</html>

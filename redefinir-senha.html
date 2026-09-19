@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<!-- Redefinir senha — mesmo visual do login, tela pública sem sidebar -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<meta name="theme-color" content="#0B0E14">
+<title>Redefinir senha — Rastreador de Documentos</title>
+<script>
+  if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --marca: #3D4FE0; --marca-hover: #2E3FC0;
+    --bg: #F7F8FA; --superficie: #FFFFFF;
+    --texto: #14161A; --texto-muted: #6B7280; --borda: #E3E5E9;
+    --status-verde: #1F9D55; --status-vermelho: #E5484D;
+  }
+
+  html.escuro {
+    --bg: #0B0E14; --superficie: #141821;
+    --texto: #F1F2F4; --texto-muted: #8A93A3; --borda: #232833;
+    --marca: #5B6EF5; --marca-hover: #4457E0;
+    --status-verde: #22C55E; --status-vermelho: #F2555C;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg); color: var(--texto);
+    -webkit-font-smoothing: antialiased;
+    position: relative; overflow-x: hidden;
+  }
+
+  svg.icone { display: block; flex-shrink: 0; }
+
+  .glow-fundo {
+    position: fixed; top: -180px; left: 50%; transform: translateX(-50%);
+    width: 640px; height: 640px;
+    background: radial-gradient(circle, rgba(91, 110, 245, 0.35), transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  html:not(.escuro) .glow-fundo { display: none; }
+
+  .cartao-auth {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 400px;
+    margin: 20px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 20px;
+    padding: 34px 30px;
+    animation: entrada 0.3s ease;
+  }
+
+  @keyframes entrada { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .logo-topo { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 24px; }
+  .logo-icone { width: 46px; height: 46px; border-radius: 13px; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+
+  h1 { font-size: 21px; font-weight: 700; margin: 0 0 6px; }
+  .subtitulo { font-size: 13.5px; color: var(--texto-muted); margin: 0; line-height: 1.5; }
+
+  .campo { margin-bottom: 16px; }
+  .campo label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .campo-com-icone { position: relative; }
+  .campo-com-icone .icone-esquerda { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--texto-muted); pointer-events: none; }
+
+  input {
+    width: 100%; padding: 12px 14px 12px 40px;
+    font-size: 15px; font-family: inherit; color: var(--texto);
+    background: var(--bg);
+    border: 1.5px solid var(--borda);
+    border-radius: 10px;
+  }
+
+  input:focus { outline: none; border-color: var(--marca); box-shadow: 0 0 0 3px rgba(91, 110, 245, 0.18); }
+
+  button[type="submit"] {
+    width: 100%; padding: 13px;
+    font-family: inherit; font-size: 15px; font-weight: 700;
+    color: #FFFFFF; background: var(--marca);
+    border: none; border-radius: 10px;
+    cursor: pointer; transition: background 0.15s ease;
+  }
+
+  button[type="submit"]:hover { background: var(--marca-hover); }
+  button[type="submit"]:disabled { opacity: 0.7; cursor: default; }
+
+  .link-voltar-login { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; color: var(--texto-muted); text-decoration: none; margin-top: 18px; }
+  .link-voltar-login:hover { color: var(--marca); }
+
+  .mensagem-auth { margin-top: 16px; font-size: 13px; line-height: 1.5; display: flex; align-items: flex-start; gap: 6px; }
+  .mensagem-auth[hidden] { display: none; }
+</style>
+</head>
+<body>
+
+  <div class="glow-fundo"></div>
+
+  <div class="cartao-auth">
+    <div class="logo-topo">
+      <span class="logo-icone" id="logo-icone"></span>
+      <h1 id="titulo">Escolha sua nova senha</h1>
+      <p class="subtitulo" id="subtitulo">Verificando o link...</p>
+    </div>
+
+    <form id="form-redefinir" hidden>
+      <div class="campo">
+        <label for="nova-senha">Nova senha</label>
+        <div class="campo-com-icone">
+          <span class="icone-esquerda" id="icone-senha1"></span>
+          <input type="password" id="nova-senha" required minlength="8" autocomplete="new-password">
+        </div>
+      </div>
+      <div class="campo">
+        <label for="confirmar">Confirmar nova senha</label>
+        <div class="campo-com-icone">
+          <span class="icone-esquerda" id="icone-senha2"></span>
+          <input type="password" id="confirmar" required minlength="8" autocomplete="new-password">
+        </div>
+      </div>
+      <button type="submit" id="btn-salvar">Salvar nova senha</button>
+    </form>
+
+    <p class="mensagem-auth" id="mensagem" hidden></p>
+
+    <a href="login.html" class="link-voltar-login"><span id="icone-voltar"></span> Voltar para o login</a>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_brDnSPSCu4ry9QTe-pYwag_zRqB6hkL';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const CORPOS_ICONE = {
+      shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+      lock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+      arrowLeft: '<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+      alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+      checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+    };
+
+    function icone(nome, tamanho, corTraco) {
+      const tam = tamanho || 18;
+      const cor = corTraco || 'currentColor';
+      return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
+    }
+
+    document.getElementById('logo-icone').innerHTML = icone('shield', 20, '#FFFFFF');
+    document.getElementById('icone-senha1').innerHTML = icone('lock', 17);
+    document.getElementById('icone-senha2').innerHTML = icone('lock', 17);
+    document.getElementById('icone-voltar').innerHTML = icone('arrowLeft', 14);
+
+    const subtitulo = document.getElementById('subtitulo');
+    const form = document.getElementById('form-redefinir');
+    const mensagem = document.getElementById('mensagem');
+
+    function mostrarMensagem(texto, tipo) {
+      const cor = tipo === 'erro' ? 'var(--status-vermelho)' : 'var(--status-verde)';
+      mensagem.style.color = cor;
+      mensagem.innerHTML = `${icone(tipo === 'erro' ? 'alertTriangle' : 'checkCircle', 15)} <span>${texto}</span>`;
+      mensagem.hidden = false;
+    }
+
+    sb.auth.onAuthStateChange(function (evento) {
+      if (evento === 'PASSWORD_RECOVERY') {
+        subtitulo.textContent = 'Digite e confirme sua nova senha abaixo.';
+        form.hidden = false;
+      }
+    });
+
+    sb.auth.getSession().then(function (resultado) {
+      if (resultado.data.session) {
+        subtitulo.textContent = 'Digite e confirme sua nova senha abaixo.';
+        form.hidden = false;
+      } else {
+        setTimeout(function () {
+          if (form.hidden) subtitulo.textContent = 'Esse link é inválido ou já expirou. Volte pro login e peça um novo.';
+        }, 2000);
+      }
+    });
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const novaSenha = document.getElementById('nova-senha').value;
+      const confirmar = document.getElementById('confirmar').value;
+
+      if (novaSenha !== confirmar) { mostrarMensagem('As senhas não são iguais.', 'erro'); return; }
+
+      const botao = document.getElementById('btn-salvar');
+      botao.disabled = true;
+      botao.textContent = 'Salvando...';
+
+      const { error } = await sb.auth.updateUser({ password: novaSenha });
+
+      botao.disabled = false;
+      botao.textContent = 'Salvar nova senha';
+
+      if (error) { mostrarMensagem(error.message, 'erro'); return; }
+
+      mostrarMensagem('Senha atualizada! Redirecionando...', 'sucesso');
+      setTimeout(function () { window.location.href = 'index.html'; }, 1500);
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<!-- Cadastrar/Editar documento — mesmo design system, seções em cards, nova seção de Custos -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<meta name="theme-color" content="#0B0E14">
+<title>Adicionar documento — Rastreador de Documentos</title>
+<script>
+  if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --marca: #3D4FE0;
+    --marca-hover: #2E3FC0;
+    --bg: #F7F8FA;
+    --superficie: #FFFFFF;
+    --texto: #14161A;
+    --texto-muted: #6B7280;
+    --borda: #E3E5E9;
+    --status-verde: #1F9D55;
+    --status-amarelo: #F5A623;
+    --status-vermelho: #E5484D;
+  }
+
+  html.escuro {
+    --bg: #0B0E14;
+    --superficie: #141821;
+    --texto: #F1F2F4;
+    --texto-muted: #8A93A3;
+    --borda: #232833;
+    --marca: #5B6EF5;
+    --marca-hover: #4457E0;
+    --status-verde: #22C55E;
+    --status-amarelo: #F5A623;
+    --status-vermelho: #F2555C;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--texto);
+    -webkit-font-smoothing: antialiased;
+    animation: entrada 0.3s ease;
+  }
+
+  @keyframes entrada { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
+  .checklist-item input[type="checkbox"]:checked { animation: pop 0.25s ease; }
+  .confirmacao { animation: entrada 0.25s ease; }
+
+  svg.icone { display: block; flex-shrink: 0; }
+
+  .glow-fundo {
+    position: fixed; top: -180px; left: 15%;
+    width: 560px; height: 560px;
+    background: radial-gradient(circle, rgba(91, 110, 245, 0.35), transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  html:not(.escuro) .glow-fundo { display: none; }
+
+  /* ---------- estrutura ---------- */
+
+  .app-shell { display: flex; min-height: 100vh; position: relative; z-index: 1; }
+
+  .sidebar {
+    position: fixed; top: 0; left: 0; height: 100vh; width: 250px;
+    display: flex; flex-direction: column;
+    padding: 22px 14px;
+    background: var(--superficie);
+    border-right: 1px solid var(--borda);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 40;
+  }
+
+  .sidebar.aberta { transform: translateX(0); }
+  .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 35; display: none; }
+  .sidebar-backdrop.ativo { display: block; }
+
+  @media (min-width: 960px) {
+    .sidebar { position: sticky; transform: none; }
+    .sidebar-backdrop { display: none !important; }
+    .botao-menu { display: none; }
+    .conteudo-principal { flex: 1; min-width: 0; }
+    .cabecalho, .conteudo { max-width: 640px; padding-left: 32px; padding-right: 32px; }
+  }
+
+  .sidebar-marca { display: flex; align-items: center; gap: 10px; padding: 6px 10px 22px; }
+  .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sidebar-titulo { font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+  .sidebar-subtitulo { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  .sidebar-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; color: var(--texto-muted); text-decoration: none; font-size: 14px; font-weight: 500; }
+  .sidebar-item:hover { background: var(--bg); }
+  .sidebar-perfil { display: flex; align-items: center; gap: 10px; padding: 12px 10px 4px; border-top: 1px solid var(--borda); margin-top: 10px; text-decoration: none; color: var(--texto); }
+  .sidebar-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+  .sidebar-perfil-nome { font-size: 12.5px; font-weight: 600; word-break: break-all; }
+  .sidebar-perfil-sub { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-perfil-seta { margin-left: auto; color: var(--texto-muted); flex-shrink: 0; }
+
+  /* ---------- cabeçalho ---------- */
+
+  .cabecalho { max-width: 640px; margin: 0 auto; padding: 24px 20px 8px; }
+  .topo-linha { display: flex; align-items: center; gap: 10px; }
+
+  .botao-menu {
+    width: 38px; height: 38px; border-radius: 10px;
+    border: 1px solid var(--borda);
+    background: var(--superficie); color: var(--texto);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0;
+  }
+
+  .link-voltar {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13.5px; font-weight: 600;
+    color: var(--texto-muted);
+    text-decoration: none;
+  }
+
+  .link-voltar:hover { color: var(--marca); }
+
+  .cabecalho h1 { font-size: 22px; font-weight: 700; margin: 14px 0 4px; }
+  .pagina-sub { font-size: 13.5px; color: var(--texto-muted); margin: 0; }
+
+  /* ---------- conteúdo / seções ---------- */
+
+  .conteudo { max-width: 640px; margin: 0 auto; padding: 16px 20px 60px; }
+
+  .secao-card {
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .secao-cabecalho { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+
+  .secao-icone {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: rgba(91, 110, 245, 0.14); color: var(--marca);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .secao-titulo { font-size: 14.5px; font-weight: 700; }
+  .secao-descricao { font-size: 12px; color: var(--texto-muted); margin-top: 1px; }
+
+  .campo { margin-bottom: 16px; }
+  .campo:last-child { margin-bottom: 0; }
+  .campo label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .campo .opcional { font-weight: 400; color: var(--texto-muted); }
+
+  .linha-dois { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 520px) { .linha-dois { grid-template-columns: 1fr 1fr; } }
+
+  input, select, textarea {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 15px;
+    font-family: inherit;
+    color: var(--texto);
+    background: var(--bg);
+    border: 1.5px solid var(--borda);
+    border-radius: 9px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--marca);
+    box-shadow: 0 0 0 3px rgba(91, 110, 245, 0.18);
+  }
+
+  select {
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238A93A3' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+  }
+
+  textarea { resize: vertical; min-height: 80px; }
+
+  input[type="file"] { padding: 10px 12px; font-size: 13.5px; border-style: dashed; color: var(--texto-muted); }
+
+  .erro-campo { font-size: 12px; color: var(--status-vermelho); margin-top: 6px; }
+
+  .preview-vencimento {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 600;
+    margin-top: 8px;
+  }
+
+  .avisos-grupo { display: flex; flex-wrap: wrap; gap: 8px; }
+  .aviso-chip { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1.5px solid var(--borda); border-radius: 999px; font-size: 13px; cursor: pointer; background: var(--bg); }
+  .aviso-chip input { width: auto; accent-color: var(--marca); cursor: pointer; }
+
+  .campo-checkbox { display: flex; align-items: center; gap: 10px; }
+  .campo-checkbox input { width: auto; accent-color: var(--marca); cursor: pointer; }
+  .campo-checkbox label { margin: 0; font-size: 13.5px; font-weight: 500; cursor: pointer; }
+
+  .arquivo-atual {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    font-size: 13px;
+  }
+
+  .arquivo-atual a { color: var(--marca); font-weight: 600; text-decoration: none; }
+
+  /* checklist / histórico */
+
+  .checklist-cabecalho { display: flex; justify-content: space-between; align-items: center; }
+  .checklist-progresso { font-size: 12px; font-weight: 700; color: var(--marca); }
+  .checklist-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--borda); font-size: 14px; cursor: pointer; }
+  .checklist-item:last-child { border-bottom: none; }
+  .checklist-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--marca); cursor: pointer; flex-shrink: 0; }
+  .checklist-item.concluido span { text-decoration: line-through; color: var(--texto-muted); }
+
+  .historico-item { font-size: 13px; color: var(--texto-muted); padding: 6px 0; border-bottom: 1px solid var(--borda); }
+  .historico-item:last-child { border-bottom: none; }
+
+  /* confirmação */
+
+  .confirmacao { border-left: 3px solid var(--marca); padding: 6px 0 6px 16px; margin-bottom: 16px; font-size: 14px; line-height: 1.8; }
+  .confirmacao strong { display: block; font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+
+  /* ações */
+
+  .acoes-principais { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+
+  button[type="submit"] {
+    width: 100%; padding: 14px;
+    font-family: inherit; font-size: 15px; font-weight: 700;
+    color: #FFFFFF; background: var(--marca);
+    border: none; border-radius: 10px;
+    cursor: pointer; transition: background 0.15s ease;
+  }
+
+  button[type="submit"]:hover { background: var(--marca-hover); }
+  button[type="submit"]:disabled { opacity: 0.7; cursor: default; }
+
+  .btn-cancelar {
+    width: 100%; padding: 13px;
+    font-family: inherit; font-size: 14.5px; font-weight: 600;
+    color: var(--texto); background: none;
+    border: 1.5px solid var(--borda); border-radius: 10px;
+    text-decoration: none; text-align: center;
+    cursor: pointer;
+  }
+
+  .btn-cancelar:hover { border-color: var(--texto-muted); }
+
+  /* zona de risco */
+
+  .zona-risco { border: 1.5px dashed var(--status-vermelho); border-radius: 16px; padding: 18px 20px; margin-top: 24px; }
+  .zona-risco-titulo { font-size: 12.5px; font-weight: 700; color: var(--status-vermelho); text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 12px; }
+
+  .btn-secundario-linha {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 11px 4px;
+    font-family: inherit; font-size: 13.5px; font-weight: 600;
+    background: none; border: none;
+    color: var(--texto);
+    cursor: pointer; text-align: left;
+  }
+
+  .btn-secundario-linha.perigo { color: var(--status-vermelho); }
+  .btn-secundario-linha:disabled { opacity: 0.6; cursor: default; }
+</style>
+</head>
+<body>
+
+  <div class="glow-fundo"></div>
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-marca">
+        <span class="sidebar-logo" id="sidebar-logo"></span>
+        <div>
+          <div class="sidebar-titulo">Rastreador</div>
+          <div class="sidebar-subtitulo">de Documentos</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+      <a href="perfil.html" class="sidebar-perfil">
+        <span class="sidebar-avatar" id="sidebar-avatar">?</span>
+        <div>
+          <div class="sidebar-perfil-nome" id="sidebar-email">Carregando...</div>
+          <div class="sidebar-perfil-sub">Minha conta</div>
+        </div>
+        <span class="sidebar-perfil-seta" id="sidebar-perfil-seta"></span>
+      </a>
+    </aside>
+
+    <div class="conteudo-principal">
+      <div class="cabecalho">
+        <div class="topo-linha">
+          <button type="button" class="botao-menu" id="botao-menu" aria-label="Abrir menu"></button>
+          <a href="index.html" class="link-voltar"><span id="icone-voltar"></span> Voltar</a>
+        </div>
+        <h1 id="titulo-pagina">Adicionar documento</h1>
+        <p class="pagina-sub">Cadastre o documento e acompanhe sua validade, custos e renovação.</p>
+      </div>
+
+      <div class="conteudo">
+        <div id="confirmacao" class="confirmacao" hidden></div>
+
+        <form id="doc-form" onsubmit="return false">
+
+          <div class="secao-card">
+            <div class="secao-cabecalho">
+              <span class="secao-icone" id="icone-secao-info"></span>
+              <span class="secao-titulo">Informações do documento</span>
+            </div>
+            <div class="campo">
+              <label for="nome">Nome do documento</label>
+              <input type="text" id="nome" name="nome" placeholder="Ex.: Alvará de funcionamento" required>
+            </div>
+            <div class="campo">
+              <label for="numero_documento">Número do documento <span class="opcional">(opcional)</span></label>
+              <input type="text" id="numero_documento" name="numero_documento" placeholder="Ex.: 12345-6">
+            </div>
+          </div>
+
+          <div class="secao-card">
+            <div class="secao-cabecalho">
+              <span class="secao-icone" id="icone-secao-classificacao"></span>
+              <span class="secao-titulo">Classificação</span>
+            </div>
+            <div class="linha-dois">
+              <div class="campo">
+                <label for="tipo">Tipo</label>
+                <select id="tipo" name="tipo" required>
+                  <option value="" disabled selected>Selecione o tipo</option>
+                  <option value="aso">ASO</option>
+                  <option value="nr">NR</option>
+                  <option value="alvara">Alvará</option>
+                  <option value="contrato">Contrato</option>
+                  <option value="certificacao">Certificação</option>
+                  <option value="outro">Outro</option>
+                </select>
+              </div>
+              <div class="campo">
+                <label for="categoria">Categoria</label>
+                <select id="categoria" name="categoria">
+                  <option value="pessoal">Pessoal</option>
+                  <option value="veiculo">Veículo</option>
+                  <option value="trabalho" selected>Trabalho</option>
+                  <option value="casa">Casa</option>
+                  <option value="outro">Outro</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="secao-card">
+            <div class="secao-cabecalho">
+              <span class="secao-icone" id="icone-secao-pessoa"></span>
+              <span class="secao-titulo">Pessoa / Empresa</span>
+            </div>
+            <div class="campo">
+              <label for="pessoa">Pessoa <span class="opcional">(opcional)</span></label>
+              <select id="pessoa" name="pessoa">
+                <option value="">Ninguém específico</option>
+                <option value="__novo__">+ Adicionar pessoa...</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label for="cliente">Cliente / Empresa <span class="opcional">(opcional)</span></label>
+              <input type="text" id="cliente" name="cliente" placeholder="Nome do cliente">
+            </div>
+          </div>
+
+          <div class="secao-card">
+            <div class="secao-cabecalho">
+              <span class="secao-icone" id="icone-secao-validade"></span>
+              <span class="secao-titulo">Validade e alertas</span>
+            </div>
+            <div class="linha-dois">
+              <div class="campo">
+                <label for="data_emissao">Data de emissão <span class="opcional">(opcional)</span></label>
+                <input type="date" id="data_emissao" name="data_emissao">
+                <p class="erro-campo" id="erro-emissao" hidden>A emissão não pode ser depois do vencimento.</p>
+              </div>
+              <div class="campo">
+                <label for="data_vencimento">Vencimento</label>
+                <input type="date" id="data_vencimento" name="data_vencimento" required>
+                <p class="preview-vencimento" id="preview-vencimento"></p>
+              </div>
+            </div>
+            <div class="campo" style="margin-bottom: 0;">
+              <label>Avisar quantos dias antes</label>
+              <div class="avisos-grupo">
+                <label class="aviso-chip"><input type="checkbox" name="avisos" value="60"> 60 dias</label>
+                <label class="aviso-chip"><input type="checkbox" name="avisos" value="30" checked> 30 dias</label>
+                <label class="aviso-chip"><input type="checkbox" name="avisos" value="14"> 14 dias</label>
+                <label class="aviso-chip"><input type="checkbox" name="avisos" value="7" checked> 7 dias</label>
+                <label class="aviso-chip"><input type="checkbox" name="avisos" value="1"> 1 dia</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="secao-card">
+            <div class="secao-cabecalho">
+              <span class="secao-icone" id="icone-secao-custos"></span>
+              <span class="secao-titulo">Custos <span class="opcional" style="font-weight:400;">(opcional)</span></span>
+            </div>
+            <div class="linha-dois">
+              <div class="campo">
+                <label for="custo_valor">Custo</label>
+                <input type="number" id="custo_valor" name="custo_valor" placeholder="0,00" step="0.01" min="0">
+              </div>
+              <div class="campo">
+                <label for="custo_tipo">Tipo de custo</label>
+                <select id="custo_tipo" name="custo_tipo">
+                  <option value="unico">Único</option>
+                  <option value="mensal">Mensal</option>
+                  <option value="trimestral">Trimestral</option>
+                  <option value="semestral">Semestral</option>
+                  <option value="anual" selected>Anual</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="bloco-pagamento" style="display: none;">
+              <div class="linha-dois">
+                <div class="campo">
+                  <label for="proximo_pagamento_data">Próximo pagamento <span class="opcional">(opcional)</span></label>
+                  <input type="date" id="proximo_pagamento_data" name="proximo_pagamento_data">
+                </div>
+                <div class="campo">
+                  <label for="proximo_pagamento_status">Status</label>
+                  <select id="proximo_pagamento_status" name="proximo_pagamento_status">
+                    <option value="pendente">Pendente</option>
+                    <option value="pago">Pago</option>
+                  </select>
+                </div>
+              </div>
+              <div class="campo campo-checkbox" style="margin-bottom: 0;">
+                <input type="checkbox" id="registrar_gasto" name="registrar_gasto">
+                <label for="registrar_gasto">Registrar esse valor na tela de Gastos</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="secao-card">
+            <div class="secao-cabecalho">
+              <span class="secao-icone" id="icone-secao-anexo"></span>
+              <span class="secao-titulo">Documento anexado</span>
+            </div>
+            <p class="secao-descricao" style="margin: -8px 0 12px;">Adicione uma foto ou PDF para manter o documento sempre disponível.</p>
+            <input type="file" id="arquivo" name="arquivo" accept="application/pdf,image/*" capture="environment">
+            <div id="arquivo-atual" class="arquivo-atual" hidden></div>
+          </div>
+
+          <div class="secao-card">
+            <div class="secao-cabecalho">
+              <span class="secao-icone" id="icone-secao-obs"></span>
+              <span class="secao-titulo">Observações <span class="opcional" style="font-weight:400;">(opcional)</span></span>
+            </div>
+            <textarea id="observacoes" name="observacoes" placeholder="Digite informações adicionais sobre esse documento..."></textarea>
+          </div>
+
+          <div id="checklist" class="secao-card" hidden>
+            <div class="secao-cabecalho checklist-cabecalho">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span class="secao-icone" id="icone-secao-checklist"></span>
+                <span class="secao-titulo">Checklist de renovação</span>
+              </div>
+              <span id="checklist-progresso" class="checklist-progresso"></span>
+            </div>
+            <div id="checklist-lista"></div>
+          </div>
+
+          <div id="historico" class="secao-card" hidden>
+            <div class="secao-cabecalho">
+              <span class="secao-icone" id="icone-secao-historico"></span>
+              <span class="secao-titulo">Histórico de renovação</span>
+            </div>
+            <div id="historico-lista"></div>
+          </div>
+
+          <div class="acoes-principais">
+            <button type="submit" id="botao-salvar">Cadastrar documento</button>
+            <a href="index.html" class="btn-cancelar">Cancelar</a>
+          </div>
+        </form>
+
+        <div class="zona-risco" id="zona-risco" hidden>
+          <p class="zona-risco-titulo">Zona de risco</p>
+          <button type="button" class="btn-secundario-linha" id="btn-duplicar"><span id="icone-duplicar"></span> Duplicar documento</button>
+          <button type="button" class="btn-secundario-linha perigo" id="btn-excluir"><span id="icone-excluir"></span> Excluir documento</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_brDnSPSCu4ry9QTe-pYwag_zRqB6hkL';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    /* ---------- ícones ---------- */
+
+    const CORPOS_ICONE = {
+      home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+      dollarSign: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+      calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+      messageCircle: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+      fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+      menu: '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',
+      chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+      arrowLeft: '<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+      tag: '<path d="M20.59 13.41L13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+      user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+      paperclip: '<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+      edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/>',
+      checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+      clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+      alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+      copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+      trash2: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
+    };
+
+    function icone(nome, tamanho, corTraco) {
+      const tam = tamanho || 18;
+      const cor = corTraco || 'currentColor';
+      return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
+    }
+
+    document.getElementById('sidebar-logo').innerHTML = icone('fileText', 18, '#FFFFFF');
+    document.getElementById('botao-menu').innerHTML = icone('menu', 18);
+    document.getElementById('icone-voltar').innerHTML = icone('arrowLeft', 15);
+    document.getElementById('sidebar-perfil-seta').innerHTML = icone('chevronRight', 16);
+    document.getElementById('icone-secao-info').innerHTML = icone('fileText', 16);
+    document.getElementById('icone-secao-classificacao').innerHTML = icone('tag', 16);
+    document.getElementById('icone-secao-pessoa').innerHTML = icone('user', 16);
+    document.getElementById('icone-secao-validade').innerHTML = icone('calendar', 16);
+    document.getElementById('icone-secao-custos').innerHTML = icone('dollarSign', 16);
+    document.getElementById('icone-secao-anexo').innerHTML = icone('paperclip', 16);
+    document.getElementById('icone-secao-obs').innerHTML = icone('edit', 16);
+    document.getElementById('icone-secao-checklist').innerHTML = icone('checkCircle', 16);
+    document.getElementById('icone-secao-historico').innerHTML = icone('clock', 16);
+    document.getElementById('icone-duplicar').innerHTML = icone('copy', 15);
+    document.getElementById('icone-excluir').innerHTML = icone('trash2', 15);
+
+    document.getElementById('sidebar-nav').innerHTML = [
+      { href: 'index.html', nome: 'home', label: 'Início' },
+      { href: 'gastos.html', nome: 'dollarSign', label: 'Gastos' },
+      { href: 'calendario.html', nome: 'calendar', label: 'Calendário' },
+      { href: 'assistente.html', nome: 'messageCircle', label: 'Assistente' },
+    ].map(function (item) {
+      return `<a href="${item.href}" class="sidebar-item">${icone(item.nome, 18)}${item.label}</a>`;
+    }).join('');
+
+    /* ---------- gaveta lateral ---------- */
+
+    const sidebarEl = document.getElementById('sidebar');
+    const backdropEl = document.getElementById('sidebar-backdrop');
+    document.getElementById('botao-menu').addEventListener('click', function () {
+      sidebarEl.classList.add('aberta');
+      backdropEl.classList.add('ativo');
+    });
+    backdropEl.addEventListener('click', function () {
+      sidebarEl.classList.remove('aberta');
+      backdropEl.classList.remove('ativo');
+    });
+
+    /* ---------- estado ---------- */
+
+    const form = document.getElementById('doc-form');
+    const confirmacao = document.getElementById('confirmacao');
+    const botao = document.getElementById('botao-salvar');
+    const btnExcluir = document.getElementById('btn-excluir');
+    const btnDuplicar = document.getElementById('btn-duplicar');
+    const tituloPagina = document.getElementById('titulo-pagina');
+    const zonaRisco = document.getElementById('zona-risco');
+
+    const idEdicao = new URLSearchParams(window.location.search).get('id');
+    let usuarioAtual = null;
+    let dataVencimentoOriginal = null;
+
+    function escapeHtml(texto) {
+      const div = document.createElement('div');
+      div.textContent = texto;
+      return div.innerHTML;
+    }
+
+    function corStatus(status) {
+      return status === 'vermelho' ? 'var(--status-vermelho)' : status === 'amarelo' ? 'var(--status-amarelo)' : 'var(--status-verde)';
+    }
+
+    /* ---------- preview de vencimento ao vivo ---------- */
+
+    function atualizarPreviewVencimento() {
+      const valor = form.data_vencimento.value;
+      const previewEl = document.getElementById('preview-vencimento');
+      if (!valor) { previewEl.innerHTML = ''; return; }
+
+      const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+      const alvo = new Date(valor + 'T00:00:00');
+      const dias = Math.round((alvo - hoje) / 86400000);
+      const status = dias < 7 ? 'vermelho' : dias < 30 ? 'amarelo' : 'verde';
+      const iconeNome = status === 'vermelho' ? 'alertTriangle' : status === 'amarelo' ? 'clock' : 'checkCircle';
+      const texto = dias < 0 ? `Vencido há ${Math.abs(dias)} dia${Math.abs(dias) === 1 ? '' : 's'}` : dias === 0 ? 'Vence hoje' : `Vence em ${dias} dia${dias === 1 ? '' : 's'}`;
+
+      previewEl.style.color = corStatus(status);
+      previewEl.innerHTML = `${icone(iconeNome, 14)} ${texto}`;
+    }
+
+    document.getElementById('data_vencimento').addEventListener('input', atualizarPreviewVencimento);
+
+    /* ---------- validação de datas ---------- */
+
+    function validarDatas() {
+      const emissao = form.data_emissao.value;
+      const vencimento = form.data_vencimento.value;
+      const erroEl = document.getElementById('erro-emissao');
+      if (emissao && vencimento && emissao > vencimento) {
+        erroEl.hidden = false;
+        return false;
+      }
+      erroEl.hidden = true;
+      return true;
+    }
+
+    form.data_emissao.addEventListener('change', validarDatas);
+    form.data_vencimento.addEventListener('change', validarDatas);
+
+    /* ---------- seção de custos condicional ---------- */
+
+    document.getElementById('custo_valor').addEventListener('input', function () {
+      document.getElementById('bloco-pagamento').style.display = this.value && parseFloat(this.value) > 0 ? 'block' : 'none';
+    });
+
+    /* ---------- checklists padrão ---------- */
+
+    const checklistsPadrao = {
+      aso: ['Agendar exame', 'Realizar avaliação', 'Receber ASO atualizado', 'Anexar novo documento', 'Atualizar validade'],
+      nr: ['Agendar treinamento', 'Realizar treinamento', 'Receber certificado', 'Anexar novo documento', 'Atualizar validade'],
+      alvara: ['Reunir documentos exigidos', 'Protocolar pedido de renovação', 'Pagar taxas', 'Receber alvará novo', 'Anexar novo documento'],
+      contrato: ['Revisar termos', 'Negociar renovação', 'Assinar novo contrato', 'Anexar novo documento'],
+      certificacao: ['Agendar avaliação ou prova', 'Realizar avaliação', 'Receber certificado', 'Anexar novo documento'],
+      outro: ['Verificar requisitos de renovação', 'Providenciar renovação', 'Anexar novo documento', 'Atualizar validade'],
+    };
+
+    async function carregarChecklist(documentoId, tipoDoc) {
+      let { data: itens } = await sb.from('checklist_items').select('*').eq('documento_id', documentoId).order('ordem', { ascending: true });
+
+      if (!itens || itens.length === 0) {
+        const modelo = checklistsPadrao[tipoDoc] || checklistsPadrao.outro;
+        const novos = modelo.map(function (texto, i) { return { documento_id: documentoId, user_id: usuarioAtual.id, texto: texto, ordem: i }; });
+        const { data: inseridos } = await sb.from('checklist_items').insert(novos).select();
+        itens = inseridos || [];
+      }
+      renderChecklist(itens);
+    }
+
+    function renderChecklist(itens) {
+      if (!itens || itens.length === 0) return;
+      const checklistEl = document.getElementById('checklist');
+      const listaChecklistEl = document.getElementById('checklist-lista');
+      const progressoEl = document.getElementById('checklist-progresso');
+
+      function atualizarProgresso() {
+        const concluidos = itens.filter(function (i) { return i.concluido; }).length;
+        progressoEl.textContent = `${concluidos}/${itens.length} concluído`;
+      }
+
+      listaChecklistEl.innerHTML = itens.map(function (item) {
+        return `
+          <label class="checklist-item${item.concluido ? ' concluido' : ''}" data-id="${item.id}">
+            <input type="checkbox" ${item.concluido ? 'checked' : ''}>
+            <span>${escapeHtml(item.texto)}</span>
+          </label>
+        `;
+      }).join('');
+
+      listaChecklistEl.querySelectorAll('.checklist-item').forEach(function (linha) {
+        const id = linha.dataset.id;
+        const checkbox = linha.querySelector('input');
+        checkbox.addEventListener('change', async function () {
+          const item = itens.find(function (i) { return i.id === id; });
+          item.concluido = checkbox.checked;
+          linha.classList.toggle('concluido', checkbox.checked);
+          atualizarProgresso();
+          await sb.from('checklist_items').update({ concluido: checkbox.checked }).eq('id', id);
+        });
+      });
+
+      atualizarProgresso();
+      checklistEl.hidden = false;
+    }
+
+    /* ---------- pessoas ---------- */
+
+    async function carregarPessoas(selecionarId) {
+      const { data } = await sb.from('pessoas').select('*').eq('user_id', usuarioAtual.id).order('nome');
+      const select = document.getElementById('pessoa');
+      const opcoes = (data || []).map(function (p) { return `<option value="${p.id}">${escapeHtml(p.nome)}</option>`; }).join('');
+      select.innerHTML = `<option value="">Ninguém específico</option>${opcoes}<option value="__novo__">+ Adicionar pessoa...</option>`;
+      if (selecionarId) select.value = selecionarId;
+    }
+
+    document.getElementById('pessoa').addEventListener('change', async function () {
+      if (this.value !== '__novo__') return;
+      const nome = prompt('Nome da pessoa:');
+      if (nome && nome.trim()) {
+        const { data, error } = await sb.from('pessoas').insert([{ user_id: usuarioAtual.id, nome: nome.trim() }]).select().single();
+        if (!error && data) await carregarPessoas(data.id);
+      } else {
+        this.value = '';
+      }
+    });
+
+    /* ---------- sessão / carregar edição ---------- */
+
+    sb.auth.getSession().then(async function (resultado) {
+      if (!resultado.data.session) { window.location.href = 'login.html'; return; }
+      usuarioAtual = resultado.data.session.user;
+      document.getElementById('sidebar-email').textContent = usuarioAtual.email;
+      document.getElementById('sidebar-avatar').textContent = usuarioAtual.email.charAt(0).toUpperCase();
+
+      await carregarPessoas();
+
+      if (idEdicao) {
+        tituloPagina.textContent = 'Editar documento';
+        document.title = 'Editar documento — Rastreador de Documentos';
+        botao.textContent = 'Salvar alterações';
+        zonaRisco.hidden = false;
+
+        const { data, error } = await sb.from('documentos').select('*').eq('id', idEdicao).single();
+        if (!error && data) {
+          form.nome.value = data.nome;
+          form.numero_documento.value = data.numero_documento || '';
+          form.tipo.value = data.tipo;
+          form.categoria.value = data.categoria || 'outro';
+          if (data.pessoa_id) carregarPessoas(data.pessoa_id);
+          form.cliente.value = data.cliente || '';
+          form.observacoes.value = data.observacoes || '';
+          form.data_emissao.value = data.data_emissao || '';
+          form.data_vencimento.value = data.data_vencimento;
+          dataVencimentoOriginal = data.data_vencimento;
+          atualizarPreviewVencimento();
+
+          if (data.custo_valor) {
+            form.custo_valor.value = data.custo_valor;
+            form.custo_tipo.value = data.custo_tipo || 'anual';
+            document.getElementById('bloco-pagamento').style.display = 'block';
+            form.proximo_pagamento_data.value = data.proximo_pagamento_data || '';
+            form.proximo_pagamento_status.value = data.proximo_pagamento_status || 'pendente';
+          }
+
+          const avisosSalvos = data.avisos_dias || [];
+          form.querySelectorAll('input[name="avisos"]').forEach(function (cb) { cb.checked = avisosSalvos.includes(parseInt(cb.value, 10)); });
+
+          carregarChecklist(idEdicao, data.tipo);
+
+          const { data: historico } = await sb.from('historico_documentos').select('*').eq('documento_id', idEdicao).order('criado_em', { ascending: false });
+          if (historico && historico.length > 0) {
+            document.getElementById('historico-lista').innerHTML = historico.map(function (item) {
+              const de = new Date(item.data_vencimento_anterior + 'T00:00:00').toLocaleDateString('pt-BR');
+              const para = new Date(item.data_vencimento_nova + 'T00:00:00').toLocaleDateString('pt-BR');
+              return `<div class="historico-item">${de} → ${para}</div>`;
+            }).join('');
+            document.getElementById('historico').hidden = false;
+          }
+
+          if (data.arquivo_path) {
+            const { data: urlData } = await sb.storage.from('documentos-arquivos').createSignedUrl(data.arquivo_path, 3600);
+            if (urlData) {
+              const arquivoAtualEl = document.getElementById('arquivo-atual');
+              arquivoAtualEl.innerHTML = `${icone('paperclip', 15)} <a href="${urlData.signedUrl}" target="_blank" rel="noopener">${escapeHtml(data.arquivo_nome || 'ver arquivo atual')}</a> — escolher outro arquivo abaixo substitui este.`;
+              arquivoAtualEl.hidden = false;
+            }
+          }
+        }
+      }
+    });
+
+    /* ---------- categoria de documento -> categoria financeira, pro gasto vinculado ---------- */
+
+    const mapaCategoriaParaGasto = { pessoal: 'outros', veiculo: 'transporte', trabalho: 'outros', casa: 'moradia', outro: 'outros' };
+
+    /* ---------- salvar ---------- */
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      if (!validarDatas()) return;
+
+      const tipoLabel = form.tipo.selectedOptions[0]?.textContent || '';
+
+      if (!idEdicao) {
+        const { count } = await sb.from('documentos').select('id', { count: 'exact', head: true });
+        if ((count || 0) >= 3) {
+          confirmacao.style.borderLeftColor = 'var(--status-vermelho)';
+          confirmacao.innerHTML = `
+            <strong>Limite do plano Grátis atingido</strong>
+            Você atingiu o limite de 3 documentos do plano Grátis. Faça upgrade para o Premium e tenha documentos ilimitados.
+            <br><a href="planos.html" style="color: var(--marca); font-weight: 600;">Ver planos →</a>
+          `;
+          confirmacao.hidden = false;
+          confirmacao.scrollIntoView({ behavior: 'smooth' });
+          return;
+        }
+      }
+
+      botao.disabled = true;
+      botao.textContent = 'Salvando...';
+
+      const dados = {
+        nome: form.nome.value.trim(),
+        numero_documento: form.numero_documento.value.trim() || null,
+        tipo: form.tipo.value,
+        categoria: form.categoria.value,
+        pessoa_id: (form.pessoa.value && form.pessoa.value !== '__novo__') ? form.pessoa.value : null,
+        cliente: form.cliente.value.trim() || null,
+        observacoes: form.observacoes.value.trim() || null,
+        data_emissao: form.data_emissao.value || null,
+        data_vencimento: form.data_vencimento.value,
+        avisos_dias: Array.from(form.querySelectorAll('input[name="avisos"]:checked')).map(function (cb) { return parseInt(cb.value, 10); }),
+        custo_valor: form.custo_valor.value ? parseFloat(form.custo_valor.value) : null,
+        custo_tipo: form.custo_valor.value ? form.custo_tipo.value : null,
+        proximo_pagamento_data: form.proximo_pagamento_data.value || null,
+        proximo_pagamento_status: form.proximo_pagamento_data.value ? form.proximo_pagamento_status.value : null,
+        user_id: usuarioAtual ? usuarioAtual.id : null,
+      };
+
+      const arquivo = form.arquivo.files[0];
+      if (arquivo) {
+        const caminho = `${usuarioAtual.id}/${Date.now()}-${arquivo.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
+        const { error: erroUpload } = await sb.storage.from('documentos-arquivos').upload(caminho, arquivo);
+        if (erroUpload) {
+          botao.disabled = false;
+          botao.textContent = idEdicao ? 'Salvar alterações' : 'Cadastrar documento';
+          confirmacao.style.borderLeftColor = 'var(--status-vermelho)';
+          confirmacao.innerHTML = `<strong>Não foi possível enviar o anexo</strong>${escapeHtml(erroUpload.message)}`;
+          confirmacao.hidden = false;
+          return;
+        }
+        dados.arquivo_path = caminho;
+        dados.arquivo_nome = arquivo.name;
+      }
+
+      const resultado = idEdicao
+        ? await sb.from('documentos').update(dados).eq('id', idEdicao).select().single()
+        : await sb.from('documentos').insert([dados]).select().single();
+
+      const { data: docSalvo, error } = resultado;
+
+      if (!error && idEdicao && dataVencimentoOriginal && dataVencimentoOriginal !== dados.data_vencimento) {
+        await sb.from('historico_documentos').insert([{
+          documento_id: idEdicao,
+          user_id: usuarioAtual.id,
+          data_vencimento_anterior: dataVencimentoOriginal,
+          data_vencimento_nova: dados.data_vencimento,
+        }]);
+      }
+
+      if (!error && document.getElementById('registrar_gasto').checked && dados.custo_valor) {
+        await sb.from('gastos').insert([{
+          user_id: usuarioAtual.id,
+          documento_id: docSalvo.id,
+          descricao: dados.nome,
+          valor: dados.custo_valor,
+          data_gasto: dados.proximo_pagamento_data || dados.data_vencimento,
+          categoria: mapaCategoriaParaGasto[dados.categoria] || 'outros',
+        }]);
+        document.getElementById('registrar_gasto').checked = false;
+      }
+
+      botao.disabled = false;
+      botao.textContent = idEdicao ? 'Salvar alterações' : 'Cadastrar documento';
+
+      if (error) {
+        confirmacao.style.borderLeftColor = 'var(--status-vermelho)';
+        confirmacao.innerHTML = `<strong>Não foi possível salvar</strong>${escapeHtml(error.message)}`;
+        confirmacao.hidden = false;
+        confirmacao.scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+
+      const dataFormatada = dados.data_vencimento ? new Date(dados.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '';
+
+      confirmacao.style.borderLeftColor = 'var(--marca)';
+      confirmacao.innerHTML = `
+        <strong>${idEdicao ? 'Documento atualizado' : 'Documento salvo com sucesso'}</strong>
+        Nome: ${escapeHtml(dados.nome)}<br>
+        Tipo: ${escapeHtml(tipoLabel)}<br>
+        ${dados.cliente ? `Cliente/Empresa: ${escapeHtml(dados.cliente)}<br>` : ''}
+        Vencimento: ${dataFormatada}
+      `;
+      confirmacao.hidden = false;
+      confirmacao.scrollIntoView({ behavior: 'smooth' });
+      setTimeout(function () { window.location.href = 'index.html'; }, 1300);
+    });
+
+    /* ---------- excluir / duplicar ---------- */
+
+    btnExcluir.addEventListener('click', async function () {
+      if (!idEdicao) return;
+      if (!window.confirm('Excluir este documento? Essa ação não pode ser desfeita.')) return;
+
+      btnExcluir.disabled = true;
+
+      const { error } = await sb.from('documentos').delete().eq('id', idEdicao);
+
+      if (error) {
+        alert('Não foi possível excluir: ' + error.message);
+        btnExcluir.disabled = false;
+        return;
+      }
+      window.location.href = 'index.html';
+    });
+
+    btnDuplicar.addEventListener('click', async function () {
+      if (!idEdicao) return;
+      btnDuplicar.disabled = true;
+
+      const { data: original, error: erroLeitura } = await sb.from('documentos').select('*').eq('id', idEdicao).single();
+      if (erroLeitura || !original) {
+        alert('Não foi possível duplicar: ' + (erroLeitura ? erroLeitura.message : 'documento não encontrado'));
+        btnDuplicar.disabled = false;
+        return;
+      }
+
+      const copia = Object.assign({}, original);
+      delete copia.id;
+      delete copia.criado_em;
+      copia.nome = original.nome + ' (cópia)';
+
+      const { data: novo, error: erroInsercao } = await sb.from('documentos').insert([copia]).select().single();
+      if (erroInsercao || !novo) {
+        alert('Não foi possível duplicar: ' + (erroInsercao ? erroInsercao.message : ''));
+        btnDuplicar.disabled = false;
+        return;
+      }
+      window.location.href = 'novo-documento.html?id=' + novo.id;
+    });
+  </script>
+
+</body>
+</html>

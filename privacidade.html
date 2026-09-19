@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<!-- Política de Privacidade — mesmo design system, texto jurídico preservado -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<meta name="theme-color" content="#0B0E14">
+<title>Política de Privacidade — Rastreador de Documentos</title>
+<script>
+  if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --marca: #3D4FE0; --bg: #F7F8FA; --superficie: #FFFFFF;
+    --texto: #14161A; --texto-muted: #6B7280; --borda: #E3E5E9;
+  }
+
+  html.escuro {
+    --bg: #0B0E14; --superficie: #141821;
+    --texto: #F1F2F4; --texto-muted: #8A93A3; --borda: #232833;
+    --marca: #5B6EF5;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg); color: var(--texto);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    animation: entrada 0.3s ease;
+  }
+
+  @keyframes entrada { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  svg.icone { display: block; flex-shrink: 0; }
+
+  .glow-fundo {
+    position: fixed; top: -180px; left: 15%;
+    width: 560px; height: 560px;
+    background: radial-gradient(circle, rgba(91, 110, 245, 0.3), transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  html:not(.escuro) .glow-fundo { display: none; }
+
+  .topo { position: relative; z-index: 1; max-width: 680px; margin: 0 auto; padding: 24px 20px 0; }
+
+  .link-voltar { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; color: var(--texto-muted); text-decoration: none; margin-bottom: 20px; }
+  .link-voltar:hover { color: var(--marca); }
+
+  .cabecalho-doc { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .cabecalho-icone { width: 42px; height: 42px; border-radius: 12px; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+  h1 { font-size: 23px; font-weight: 700; margin: 0; }
+  .atualizado { font-size: 12.5px; color: var(--texto-muted); margin: 10px 0 0 56px; }
+
+  .conteudo {
+    position: relative; z-index: 1;
+    max-width: 680px; margin: 0 auto;
+    padding: 28px 20px 70px;
+    font-size: 14.5px;
+  }
+
+  .conteudo > p:first-child { color: var(--texto-muted); margin-top: 0; }
+
+  .secao-legal { background: var(--superficie); border: 1px solid var(--borda); border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; }
+  .secao-legal h2 { font-size: 15.5px; font-weight: 700; margin: 0 0 10px; color: var(--texto); }
+  .secao-legal p, .secao-legal li { color: var(--texto-muted); }
+  .secao-legal ul { padding-left: 20px; margin: 8px 0 0; }
+  .secao-legal p:last-child, .secao-legal ul:last-child { margin-bottom: 0; }
+
+  .link-cruzado {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    text-align: center; font-size: 13px; font-weight: 600;
+    color: var(--marca); text-decoration: none;
+    margin-top: 24px;
+  }
+</style>
+</head>
+<body>
+
+  <div class="glow-fundo"></div>
+
+  <div class="topo">
+    <a href="perfil.html" class="link-voltar"><span id="icone-voltar"></span> Voltar</a>
+    <div class="cabecalho-doc">
+      <span class="cabecalho-icone" id="cabecalho-icone"></span>
+      <h1>Política de Privacidade</h1>
+    </div>
+    <p class="atualizado">Última atualização: setembro de 2026</p>
+  </div>
+
+  <div class="conteudo">
+    <p>Esta política explica quais dados o Rastreador de Documentos coleta, como eles são usados e quais são os seus direitos sobre eles.</p>
+
+    <div class="secao-legal">
+      <h2>1. Quais dados coletamos</h2>
+      <ul>
+        <li>Seu e-mail, usado para login e comunicação sobre a conta.</li>
+        <li>Os documentos que você cadastra: nome, tipo, categoria, datas, observações e anexos (PDF ou foto) que você mesmo envia.</li>
+        <li>Gastos que você registra, se usar essa função.</li>
+        <li>Preferência de tema (claro/escuro), guardada só no seu navegador.</li>
+      </ul>
+      <p>Não coletamos dados de navegação, não usamos cookies de rastreamento e não vendemos dados a terceiros.</p>
+    </div>
+
+    <div class="secao-legal">
+      <h2>2. Onde os dados ficam guardados</h2>
+      <p>Usamos o Supabase como banco de dados e armazenamento de arquivos. Seus documentos e anexos são protegidos por regras de acesso que garantem que só você (dono da conta) pode vê-los.</p>
+    </div>
+
+    <div class="secao-legal">
+      <h2>3. Para que usamos seus dados</h2>
+      <ul>
+        <li>Mostrar seus documentos e organizar os vencimentos.</li>
+        <li>Enviar avisos de vencimento (quando essa função estiver ativa).</li>
+        <li>Melhorar o funcionamento do aplicativo.</li>
+      </ul>
+    </div>
+
+    <div class="secao-legal">
+      <h2>4. Seus direitos (LGPD)</h2>
+      <p>Você pode, a qualquer momento:</p>
+      <ul>
+        <li>Acessar todos os seus documentos, exportando-os em CSV pela tela de Perfil.</li>
+        <li>Corrigir ou excluir qualquer documento cadastrado.</li>
+        <li>Solicitar a exclusão completa da sua conta, entrando em contato pelo suporte.</li>
+      </ul>
+    </div>
+
+    <div class="secao-legal">
+      <h2>5. Compartilhamento com terceiros</h2>
+      <p>Não compartilhamos seus documentos com ninguém. Prestadores de infraestrutura (como o Supabase) têm acesso técnico aos dados apenas para operar o serviço.</p>
+    </div>
+
+    <div class="secao-legal">
+      <h2>6. Alterações nesta política</h2>
+      <p>Podemos atualizar este texto conforme o aplicativo evolui. Mudanças relevantes serão avisadas dentro do próprio app.</p>
+    </div>
+
+    <div class="secao-legal">
+      <h2>7. Contato</h2>
+      <p>Dúvidas sobre privacidade: <a href="mailto:suporte@rastreadordedocumentos.com.br" style="color: var(--marca);">suporte@rastreadordedocumentos.com.br</a></p>
+    </div>
+
+    <a href="termos.html" class="link-cruzado">Ver Termos de Uso <span id="icone-seta"></span></a>
+  </div>
+
+  <script>
+    const CORPOS_ICONE = {
+      shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+      arrowLeft: '<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+      chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+    };
+    function icone(nome, tamanho, corTraco) {
+      const tam = tamanho || 18;
+      const cor = corTraco || 'currentColor';
+      return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
+    }
+    document.getElementById('icone-voltar').innerHTML = icone('arrowLeft', 15);
+    document.getElementById('cabecalho-icone').innerHTML = icone('shield', 19, '#FFFFFF');
+    document.getElementById('icone-seta').innerHTML = icone('chevronRight', 14);
+  </script>
+
+</body>
+</html>

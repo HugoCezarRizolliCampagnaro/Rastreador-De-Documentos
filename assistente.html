@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<!-- Assistente — copiloto de documentos com dados reais, mesmo design system das outras telas -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<meta name="theme-color" content="#0B0E14">
+<title>Assistente — Rastreador de Documentos</title>
+<script>
+  if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --marca: #3D4FE0;
+    --marca-hover: #2E3FC0;
+    --bg: #F7F8FA;
+    --superficie: #FFFFFF;
+    --texto: #14161A;
+    --texto-muted: #6B7280;
+    --borda: #E3E5E9;
+    --status-verde: #1F9D55;
+    --status-amarelo: #F5A623;
+    --status-vermelho: #E5484D;
+  }
+
+  html.escuro {
+    --bg: #0B0E14;
+    --superficie: #141821;
+    --texto: #F1F2F4;
+    --texto-muted: #8A93A3;
+    --borda: #232833;
+    --marca: #5B6EF5;
+    --marca-hover: #4457E0;
+    --status-verde: #22C55E;
+    --status-amarelo: #F5A623;
+    --status-vermelho: #F2555C;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { height: 100%; margin: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--texto);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  @keyframes entrada { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes subir { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes piscar { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+
+  svg.icone { display: block; flex-shrink: 0; }
+
+  .glow-fundo {
+    position: fixed; top: -180px; left: 15%;
+    width: 560px; height: 560px;
+    background: radial-gradient(circle, rgba(91, 110, 245, 0.35), transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  html:not(.escuro) .glow-fundo { display: none; }
+
+  /* ---------- estrutura ---------- */
+
+  .app-shell { display: flex; height: 100vh; position: relative; z-index: 1; }
+
+  .sidebar {
+    position: fixed; top: 0; left: 0; height: 100vh; width: 250px;
+    display: flex; flex-direction: column;
+    padding: 22px 14px;
+    background: var(--superficie);
+    border-right: 1px solid var(--borda);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 40;
+  }
+
+  .sidebar.aberta { transform: translateX(0); }
+
+  .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 35; display: none; }
+  .sidebar-backdrop.ativo { display: block; }
+
+  @media (min-width: 960px) {
+    .sidebar { position: sticky; transform: none; }
+    .sidebar-backdrop { display: none !important; }
+    .botao-menu { display: none; }
+    .conteudo-principal { flex: 1; min-width: 0; }
+  }
+
+  .sidebar-marca { display: flex; align-items: center; gap: 10px; padding: 6px 10px 22px; }
+  .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sidebar-titulo { font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+  .sidebar-subtitulo { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+
+  .sidebar-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: 8px;
+    color: var(--texto-muted); text-decoration: none;
+    font-size: 14px; font-weight: 500;
+  }
+
+  .sidebar-item:hover { background: var(--bg); }
+  .sidebar-item.ativo { background: rgba(91, 110, 245, 0.14); color: var(--marca); font-weight: 600; }
+
+  .sidebar-perfil {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 10px 4px;
+    border-top: 1px solid var(--borda);
+    margin-top: 10px;
+    text-decoration: none; color: var(--texto);
+  }
+
+  .sidebar-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--marca); color: #FFFFFF;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px; flex-shrink: 0;
+  }
+
+  .sidebar-perfil-nome { font-size: 12.5px; font-weight: 600; word-break: break-all; }
+  .sidebar-perfil-sub { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-perfil-seta { margin-left: auto; color: var(--texto-muted); flex-shrink: 0; }
+
+  /* ---------- coluna principal do assistente ---------- */
+
+  .conteudo-principal { display: flex; flex-direction: column; height: 100vh; min-width: 0; }
+
+  .cabecalho-assistente {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--borda);
+    flex-shrink: 0;
+  }
+
+  .botao-menu {
+    width: 38px; height: 38px; border-radius: 10px;
+    border: 1px solid var(--borda);
+    background: var(--superficie); color: var(--texto);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0;
+  }
+
+  .assistente-icone-topo {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: var(--marca); color: #FFFFFF;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .cabecalho-assistente h1 { font-size: 17px; font-weight: 700; margin: 0; }
+  .cabecalho-assistente p { font-size: 12.5px; color: var(--texto-muted); margin: 2px 0 0; }
+
+  /* ---------- área de conversa ---------- */
+
+  .area-conversa {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 20px;
+  }
+
+  .conversa-largura { max-width: 640px; margin: 0 auto; }
+
+  /* estado vazio / boas-vindas */
+
+  .boas-vindas { text-align: center; padding: 20px 10px 8px; }
+
+  .boas-vindas-icone {
+    width: 56px; height: 56px; border-radius: 16px;
+    background: var(--marca); color: #FFFFFF;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+  }
+
+  .boas-vindas h2 { font-size: 19px; margin: 0 0 6px; }
+  .boas-vindas p { font-size: 13.5px; color: var(--texto-muted); margin: 0 0 22px; }
+
+  .cartoes-inteligentes { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; text-align: left; }
+
+  .cartao-inteligente {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+
+  .cartao-inteligente-icone { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .cartao-inteligente-texto { flex: 1; font-size: 13.5px; font-weight: 600; }
+  .cartao-inteligente-botao {
+    padding: 7px 12px; font-size: 12px; font-weight: 600; font-family: inherit;
+    border-radius: 8px; border: 1.5px solid var(--borda);
+    background: var(--bg); color: var(--texto);
+    cursor: pointer; white-space: nowrap;
+  }
+
+  .sugestoes { display: flex; flex-wrap: wrap; gap: 8px; text-align: left; }
+
+  .sugestao-chip {
+    padding: 9px 14px;
+    font-size: 12.5px; font-weight: 500; font-family: inherit;
+    border-radius: 999px; border: 1.5px solid var(--borda);
+    background: var(--superficie); color: var(--texto);
+    cursor: pointer;
+  }
+
+  .sugestao-chip:hover { border-color: var(--marca); color: var(--marca); }
+
+  /* turnos da conversa */
+
+  .turno { display: flex; gap: 10px; margin-bottom: 18px; animation: subir 0.25s ease; }
+  .turno.usuario { flex-direction: row-reverse; }
+
+  .avatar-assistente {
+    width: 30px; height: 30px; border-radius: 9px;
+    background: var(--marca); color: #FFFFFF;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .conteudo-turno { max-width: 82%; display: flex; flex-direction: column; gap: 8px; }
+  .turno.usuario .conteudo-turno { align-items: flex-end; }
+
+  .bolha {
+    padding: 11px 15px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.55;
+    white-space: pre-line;
+  }
+
+  .bolha.assistente { background: var(--superficie); border: 1px solid var(--borda); border-top-left-radius: 4px; }
+  .bolha.usuario { background: var(--marca); color: #FFFFFF; border-top-right-radius: 4px; }
+
+  .cards-resposta { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+
+  .card-resposta-doc {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--texto);
+  }
+
+  .card-resposta-ponto { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .card-resposta-nome { flex: 1; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-resposta-status { font-size: 11.5px; color: var(--texto-muted); flex-shrink: 0; }
+
+  .checklist-resposta {
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    padding: 12px 14px;
+    width: 100%;
+  }
+
+  .checklist-resposta-item { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
+  .checklist-resposta-item.feito { color: var(--texto-muted); text-decoration: line-through; }
+
+  .btn-acao {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px; margin-top: 4px;
+    font-size: 12.5px; font-weight: 600; font-family: inherit;
+    border-radius: 8px; border: 1.5px solid var(--marca);
+    background: none; color: var(--marca);
+    text-decoration: none;
+    cursor: pointer;
+    width: fit-content;
+  }
+
+  .btn-acao:hover { background: rgba(91, 110, 245, 0.1); }
+
+  .digitando { display: flex; gap: 4px; padding: 13px 15px; }
+  .digitando span { width: 6px; height: 6px; border-radius: 50%; background: var(--texto-muted); animation: piscar 1.2s infinite; }
+  .digitando span:nth-child(2) { animation-delay: 0.2s; }
+  .digitando span:nth-child(3) { animation-delay: 0.4s; }
+
+  /* ---------- barra de envio ---------- */
+
+  .barra-envio-wrap { border-top: 1px solid var(--borda); padding: 14px 20px calc(14px + env(safe-area-inset-bottom)); flex-shrink: 0; }
+
+  .barra-envio {
+    max-width: 640px; margin: 0 auto;
+    display: flex; align-items: center; gap: 10px;
+    background: var(--superficie);
+    border: 1.5px solid var(--borda);
+    border-radius: 999px;
+    padding: 6px 6px 6px 18px;
+  }
+
+  .barra-envio:focus-within { border-color: var(--marca); box-shadow: 0 0 0 3px rgba(91,110,245,0.18); }
+
+  .barra-envio input {
+    flex: 1; border: none; background: none; outline: none;
+    font-family: inherit; font-size: 14.5px; color: var(--texto);
+    padding: 8px 0;
+  }
+
+  .botao-enviar {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--marca); color: #FFFFFF;
+    border: none; cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s ease;
+  }
+
+  .botao-enviar:hover { background: var(--marca-hover); }
+  .botao-enviar:disabled { opacity: 0.5; cursor: default; }
+</style>
+</head>
+<body>
+
+  <div class="glow-fundo"></div>
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-marca">
+        <span class="sidebar-logo" id="sidebar-logo"></span>
+        <div>
+          <div class="sidebar-titulo">Rastreador</div>
+          <div class="sidebar-subtitulo">de Documentos</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+      <a href="perfil.html" class="sidebar-perfil">
+        <span class="sidebar-avatar" id="sidebar-avatar">?</span>
+        <div>
+          <div class="sidebar-perfil-nome" id="sidebar-email">Carregando...</div>
+          <div class="sidebar-perfil-sub">Minha conta</div>
+        </div>
+        <span class="sidebar-perfil-seta" id="sidebar-perfil-seta"></span>
+      </a>
+    </aside>
+
+    <div class="conteudo-principal">
+      <div class="cabecalho-assistente">
+        <button type="button" class="botao-menu" id="botao-menu" aria-label="Abrir menu"></button>
+        <div class="assistente-icone-topo" id="assistente-icone-topo"></div>
+        <div>
+          <h1>Assistente</h1>
+          <p>Seu assistente para documentos, prazos e organização.</p>
+        </div>
+      </div>
+
+      <div class="area-conversa" id="area-conversa">
+        <div class="conversa-largura">
+          <div class="boas-vindas" id="boas-vindas">
+            <div class="boas-vindas-icone" id="boas-vindas-icone"></div>
+            <h2 id="boas-vindas-titulo">Olá! 👋</h2>
+            <p>Posso ajudar você a acompanhar seus documentos e prazos.</p>
+
+            <div class="cartoes-inteligentes" id="cartoes-inteligentes"></div>
+
+            <div class="sugestoes" id="sugestoes">
+              <button type="button" class="sugestao-chip" data-pergunta="Quais documentos vencem este mês?">Quais documentos vencem este mês?</button>
+              <button type="button" class="sugestao-chip" data-pergunta="O que está vencido?">O que está vencido?</button>
+              <button type="button" class="sugestao-chip" data-pergunta="Quais documentos precisam de atenção?">Quais documentos precisam de atenção?</button>
+              <button type="button" class="sugestao-chip" data-pergunta="Mostre meus próximos vencimentos">Mostre meus próximos vencimentos</button>
+            </div>
+          </div>
+
+          <div id="turnos"></div>
+        </div>
+      </div>
+
+      <div class="barra-envio-wrap">
+        <form class="barra-envio" id="form-envio">
+          <input type="text" id="pergunta" placeholder="Pergunte sobre seus documentos..." autocomplete="off">
+          <button type="submit" class="botao-enviar" id="botao-enviar" aria-label="Enviar"></button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_brDnSPSCu4ry9QTe-pYwag_zRqB6hkL';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    /* ---------- ícones ---------- */
+
+    const CORPOS_ICONE = {
+      home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+      dollarSign: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+      calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+      messageCircle: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+      fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+      menu: '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',
+      chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+      activity: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+      send: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 12 2"/>',
+      checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+      clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+      alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+      refreshCw: '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+    };
+
+    function icone(nome, tamanho, corTraco) {
+      const tam = tamanho || 18;
+      const cor = corTraco || 'currentColor';
+      return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
+    }
+
+    document.getElementById('sidebar-logo').innerHTML = icone('fileText', 18, '#FFFFFF');
+    document.getElementById('botao-menu').innerHTML = icone('menu', 18);
+    document.getElementById('sidebar-perfil-seta').innerHTML = icone('chevronRight', 16);
+    document.getElementById('assistente-icone-topo').innerHTML = icone('activity', 19, '#FFFFFF');
+    document.getElementById('boas-vindas-icone').innerHTML = icone('activity', 24, '#FFFFFF');
+    document.getElementById('botao-enviar').innerHTML = icone('send', 16, '#FFFFFF');
+
+    document.getElementById('sidebar-nav').innerHTML = [
+      { href: 'index.html', nome: 'home', label: 'Início' },
+      { href: 'gastos.html', nome: 'dollarSign', label: 'Gastos' },
+      { href: 'calendario.html', nome: 'calendar', label: 'Calendário' },
+      { href: 'assistente.html', nome: 'messageCircle', label: 'Assistente', ativo: true },
+    ].map(function (item) {
+      return `<a href="${item.href}" class="sidebar-item${item.ativo ? ' ativo' : ''}">${icone(item.nome, 18)}${item.label}</a>`;
+    }).join('');
+
+    /* ---------- gaveta lateral ---------- */
+
+    const sidebarEl = document.getElementById('sidebar');
+    const backdropEl = document.getElementById('sidebar-backdrop');
+    document.getElementById('botao-menu').addEventListener('click', function () {
+      sidebarEl.classList.add('aberta');
+      backdropEl.classList.add('ativo');
+    });
+    backdropEl.addEventListener('click', function () {
+      sidebarEl.classList.remove('aberta');
+      backdropEl.classList.remove('ativo');
+    });
+
+    /* ---------- utilidades de dados ---------- */
+
+    function escapeHtml(texto) {
+      const div = document.createElement('div');
+      div.textContent = texto;
+      return div.innerHTML;
+    }
+
+    function diasRestantes(dataStr) {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const alvo = new Date(dataStr + 'T00:00:00');
+      return Math.round((alvo - hoje) / 86400000);
+    }
+
+    function statusPorDias(dias) {
+      if (dias < 7) return 'vermelho';
+      if (dias < 30) return 'amarelo';
+      return 'verde';
+    }
+
+    function statusLabel(status, dias) {
+      if (status === 'vermelho') return dias < 0 ? 'Vencido' : 'Urgente';
+      if (status === 'amarelo') return 'Em atenção';
+      return 'Em dia';
+    }
+
+    function corStatus(status) {
+      return status === 'vermelho' ? 'var(--status-vermelho)' : status === 'amarelo' ? 'var(--status-amarelo)' : 'var(--status-verde)';
+    }
+
+    const categoriaLabelMap = { pessoal: 'Pessoal', veiculo: 'Veículo', trabalho: 'Trabalho', casa: 'Casa', outro: 'Outro' };
+
+    let usuarioAtual = null;
+    let ultimaPergunta = '';
+
+    /* ---------- boas-vindas dinâmicas ---------- */
+
+    async function montarBoasVindas() {
+      const { data } = await sb.from('documentos').select('id, nome, data_vencimento');
+      const docs = data || [];
+
+      const nome = (usuarioAtual.email || '').split('@')[0];
+      document.getElementById('boas-vindas-titulo').textContent = `Olá, ${nome}! 👋`;
+
+      const vencidos = docs.filter(function (d) { return diasRestantes(d.data_vencimento) < 0; });
+      const proximos = docs.filter(function (d) { const dd = diasRestantes(d.data_vencimento); return dd >= 0 && dd < 30; });
+
+      const cartoes = [];
+      if (vencidos.length > 0) {
+        cartoes.push({
+          icone: 'alertTriangle', cor: 'var(--status-vermelho)', bg: 'rgba(242,85,92,0.16)',
+          texto: `Você possui ${vencidos.length} documento${vencidos.length === 1 ? '' : 's'} vencido${vencidos.length === 1 ? '' : 's'}.`,
+          botao: 'Ver vencidos', pergunta: 'O que está vencido?',
+        });
+      }
+      if (proximos.length > 0) {
+        cartoes.push({
+          icone: 'clock', cor: 'var(--status-amarelo)', bg: 'rgba(245,166,35,0.18)',
+          texto: `Você tem ${proximos.length} documento${proximos.length === 1 ? '' : 's'} próximo${proximos.length === 1 ? '' : 's'} do vencimento.`,
+          botao: 'Ver documentos', pergunta: 'Quais documentos vencem nos próximos 30 dias?',
+        });
+      }
+
+      document.getElementById('cartoes-inteligentes').innerHTML = cartoes.map(function (c) {
+        return `
+          <div class="cartao-inteligente">
+            <span class="cartao-inteligente-icone" style="background: ${c.bg}; color: ${c.cor};">${icone(c.icone, 16)}</span>
+            <span class="cartao-inteligente-texto">${c.texto}</span>
+            <button type="button" class="cartao-inteligente-botao" data-pergunta="${escapeHtml(c.pergunta)}">${c.botao}</button>
+          </div>
+        `;
+      }).join('');
+
+      document.querySelectorAll('[data-pergunta]').forEach(function (el) {
+        el.addEventListener('click', function () { enviarPergunta(el.dataset.pergunta); });
+      });
+    }
+
+    /* ---------- montagem de turnos ---------- */
+
+    const turnosEl = document.getElementById('turnos');
+
+    function adicionarTurnoUsuario(texto) {
+      const div = document.createElement('div');
+      div.className = 'turno usuario';
+      div.innerHTML = `<div class="conteudo-turno"><div class="bolha usuario">${escapeHtml(texto)}</div></div>`;
+      turnosEl.appendChild(div);
+      rolarParaFinal();
+    }
+
+    function adicionarDigitando() {
+      const div = document.createElement('div');
+      div.className = 'turno assistente';
+      div.id = 'turno-digitando';
+      div.innerHTML = `<div class="avatar-assistente">${icone('activity', 15, '#FFFFFF')}</div><div class="conteudo-turno"><div class="bolha assistente digitando"><span></span><span></span><span></span></div></div>`;
+      turnosEl.appendChild(div);
+      rolarParaFinal();
+    }
+
+    function removerDigitando() {
+      const el = document.getElementById('turno-digitando');
+      if (el) el.remove();
+    }
+
+    function cardsDocumentos(docs) {
+      return `<div class="cards-resposta">${docs.map(function (doc) {
+        const dias = diasRestantes(doc.data_vencimento);
+        const status = statusPorDias(dias);
+        return `
+          <a class="card-resposta-doc" href="novo-documento.html?id=${doc.id}">
+            <span class="card-resposta-ponto" style="background: ${corStatus(status)};"></span>
+            <span class="card-resposta-nome">${escapeHtml(doc.nome)}</span>
+            <span class="card-resposta-status">${statusLabel(status, dias)}</span>
+          </a>
+        `;
+      }).join('')}</div>`;
+    }
+
+    function adicionarTurnoAssistente(texto, extraHtml) {
+      const div = document.createElement('div');
+      div.className = 'turno assistente';
+      div.innerHTML = `
+        <div class="avatar-assistente">${icone('activity', 15, '#FFFFFF')}</div>
+        <div class="conteudo-turno">
+          <div class="bolha assistente">${escapeHtml(texto)}</div>
+          ${extraHtml || ''}
+        </div>
+      `;
+      turnosEl.appendChild(div);
+      rolarParaFinal();
+    }
+
+    function adicionarErro() {
+      const div = document.createElement('div');
+      div.className = 'turno assistente';
+      div.innerHTML = `
+        <div class="avatar-assistente">${icone('activity', 15, '#FFFFFF')}</div>
+        <div class="conteudo-turno">
+          <div class="bolha assistente">Não consegui analisar seus documentos agora.</div>
+          <button type="button" class="btn-acao" id="btn-tentar-novamente">${icone('refreshCw', 13)} Tentar novamente</button>
+        </div>
+      `;
+      turnosEl.appendChild(div);
+      document.getElementById('btn-tentar-novamente').addEventListener('click', function () {
+        div.remove();
+        enviarPergunta(ultimaPergunta);
+      });
+      rolarParaFinal();
+    }
+
+    function rolarParaFinal() {
+      const areaEl = document.getElementById('area-conversa');
+      areaEl.scrollTop = areaEl.scrollHeight;
+    }
+
+    /* ---------- interpretação das perguntas ---------- */
+
+    async function buscarChecklistPara(doc) {
+      const { data } = await sb.from('checklist_items').select('*').eq('documento_id', doc.id).order('ordem');
+      return data || [];
+    }
+
+    async function responder(pergunta, documentos) {
+      const p = pergunta.toLowerCase();
+
+      if (documentos.length === 0) {
+        return { texto: 'Você ainda não tem documentos cadastrados. Toque no "+" na tela inicial pra adicionar o primeiro.' };
+      }
+
+      const comDias = documentos.map(function (doc) {
+        return Object.assign({}, doc, { dias: diasRestantes(doc.data_vencimento) });
+      });
+
+      // categoria mencionada
+      const categoriasChave = { carro: 'veiculo', veículo: 'veiculo', veiculo: 'veiculo', casa: 'casa', trabalho: 'trabalho', pessoal: 'pessoal' };
+      for (const chave in categoriasChave) {
+        if (p.includes(chave)) {
+          const cat = categoriasChave[chave];
+          const docsCategoria = comDias.filter(function (d) { return d.categoria === cat; });
+          if (docsCategoria.length === 0) return { texto: `Não encontrei documentos na categoria ${categoriaLabelMap[cat]}.` };
+          return { texto: `${docsCategoria.length} documento(s) em ${categoriaLabelMap[cat]}:`, docs: docsCategoria };
+        }
+      }
+
+      // checklist / renovação de um documento específico
+      if (p.includes('checklist') || p.includes('renovar') || p.includes('renovação') || p.includes('renovacao')) {
+        const docMencionado = comDias.find(function (d) { return p.includes(d.nome.toLowerCase()); });
+        const alvo = docMencionado || comDias.slice().sort(function (a, b) { return a.dias - b.dias; })[0];
+        const itens = await buscarChecklistPara(alvo);
+
+        if (itens.length === 0) {
+          return { texto: `"${alvo.nome}" ainda não tem um checklist de renovação gerado. Abra o documento pra criar um.`, docs: [alvo] };
+        }
+
+        const concluidos = itens.filter(function (i) { return i.concluido; }).length;
+        const listaHtml = `<div class="checklist-resposta">` + itens.map(function (i) {
+          return `<div class="checklist-resposta-item${i.concluido ? ' feito' : ''}">${icone(i.concluido ? 'checkCircle' : 'clock', 14)} ${escapeHtml(i.texto)}</div>`;
+        }).join('') + `</div><a class="btn-acao" href="novo-documento.html?id=${alvo.id}">${icone('chevronRight', 13)} Continuar checklist</a>`;
+
+        return { texto: `Checklist de renovação de "${alvo.nome}" — ${concluidos}/${itens.length} concluído:`, extraHtml: listaHtml };
+      }
+
+      if (p.includes('urgente') || p.includes('primeiro') || p.includes('mais perto') || p.includes('mais próximo') || p.includes('mais cedo')) {
+        const ordenado = comDias.slice().sort(function (a, b) { return a.dias - b.dias; });
+        return { texto: 'O mais urgente é:', docs: [ordenado[0]] };
+      }
+
+      if (p.includes('vencid') || p.includes('venceu')) {
+        const vencidos = comDias.filter(function (d) { return d.dias < 0; });
+        if (vencidos.length === 0) return { texto: 'Nenhum documento vencido. 🎉' };
+        return { texto: `${vencidos.length} documento(s) vencido(s):`, docs: vencidos };
+      }
+
+      if (p.includes('em dia')) {
+        const emDia = comDias.filter(function (d) { return d.dias >= 30; });
+        if (emDia.length === 0) return { texto: 'Nenhum documento está com mais de 30 dias de folga no momento.' };
+        return { texto: `${emDia.length} documento(s) em dia:`, docs: emDia };
+      }
+
+      if (p.includes('atenção') || p.includes('atencao')) {
+        const atencao = comDias.filter(function (d) { return d.dias < 30; });
+        if (atencao.length === 0) return { texto: 'Nenhum documento precisa de atenção agora.' };
+        return { texto: `${atencao.length} documento(s) precisando de atenção:`, docs: atencao };
+      }
+
+      if (p.includes('próximos') || p.includes('proximos') || p.includes('30 dias') || p.includes('esse mês') || p.includes('este mês') || p.includes('mes')) {
+        let filtrados;
+        if (p.includes('mes')) {
+          const agora = new Date();
+          filtrados = comDias.filter(function (d) {
+            const dt = new Date(d.data_vencimento + 'T00:00:00');
+            return dt.getMonth() === agora.getMonth() && dt.getFullYear() === agora.getFullYear();
+          });
+        } else {
+          filtrados = comDias.filter(function (d) { return d.dias >= 0 && d.dias < 30; });
+        }
+        if (filtrados.length === 0) return { texto: 'Nenhum documento vencendo nesse período.' };
+        return { texto: `${filtrados.length} documento(s) encontrados:`, docs: filtrados.sort(function (a, b) { return a.dias - b.dias; }) };
+      }
+
+      if (p.includes('quantos') || p.includes('total')) {
+        return { texto: `Você tem ${documentos.length} documento(s) cadastrado(s) no total.` };
+      }
+
+      return { texto: 'Não encontrei essa informação nos seus documentos. Posso te dizer: o que está vencido, o que vence este mês, o mais urgente, documentos por categoria, ou o checklist de renovação de um deles.' };
+    }
+
+    /* ---------- envio ---------- */
+
+    async function enviarPergunta(texto) {
+      ultimaPergunta = texto;
+      document.getElementById('boas-vindas').style.display = 'none';
+      adicionarTurnoUsuario(texto);
+      adicionarDigitando();
+
+      try {
+        const { data, error } = await sb.from('documentos').select('*');
+        if (error) throw error;
+
+        await new Promise(function (resolve) { setTimeout(resolve, 450); });
+
+        const resposta = await responder(texto, data || []);
+        removerDigitando();
+        adicionarTurnoAssistente(resposta.texto, resposta.extraHtml || (resposta.docs ? cardsDocumentos(resposta.docs) : ''));
+      } catch (err) {
+        removerDigitando();
+        adicionarErro();
+      }
+    }
+
+    document.getElementById('form-envio').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const inputEl = document.getElementById('pergunta');
+      const texto = inputEl.value.trim();
+      if (!texto) return;
+      inputEl.value = '';
+      enviarPergunta(texto);
+    });
+
+    document.getElementById('sugestoes').querySelectorAll('.sugestao-chip').forEach(function (chip) {
+      chip.addEventListener('click', function () { enviarPergunta(chip.dataset.pergunta); });
+    });
+
+    /* ---------- sessão ---------- */
+
+    sb.auth.getSession().then(function (resultado) {
+      if (!resultado.data.session) {
+        window.location.href = 'login.html';
+        return;
+      }
+      usuarioAtual = resultado.data.session.user;
+      document.getElementById('sidebar-email').textContent = usuarioAtual.email;
+      document.getElementById('sidebar-avatar').textContent = usuarioAtual.email.charAt(0).toUpperCase();
+      montarBoasVindas();
+    });
+  </script>
+
+</body>
+</html>

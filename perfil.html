@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<!-- Perfil — mesmo design system das outras telas: sidebar, ícones SVG, sem barra inferior -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<meta name="theme-color" content="#0B0E14">
+<title>Perfil — Rastreador de Documentos</title>
+<script>
+  if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --marca: #3D4FE0;
+    --marca-hover: #2E3FC0;
+    --bg: #F7F8FA;
+    --superficie: #FFFFFF;
+    --texto: #14161A;
+    --texto-muted: #6B7280;
+    --borda: #E3E5E9;
+    --status-verde: #1F9D55;
+    --status-amarelo: #F5A623;
+    --status-vermelho: #E5484D;
+  }
+
+  html.escuro {
+    --bg: #0B0E14;
+    --superficie: #141821;
+    --texto: #F1F2F4;
+    --texto-muted: #8A93A3;
+    --borda: #232833;
+    --marca: #5B6EF5;
+    --marca-hover: #4457E0;
+    --status-verde: #22C55E;
+    --status-amarelo: #F5A623;
+    --status-vermelho: #F2555C;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--texto);
+    -webkit-font-smoothing: antialiased;
+    animation: entrada 0.3s ease;
+  }
+
+  @keyframes entrada { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  svg.icone { display: block; flex-shrink: 0; }
+
+  .glow-fundo {
+    position: fixed; top: -180px; left: 15%;
+    width: 560px; height: 560px;
+    background: radial-gradient(circle, rgba(91, 110, 245, 0.35), transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  html:not(.escuro) .glow-fundo { display: none; }
+
+  /* ---------- estrutura (idêntica às outras telas) ---------- */
+
+  .app-shell { display: flex; min-height: 100vh; position: relative; z-index: 1; }
+
+  .sidebar {
+    position: fixed; top: 0; left: 0; height: 100vh; width: 250px;
+    display: flex; flex-direction: column;
+    padding: 22px 14px;
+    background: var(--superficie);
+    border-right: 1px solid var(--borda);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 40;
+  }
+
+  .sidebar.aberta { transform: translateX(0); }
+
+  .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 35; display: none; }
+  .sidebar-backdrop.ativo { display: block; }
+
+  @media (min-width: 960px) {
+    .sidebar { position: sticky; transform: none; }
+    .sidebar-backdrop { display: none !important; }
+    .botao-menu { display: none; }
+    .conteudo-principal { flex: 1; min-width: 0; }
+    .cabecalho, .conteudo { max-width: 720px; padding-left: 32px; padding-right: 32px; }
+  }
+
+  .sidebar-marca { display: flex; align-items: center; gap: 10px; padding: 6px 10px 22px; }
+  .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sidebar-titulo { font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+  .sidebar-subtitulo { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+
+  .sidebar-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: 8px;
+    color: var(--texto-muted); text-decoration: none;
+    font-size: 14px; font-weight: 500;
+  }
+
+  .sidebar-item:hover { background: var(--bg); }
+  .sidebar-item.ativo { background: rgba(91, 110, 245, 0.14); color: var(--marca); font-weight: 600; }
+
+  .sidebar-perfil {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 10px 4px;
+    border-top: 1px solid var(--borda);
+    margin-top: 10px;
+    text-decoration: none; color: var(--texto);
+  }
+
+  .sidebar-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--marca); color: #FFFFFF;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px; flex-shrink: 0;
+  }
+
+  .sidebar-perfil-nome { font-size: 12.5px; font-weight: 600; word-break: break-all; }
+  .sidebar-perfil-sub { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-perfil-seta { margin-left: auto; color: var(--texto-muted); flex-shrink: 0; }
+
+  /* ---------- cabeçalho ---------- */
+
+  .cabecalho { max-width: 720px; margin: 0 auto; padding: 24px 20px 4px; }
+  .topo-pagina { display: flex; align-items: flex-start; gap: 14px; }
+
+  .botao-menu {
+    width: 38px; height: 38px; border-radius: 10px;
+    border: 1px solid var(--borda);
+    background: var(--superficie); color: var(--texto);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0;
+  }
+
+  .cabecalho h1 { font-size: 24px; font-weight: 700; margin: 0 0 4px; }
+  .pagina-sub { font-size: 13.5px; color: var(--texto-muted); margin: 0; }
+
+  /* ---------- conteúdo ---------- */
+
+  .conteudo { max-width: 720px; margin: 0 auto; padding: 20px 20px 60px; }
+
+  /* card da conta */
+
+  .conta-card {
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 16px;
+    padding: 22px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .conta-avatar {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--marca), var(--marca-hover));
+    color: #FFFFFF;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .conta-info { flex: 1; min-width: 180px; }
+  .conta-email { font-size: 15px; font-weight: 700; word-break: break-all; }
+
+  .conta-plano-linha { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .conta-plano-selo {
+    font-size: 11px; font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(91, 110, 245, 0.16);
+    color: var(--marca);
+  }
+
+  .btn-ver-planos {
+    padding: 9px 16px;
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    border-radius: 8px;
+    border: 1.5px solid var(--borda);
+    background: var(--bg);
+    color: var(--texto);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .btn-ver-planos:hover { border-color: var(--marca); color: var(--marca); }
+
+  /* seções */
+
+  .secao-titulo-grupo {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--texto-muted);
+    margin: 24px 0 10px;
+  }
+
+  .opcao-card {
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .opcao-linha {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--borda);
+    text-decoration: none;
+    color: var(--texto);
+    background: none;
+    border-left: none; border-right: none; border-top: none;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .opcao-linha:last-child { border-bottom: none; }
+  .opcao-linha:hover { background: var(--bg); }
+
+  .opcao-icone {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    background: rgba(91, 110, 245, 0.14);
+    color: var(--marca);
+  }
+
+  .opcao-texto { flex: 1; min-width: 0; }
+  .opcao-titulo { font-size: 14px; font-weight: 600; }
+  .opcao-descricao { font-size: 12px; color: var(--texto-muted); margin-top: 1px; }
+
+  .opcao-seta { color: var(--texto-muted); flex-shrink: 0; }
+
+  .opcao-linha.perigo .opcao-icone { background: rgba(242, 85, 92, 0.14); color: var(--status-vermelho); }
+  .opcao-linha.perigo .opcao-titulo { color: var(--status-vermelho); }
+
+  /* toggle */
+
+  .switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+
+  .slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background: var(--borda);
+    transition: 0.2s;
+    border-radius: 999px;
+  }
+
+  .slider::before {
+    position: absolute; content: "";
+    height: 18px; width: 18px; left: 3px; bottom: 3px;
+    background: #FFFFFF;
+    transition: 0.2s;
+    border-radius: 50%;
+  }
+
+  input:checked + .slider { background: var(--marca); }
+  input:checked + .slider::before { transform: translateX(20px); }
+
+  /* fab */
+
+  .fab {
+    position: fixed; right: 20px; bottom: 24px;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--marca); color: #FFFFFF;
+    display: flex; align-items: center; justify-content: center;
+    text-decoration: none;
+    box-shadow: 0 6px 20px rgba(91, 110, 245, 0.5);
+    transition: background 0.15s ease, transform 0.15s ease;
+    animation: pulso 2.5s ease-in-out infinite;
+    z-index: 6;
+  }
+
+  @keyframes pulso { 0%, 100% { box-shadow: 0 6px 20px rgba(91,110,245,0.5); } 50% { box-shadow: 0 6px 26px rgba(91,110,245,0.75); } }
+  .fab:hover { background: var(--marca-hover); transform: scale(1.06); }
+</style>
+</head>
+<body>
+
+  <div class="glow-fundo"></div>
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-marca">
+        <span class="sidebar-logo" id="sidebar-logo"></span>
+        <div>
+          <div class="sidebar-titulo">Rastreador</div>
+          <div class="sidebar-subtitulo">de Documentos</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+      <a href="perfil.html" class="sidebar-perfil">
+        <span class="sidebar-avatar" id="sidebar-avatar">?</span>
+        <div>
+          <div class="sidebar-perfil-nome" id="sidebar-email">Carregando...</div>
+          <div class="sidebar-perfil-sub">Minha conta</div>
+        </div>
+        <span class="sidebar-perfil-seta" id="sidebar-perfil-seta"></span>
+      </a>
+    </aside>
+
+    <div class="conteudo-principal">
+      <div class="cabecalho">
+        <div class="topo-pagina">
+          <button type="button" class="botao-menu" id="botao-menu" aria-label="Abrir menu"></button>
+          <div>
+            <h1>Perfil</h1>
+            <p class="pagina-sub">Gerencie sua conta, preferências e dados.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="conteudo">
+        <div class="conta-card">
+          <div class="conta-avatar" id="conta-avatar">?</div>
+          <div class="conta-info">
+            <div class="conta-email" id="conta-email">Carregando...</div>
+            <div class="conta-plano-linha">
+              <span class="conta-plano-selo">Plano Grátis</span>
+            </div>
+          </div>
+          <a href="planos.html" class="btn-ver-planos">Ver planos</a>
+        </div>
+
+        <p class="secao-titulo-grupo">Aparência</p>
+        <div class="opcao-card">
+          <div class="opcao-linha">
+            <span class="opcao-icone" id="icone-aparencia"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo">Modo escuro</div>
+              <div class="opcao-descricao">Use o tema escuro em todo o aplicativo</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggle-escuro">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <p class="secao-titulo-grupo">Dados</p>
+        <div class="opcao-card">
+          <button type="button" class="opcao-linha" id="btn-exportar">
+            <span class="opcao-icone" id="icone-exportar"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo" id="texto-exportar">Exportar documentos (CSV)</div>
+              <div class="opcao-descricao">Baixe seus documentos em formato CSV</div>
+            </div>
+          </button>
+          <a href="planos.html" class="opcao-linha">
+            <span class="opcao-icone" id="icone-planos"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo">Planos e assinatura</div>
+              <div class="opcao-descricao">Gerencie seu plano atual</div>
+            </div>
+            <span class="opcao-seta" id="seta-planos"></span>
+          </a>
+        </div>
+
+        <p class="secao-titulo-grupo">Suporte</p>
+        <div class="opcao-card">
+          <a href="mailto:suporte@rastreadordedocumentos.com.br" class="opcao-linha">
+            <span class="opcao-icone" id="icone-suporte"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo">Falar com o suporte</div>
+              <div class="opcao-descricao">Entre em contato para obter ajuda</div>
+            </div>
+            <span class="opcao-seta" id="seta-suporte"></span>
+          </a>
+          <a href="termos.html" class="opcao-linha">
+            <span class="opcao-icone" id="icone-termos"></span>
+            <div class="opcao-texto"><div class="opcao-titulo">Termos de Uso</div></div>
+            <span class="opcao-seta" id="seta-termos"></span>
+          </a>
+          <a href="privacidade.html" class="opcao-linha">
+            <span class="opcao-icone" id="icone-privacidade"></span>
+            <div class="opcao-texto"><div class="opcao-titulo">Política de Privacidade</div></div>
+            <span class="opcao-seta" id="seta-privacidade"></span>
+          </a>
+        </div>
+
+        <p class="secao-titulo-grupo">Conta</p>
+        <div class="opcao-card">
+          <button type="button" class="opcao-linha perigo" id="btn-sair">
+            <span class="opcao-icone" id="icone-sair"></span>
+            <div class="opcao-texto"><div class="opcao-titulo">Sair da conta</div></div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <a class="fab" href="novo-documento.html" aria-label="Cadastrar documento" id="fab-adicionar"></a>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_brDnSPSCu4ry9QTe-pYwag_zRqB6hkL';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    /* ---------- ícones ---------- */
+
+    const CORPOS_ICONE = {
+      home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+      dollarSign: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+      calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+      messageCircle: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+      fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+      menu: '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',
+      plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+      chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+      moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+      download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+      creditCard: '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
+      helpCircle: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+      shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+      logOut: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+    };
+
+    function icone(nome, tamanho, corTraco) {
+      const tam = tamanho || 18;
+      const cor = corTraco || 'currentColor';
+      return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
+    }
+
+    document.getElementById('sidebar-logo').innerHTML = icone('fileText', 18, '#FFFFFF');
+    document.getElementById('botao-menu').innerHTML = icone('menu', 18);
+    document.getElementById('sidebar-perfil-seta').innerHTML = icone('chevronRight', 16);
+    document.getElementById('fab-adicionar').innerHTML = icone('plus', 26, '#FFFFFF');
+
+    document.getElementById('icone-aparencia').innerHTML = icone('moon', 17);
+    document.getElementById('icone-exportar').innerHTML = icone('download', 17);
+    document.getElementById('icone-planos').innerHTML = icone('creditCard', 17);
+    document.getElementById('icone-suporte').innerHTML = icone('helpCircle', 17);
+    document.getElementById('icone-termos').innerHTML = icone('fileText', 17);
+    document.getElementById('icone-privacidade').innerHTML = icone('shield', 17);
+    document.getElementById('icone-sair').innerHTML = icone('logOut', 17);
+    ['seta-planos', 'seta-suporte', 'seta-termos', 'seta-privacidade'].forEach(function (id) {
+      document.getElementById(id).innerHTML = icone('chevronRight', 15);
+    });
+
+    document.getElementById('sidebar-nav').innerHTML = [
+      { href: 'index.html', nome: 'home', label: 'Início' },
+      { href: 'gastos.html', nome: 'dollarSign', label: 'Gastos' },
+      { href: 'calendario.html', nome: 'calendar', label: 'Calendário' },
+      { href: 'assistente.html', nome: 'messageCircle', label: 'Assistente' },
+    ].map(function (item) {
+      return `<a href="${item.href}" class="sidebar-item${item.ativo ? ' ativo' : ''}">${icone(item.nome, 18)}${item.label}</a>`;
+    }).join('');
+
+    /* ---------- gaveta lateral ---------- */
+
+    const sidebarEl = document.getElementById('sidebar');
+    const backdropEl = document.getElementById('sidebar-backdrop');
+    document.getElementById('botao-menu').addEventListener('click', function () {
+      sidebarEl.classList.add('aberta');
+      backdropEl.classList.add('ativo');
+    });
+    backdropEl.addEventListener('click', function () {
+      sidebarEl.classList.remove('aberta');
+      backdropEl.classList.remove('ativo');
+    });
+
+    /* ---------- modo escuro ---------- */
+
+    const toggleEscuro = document.getElementById('toggle-escuro');
+    toggleEscuro.checked = localStorage.getItem('modo-escuro') !== 'false';
+
+    toggleEscuro.addEventListener('change', function () {
+      const ativo = toggleEscuro.checked;
+      localStorage.setItem('modo-escuro', ativo ? 'true' : 'false');
+      document.documentElement.classList.toggle('escuro', ativo);
+    });
+
+    /* ---------- sair ---------- */
+
+    document.getElementById('btn-sair').addEventListener('click', async function () {
+      await sb.auth.signOut();
+      window.location.href = 'login.html';
+    });
+
+    /* ---------- exportar CSV ---------- */
+
+    document.getElementById('btn-exportar').addEventListener('click', async function () {
+      const textoEl = document.getElementById('texto-exportar');
+      const textoOriginal = textoEl.textContent;
+      textoEl.textContent = 'Exportando...';
+
+      const { data } = await sb.from('documentos').select('*');
+
+      if (!data || data.length === 0) {
+        alert('Nenhum documento pra exportar ainda.');
+        textoEl.textContent = textoOriginal;
+        return;
+      }
+
+      const colunas = ['nome', 'numero_documento', 'tipo', 'categoria', 'cliente', 'data_emissao', 'data_vencimento', 'observacoes'];
+      const linhas = [colunas.join(',')];
+
+      data.forEach(function (doc) {
+        const linha = colunas.map(function (c) {
+          const valor = (doc[c] === null || doc[c] === undefined ? '' : doc[c]).toString().replace(/"/g, '""');
+          return `"${valor}"`;
+        }).join(',');
+        linhas.push(linha);
+      });
+
+      const csv = '\uFEFF' + linhas.join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'documentos.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+
+      textoEl.textContent = textoOriginal;
+    });
+
+    /* ---------- sessão ---------- */
+
+    sb.auth.getSession().then(function (resultado) {
+      if (!resultado.data.session) {
+        window.location.href = 'login.html';
+        return;
+      }
+      const email = resultado.data.session.user.email;
+      document.getElementById('conta-email').textContent = email;
+      document.getElementById('conta-avatar').textContent = email.charAt(0).toUpperCase();
+      document.getElementById('sidebar-email').textContent = email;
+      document.getElementById('sidebar-avatar').textContent = email.charAt(0).toUpperCase();
+    });
+  </script>
+
+</body>
+</html>
