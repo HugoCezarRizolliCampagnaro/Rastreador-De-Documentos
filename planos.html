@@ -46,6 +46,8 @@
 
   body {
     margin: 0;
+    overflow-x: hidden;
+    max-width: 100vw;
     font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     background: var(--bg);
     color: var(--texto);
@@ -110,7 +112,7 @@
   .sidebar-perfil-seta { margin-left: auto; color: var(--texto-muted); flex-shrink: 0; }
 
   .cabecalho { max-width: 1080px; margin: 0 auto; padding: 24px 20px 4px; }
-  .topo-pagina { display: flex; align-items: flex-start; gap: 14px; }
+  .topo-pagina { display: flex; flex-wrap: wrap; row-gap: 12px; align-items: flex-start; gap: 14px; }
 
   .botao-menu { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--borda); background: var(--superficie); color: var(--texto); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
   .pagina-icone { width: 46px; height: 46px; border-radius: 12px; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -225,9 +227,8 @@
 <body>
 
   <div class="glow-fundo"></div>
-  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
-
   <div class="app-shell">
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-marca">
         <span class="sidebar-logo" id="sidebar-logo"></span>

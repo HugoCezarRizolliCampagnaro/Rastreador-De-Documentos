@@ -46,6 +46,8 @@
 
   body {
     margin: 0;
+    overflow-x: hidden;
+    max-width: 100vw;
     font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     background: var(--bg);
     color: var(--texto);
@@ -290,9 +292,8 @@
 <body>
 
   <div class="glow-fundo"></div>
-  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
-
   <div class="app-shell">
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-marca">
         <span class="sidebar-logo" id="sidebar-logo"></span>
