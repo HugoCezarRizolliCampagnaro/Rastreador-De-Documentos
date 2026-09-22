@@ -11,6 +11,7 @@
 <title>Assistente — Rastreador de Documentos</title>
 <script>
   if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+  if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -318,6 +319,18 @@
 
   .botao-enviar:hover { background: var(--marca-hover); }
   .botao-enviar:disabled { opacity: 0.5; cursor: default; }
+
+  .botao-mic {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: none; color: var(--texto-muted);
+    border: none; cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+
+  .botao-mic:hover { color: var(--marca); background: var(--bg); }
+  .botao-mic.gravando { color: var(--status-vermelho); animation: piscar 1s infinite; }
+  .botao-mic[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -378,6 +391,7 @@
       <div class="barra-envio-wrap">
         <form class="barra-envio" id="form-envio">
           <input type="text" id="pergunta" placeholder="Pergunte sobre seus documentos..." autocomplete="off">
+          <button type="button" class="botao-mic" id="botao-mic" aria-label="Falar" hidden></button>
           <button type="submit" class="botao-enviar" id="botao-enviar" aria-label="Enviar"></button>
         </form>
       </div>
@@ -406,6 +420,7 @@
       clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
       alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
       refreshCw: '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+      mic: '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>',
     };
 
     function icone(nome, tamanho, corTraco) {
@@ -713,6 +728,55 @@
         adicionarErro();
       }
     }
+
+    /* ---------- microfone (voz -> texto) ---------- */
+
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const botaoMic = document.getElementById('botao-mic');
+
+    if (SpeechRecognitionAPI) {
+      botaoMic.innerHTML = icone('mic', 17);
+      botaoMic.hidden = false;
+
+      const reconhecimento = new SpeechRecognitionAPI();
+      reconhecimento.lang = 'pt-BR';
+      reconhecimento.interimResults = false;
+      reconhecimento.maxAlternatives = 1;
+
+      let gravando = false;
+
+      botaoMic.addEventListener('click', function () {
+        if (gravando) { reconhecimento.stop(); return; }
+        try {
+          reconhecimento.start();
+        } catch (err) {
+          // já estava iniciando; ignora
+        }
+      });
+
+      reconhecimento.addEventListener('start', function () {
+        gravando = true;
+        botaoMic.classList.add('gravando');
+      });
+
+      reconhecimento.addEventListener('end', function () {
+        gravando = false;
+        botaoMic.classList.remove('gravando');
+      });
+
+      reconhecimento.addEventListener('result', function (e) {
+        const texto = e.results[0][0].transcript;
+        document.getElementById('pergunta').value = texto;
+        enviarPergunta(texto);
+      });
+
+      reconhecimento.addEventListener('error', function () {
+        gravando = false;
+        botaoMic.classList.remove('gravando');
+      });
+    }
+    // Se o navegador não suportar (ex.: alguns navegadores no iPhone), o botão
+    // simplesmente continua escondido — o chat por texto funciona normalmente.
 
     document.getElementById('form-envio').addEventListener('submit', function (e) {
       e.preventDefault();

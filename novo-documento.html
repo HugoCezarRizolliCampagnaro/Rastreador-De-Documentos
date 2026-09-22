@@ -11,6 +11,7 @@
 <title>Adicionar documento — Rastreador de Documentos</title>
 <script>
   if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+  if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -461,6 +462,9 @@
                 <input type="checkbox" id="registrar_gasto" name="registrar_gasto">
                 <label for="registrar_gasto">Registrar esse valor na tela de Gastos</label>
               </div>
+              <button type="button" class="btn-secundario-linha" id="btn-remover-custo" style="padding: 12px 0 0; font-size: 12.5px; color: var(--texto-muted);">
+                <span id="icone-remover-custo"></span> Remover custo/pagamento
+              </button>
             </div>
           </div>
 
@@ -559,6 +563,7 @@
     document.getElementById('icone-secao-pessoa').innerHTML = icone('user', 16);
     document.getElementById('icone-secao-validade').innerHTML = icone('calendar', 16);
     document.getElementById('icone-secao-custos').innerHTML = icone('dollarSign', 16);
+    document.getElementById('icone-remover-custo').innerHTML = icone('trash2', 13);
     document.getElementById('icone-secao-anexo').innerHTML = icone('paperclip', 16);
     document.getElementById('icone-secao-obs').innerHTML = icone('edit', 16);
     document.getElementById('icone-secao-checklist').innerHTML = icone('checkCircle', 16);
@@ -653,6 +658,15 @@
 
     document.getElementById('custo_valor').addEventListener('input', function () {
       document.getElementById('bloco-pagamento').style.display = this.value && parseFloat(this.value) > 0 ? 'block' : 'none';
+    });
+
+    document.getElementById('btn-remover-custo').addEventListener('click', function () {
+      form.custo_valor.value = '';
+      form.custo_tipo.value = 'anual';
+      form.proximo_pagamento_data.value = '';
+      form.proximo_pagamento_status.value = 'pendente';
+      form.registrar_gasto.checked = false;
+      document.getElementById('bloco-pagamento').style.display = 'none';
     });
 
     /* ---------- checklists padrão ---------- */
