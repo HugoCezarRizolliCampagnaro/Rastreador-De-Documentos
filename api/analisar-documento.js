@@ -6,7 +6,8 @@
 //
 // Env var necessária na Vercel: MISTRAL_API_KEY
 
-const MODELO_IA = 'mistral-small-latest';
+// Modelo com limites bem mais altos na conta grátis. Dá pra trocar sem mexer no código: variável MISTRAL_MODEL na Vercel.
+const MODELO_IA = process.env.MISTRAL_MODEL || 'ministral-8b-2512';
 
 
 // A Mistral grátis limita quantas chamadas por segundo/minuto. Se der 429, espera um pouco e tenta de novo.
