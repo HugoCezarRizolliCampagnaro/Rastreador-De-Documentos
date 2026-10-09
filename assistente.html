@@ -248,6 +248,10 @@
 
   .bolha.assistente { background: var(--superficie); border: 1px solid var(--borda); border-top-left-radius: 4px; }
   .bolha.usuario { background: var(--marca); color: #FFFFFF; border-top-right-radius: 4px; }
+  .bolha.assistente strong { font-weight: 700; color: var(--texto); }
+  .bolha.assistente p { margin: 0; }
+  .bolha.assistente p + p, .bolha.assistente p + ul, .bolha.assistente ul + p { margin-top: 8px; }
+  .bolha.assistente ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 
   .cards-resposta { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 
@@ -575,6 +579,7 @@
 
     let usuarioAtual = null;
     let ultimaPergunta = '';
+    const historicoChat = []; // últimas mensagens, pra IA lembrar do assunto
 
     /* ---------- boas-vindas dinâmicas ---------- */
 
@@ -659,13 +664,34 @@
       }).join('')}</div>`;
     }
 
+    // Converte o texto da IA (com **negrito** e listas "- ") em HTML seguro: escapa tudo primeiro.
+    function formatarTexto(texto) {
+      const linhas = escapeHtml(String(texto)).replace(/\r/g, '').split('\n');
+      let html = '';
+      let emLista = false;
+      linhas.forEach(function (linha) {
+        const t = linha.trim();
+        const item = t.match(/^[-*•]\s+(.*)$/);
+        const comNegrito = function (x) { return x.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'); };
+        if (item) {
+          if (!emLista) { html += '<ul>'; emLista = true; }
+          html += '<li>' + comNegrito(item[1]) + '</li>';
+        } else {
+          if (emLista) { html += '</ul>'; emLista = false; }
+          if (t) html += '<p>' + comNegrito(t) + '</p>';
+        }
+      });
+      if (emLista) html += '</ul>';
+      return html;
+    }
+
     function adicionarTurnoAssistente(texto, extraHtml) {
       const div = document.createElement('div');
       div.className = 'turno assistente';
       div.innerHTML = `
         <div class="avatar-assistente">${icone('activity', 15, '#FFFFFF')}</div>
         <div class="conteudo-turno">
-          <div class="bolha assistente">${escapeHtml(texto)}</div>
+          <div class="bolha assistente">${formatarTexto(texto)}</div>
           ${extraHtml || ''}
         </div>
       `;
@@ -706,17 +732,13 @@
     async function responder(pergunta, documentos) {
       const p = pergunta.toLowerCase();
 
-      if (documentos.length === 0) {
-        return { texto: 'Você ainda não tem documentos cadastrados. Toque no "+" na tela inicial pra adicionar o primeiro.' };
-      }
-
       const comDias = documentos.map(function (doc) {
         return Object.assign({}, doc, { dias: diasRestantes(doc.data_vencimento) });
       });
 
       // checklist / renovação de um documento específico — continua sem IA, porque mostra
       // o checklist interativo de verdade (com o progresso real salvo no banco)
-      if (p.includes('checklist') || p.includes('renovar') || p.includes('renovação') || p.includes('renovacao')) {
+      if (comDias.length > 0 && (p.includes('checklist') || p.includes('renovar') || p.includes('renovação') || p.includes('renovacao'))) {
         const docMencionado = comDias.find(function (d) { return p.includes(d.nome.toLowerCase()); });
         const alvo = docMencionado || comDias.slice().sort(function (a, b) { return a.dias - b.dias; })[0];
         const itens = await buscarChecklistPara(alvo);
@@ -755,7 +777,8 @@
           body: JSON.stringify({
             pergunta: pergunta,
             documentos: resumo,
-            dataHoje: new Date().toISOString().slice(0, 10),
+            dataHoje: new Date().toLocaleDateString('sv-SE'), // data local (não UTC), senão à noite o "hoje" vira amanhã
+            historico: historicoChat.slice(-6),
           }),
         });
 
@@ -765,6 +788,8 @@
           return { texto: dados.erro || 'Não consegui pensar numa resposta agora. Tenta de novo em alguns segundos.' };
         }
 
+        historicoChat.push({ role: 'user', content: pergunta });
+        historicoChat.push({ role: 'assistant', content: dados.resposta });
         return { texto: dados.resposta };
       } catch (err) {
         return { texto: 'Não consegui falar com a IA agora. Confere sua internet e tenta de novo.' };
