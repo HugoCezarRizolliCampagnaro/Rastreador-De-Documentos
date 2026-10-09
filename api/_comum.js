@@ -96,6 +96,7 @@ async function salvarPerfil(userId, campos) {
 }
 
 module.exports = {
+  SUPABASE_URL,
   PLANOS,
   DIAS_TESTE_GRATIS,
   DIAS_TOLERANCIA,

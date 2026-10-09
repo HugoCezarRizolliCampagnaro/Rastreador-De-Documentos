@@ -533,6 +533,8 @@
       // sem erro: o navegador segue para o Google e volta logado
     });
 
+    if (location.hash === '#conta-excluida') mostrarMensagem('Sua conta foi excluída. Sentiremos sua falta!', 'sucesso');
+
     // voltou do Google com erro (ex.: pessoa cancelou)?
     (function () {
       const p = new URLSearchParams(location.search.slice(1) + '&' + location.hash.slice(1));

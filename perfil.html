@@ -374,6 +374,22 @@
   .app-shell { overflow-x: clip; max-width: 100%; }
   .conteudo-principal { min-width: 0; max-width: 100%; }
   .glow-fundo { max-width: 85vw; }
+  .modal-excluir { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .modal-excluir[hidden] { display: none; }
+  .modal-excluir-card { width: 100%; max-width: 420px; background: var(--superficie); border: 1px solid var(--borda); border-radius: 18px; padding: 24px; }
+  .modal-excluir-card h2 { margin: 0 0 10px; font-size: 18px; color: var(--status-vermelho); }
+  .modal-excluir-card p { margin: 0 0 10px; font-size: 13.5px; line-height: 1.55; color: var(--texto-muted); }
+  .modal-excluir-card p strong, .modal-excluir-card label strong { color: var(--texto); }
+  .modal-excluir-card label { display: block; font-size: 13px; margin: 14px 0 6px; }
+  .modal-excluir-card input { width: 100%; padding: 12px 14px; font: inherit; font-size: 16px; color: var(--texto); background: var(--bg); border: 1.5px solid var(--borda); border-radius: 10px; }
+  .modal-excluir-card input:focus { outline: none; border-color: var(--status-vermelho); }
+  .modal-excluir-erro { color: var(--status-vermelho) !important; margin-top: 10px !important; }
+  .modal-excluir-acoes { display: flex; gap: 10px; margin-top: 18px; }
+  .modal-excluir-acoes button { flex: 1; padding: 12px; font: inherit; font-size: 14px; font-weight: 700; border-radius: 10px; cursor: pointer; }
+  .modal-excluir-cancelar { background: none; color: var(--texto); border: 1.5px solid var(--borda); }
+  .modal-excluir-confirmar { background: var(--status-vermelho); color: #FFFFFF; border: none; }
+  .modal-excluir-confirmar:disabled { opacity: 0.4; cursor: default; }
+  .opcao-linha[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -438,6 +454,28 @@
           </div>
         </div>
 
+        <p class="secao-titulo-grupo">Notificações</p>
+        <div class="opcao-card">
+          <div class="opcao-linha">
+            <span class="opcao-icone" id="icone-notificacoes"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo">Avisos de vencimento</div>
+              <div class="opcao-descricao" id="desc-notificacoes">Receba um aviso neste aparelho quando um documento estiver perto de vencer.</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggle-notificacoes" disabled>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <button type="button" class="opcao-linha" id="btn-testar-notificacao" hidden>
+            <span class="opcao-icone" id="icone-testar-notificacao"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo" id="texto-testar-notificacao">Enviar notificação de teste</div>
+              <div class="opcao-descricao">Confira se o aviso chega neste aparelho.</div>
+            </div>
+          </button>
+        </div>
+
         <p class="secao-titulo-grupo">Dados</p>
         <div class="opcao-card">
           <button type="button" class="opcao-linha" id="btn-exportar">
@@ -496,7 +534,30 @@
             <span class="opcao-icone" id="icone-sair"></span>
             <div class="opcao-texto"><div class="opcao-titulo">Sair da conta</div></div>
           </button>
+          <button type="button" class="opcao-linha perigo" id="btn-excluir-conta">
+            <span class="opcao-icone" id="icone-excluir"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo">Excluir minha conta</div>
+              <div class="opcao-descricao">Apaga seus documentos, arquivos e dados. Não dá para desfazer.</div>
+            </div>
+          </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="modal-excluir" id="modal-excluir" hidden>
+    <div class="modal-excluir-card" role="dialog" aria-modal="true" aria-labelledby="modal-excluir-titulo">
+      <h2 id="modal-excluir-titulo">Excluir sua conta?</h2>
+      <p>Isso apaga <strong>de forma definitiva</strong> todos os seus documentos, anexos, gastos e dados, e cancela qualquer assinatura ativa. Não é possível recuperar depois.</p>
+      <p>Se quiser guardar uma cópia, exporte seus documentos em CSV antes.</p>
+      <label for="confirma-excluir">Para confirmar, digite <strong>EXCLUIR</strong>:</label>
+      <input type="text" id="confirma-excluir" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <p class="modal-excluir-erro" id="erro-excluir" hidden></p>
+      <div class="modal-excluir-acoes">
+        <button type="button" class="modal-excluir-cancelar" id="cancelar-excluir">Cancelar</button>
+        <button type="button" class="modal-excluir-confirmar" id="confirmar-excluir" disabled>Excluir tudo</button>
       </div>
     </div>
   </div>
@@ -524,6 +585,8 @@
     /* ---------- ícones ---------- */
 
     const CORPOS_ICONE = {
+      bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+      trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
       home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
       dollarSign: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
       calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
@@ -602,6 +665,168 @@
       await sb.auth.signOut();
       window.location.href = 'login.html';
     });
+
+
+
+    /* ---------- notificações push ---------- */
+
+    (function () {
+      const VAPID_PUBLIC_KEY = 'BIEAnA0Kth4N3BVepY7a1eqQDOVMUev7Vj_t5I7OEgCFDkNhlvYRySW1k6MK8MF5DTeXat0ETeEuqFlPh_eZEIc';
+      const toggle = document.getElementById('toggle-notificacoes');
+      const desc = document.getElementById('desc-notificacoes');
+      const btnTeste = document.getElementById('btn-testar-notificacao');
+      const textoTeste = document.getElementById('texto-testar-notificacao');
+      const padrao = desc.textContent;
+
+      document.getElementById('icone-notificacoes').innerHTML = icone('bell', 17);
+      document.getElementById('icone-testar-notificacao').innerHTML = icone('bell', 17);
+
+      const iOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+      const instalado = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      const suporta = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+      function avisar(texto) { desc.textContent = texto; }
+
+      if (!suporta) {
+        avisar(iOS && !instalado
+          ? 'No iPhone, instale o DocTrack na tela inicial (Compartilhar > Adicionar à Tela de Início) para receber avisos.'
+          : 'Este navegador não suporta notificações.');
+        return;
+      }
+
+      function chaveParaBytes(base64) {
+        const preenchido = (base64 + '='.repeat((4 - base64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+        const bruto = atob(preenchido);
+        return Uint8Array.from(bruto, function (c) { return c.charCodeAt(0); });
+      }
+
+      async function registro() {
+        return navigator.serviceWorker.ready;
+      }
+
+      async function atualizar() {
+        try {
+          const reg = await registro();
+          const sub = await reg.pushManager.getSubscription();
+          toggle.checked = !!sub && Notification.permission === 'granted';
+          btnTeste.hidden = !toggle.checked;
+          if (Notification.permission === 'denied') {
+            toggle.checked = false;
+            avisar('As notificações estão bloqueadas neste navegador. Libere nas configurações do site para ativar.');
+          } else {
+            avisar(padrao);
+          }
+          toggle.disabled = Notification.permission === 'denied';
+        } catch (e) {
+          avisar('Não foi possível verificar as notificações agora.');
+        }
+      }
+
+      async function ativar() {
+        const permissao = await Notification.requestPermission();
+        if (permissao !== 'granted') { await atualizar(); return; }
+
+        const reg = await registro();
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveParaBytes(VAPID_PUBLIC_KEY) });
+
+        const dados = sub.toJSON();
+        const { data: sessao } = await sb.auth.getSession();
+        const { error } = await sb.from('push_inscricoes').upsert({
+          user_id: sessao.session.user.id,
+          endpoint: dados.endpoint,
+          p256dh: dados.keys.p256dh,
+          auth: dados.keys.auth,
+        }, { onConflict: 'endpoint' });
+        if (error) throw error;
+      }
+
+      async function desativar() {
+        const reg = await registro();
+        const sub = await reg.pushManager.getSubscription();
+        if (!sub) return;
+        await sb.from('push_inscricoes').delete().eq('endpoint', sub.endpoint);
+        await sub.unsubscribe();
+      }
+
+      toggle.addEventListener('change', async function () {
+        toggle.disabled = true;
+        try {
+          if (toggle.checked) await ativar(); else await desativar();
+        } catch (e) {
+          console.error('Notificações:', e);
+          avisar('Não foi possível alterar agora. Tente de novo em instantes.');
+          toggle.checked = !toggle.checked;
+          toggle.disabled = false;
+          return;
+        }
+        toggle.disabled = false;
+        await atualizar();
+      });
+
+      btnTeste.addEventListener('click', async function () {
+        textoTeste.textContent = 'Enviando...';
+        try {
+          const sessao = (await sb.auth.getSession()).data.session;
+          const resp = await fetch('/api/testar-notificacao', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + (sessao ? sessao.access_token : '') },
+          });
+          const dados = await resp.json().catch(function () { return {}; });
+          textoTeste.textContent = resp.ok ? 'Enviada! Veja o aparelho.' : (dados.erro || 'Não foi possível enviar.');
+        } catch (e) {
+          textoTeste.textContent = 'Sem conexão. Tente de novo.';
+        }
+        setTimeout(function () { textoTeste.textContent = 'Enviar notificação de teste'; }, 4000);
+      });
+
+      toggle.disabled = false;
+      atualizar();
+    })();
+
+    /* ---------- excluir conta ---------- */
+
+    (function () {
+      const modal = document.getElementById('modal-excluir');
+      const campo = document.getElementById('confirma-excluir');
+      const botao = document.getElementById('confirmar-excluir');
+      const erroEl = document.getElementById('erro-excluir');
+
+      document.getElementById('icone-excluir').innerHTML = icone('trash', 17);
+
+      function abrir() { campo.value = ''; botao.disabled = true; erroEl.hidden = true; modal.hidden = false; campo.focus(); }
+      function fechar() { modal.hidden = true; }
+
+      document.getElementById('btn-excluir-conta').addEventListener('click', abrir);
+      document.getElementById('cancelar-excluir').addEventListener('click', fechar);
+      modal.addEventListener('click', function (e) { if (e.target === modal) fechar(); });
+      campo.addEventListener('input', function () { botao.disabled = campo.value.trim().toUpperCase() !== 'EXCLUIR'; });
+
+      botao.addEventListener('click', async function () {
+        botao.disabled = true; botao.textContent = 'Excluindo...'; erroEl.hidden = true;
+        try {
+          const sessao = (await sb.auth.getSession()).data.session;
+          const resp = await fetch('/api/excluir-conta', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (sessao ? sessao.access_token : '') },
+            body: JSON.stringify({ confirmacao: 'EXCLUIR' }),
+          });
+          const dados = await resp.json().catch(function () { return {}; });
+          if (!resp.ok) throw new Error(dados.erro || 'Não foi possível excluir agora.');
+
+          try {
+            Object.keys(localStorage).filter(function (k) { return k.indexOf('doctrack-chat-') === 0; }).forEach(function (k) { localStorage.removeItem(k); });
+          } catch (e) {}
+          await sb.auth.signOut().catch(function () {});
+          window.location.replace('login.html#conta-excluida');
+        } catch (e) {
+          erroEl.textContent = e.message;
+          erroEl.hidden = false;
+          botao.textContent = 'Excluir tudo';
+          botao.disabled = campo.value.trim().toUpperCase() !== 'EXCLUIR';
+        }
+      });
+    })();
 
     /* ---------- instalar app (atalho no perfil) ---------- */
 

@@ -206,6 +206,7 @@
       const novaSenha = document.getElementById('nova-senha').value;
       const confirmar = document.getElementById('confirmar').value;
 
+      if (novaSenha.length < 8) { mostrarMensagem('A senha precisa ter pelo menos 8 caracteres.', 'erro'); return; }
       if (novaSenha !== confirmar) { mostrarMensagem('As senhas não são iguais.', 'erro'); return; }
 
       const botao = document.getElementById('btn-salvar');
@@ -217,7 +218,11 @@
       botao.disabled = false;
       botao.textContent = 'Salvar nova senha';
 
-      if (error) { mostrarMensagem(error.message, 'erro'); return; }
+      if (error) {
+        const m = String(error.message || '').toLowerCase();
+        mostrarMensagem(m.includes('different') ? 'A nova senha precisa ser diferente da anterior.' : (m.includes('weak') || m.includes('at least')) ? 'Senha fraca. Use pelo menos 8 caracteres.' : 'Não foi possível salvar agora. Peça um novo link e tente de novo.', 'erro');
+        return;
+      }
 
       mostrarMensagem('Senha atualizada! Redirecionando...', 'sucesso');
       setTimeout(function () { window.location.href = 'index.html'; }, 1500);

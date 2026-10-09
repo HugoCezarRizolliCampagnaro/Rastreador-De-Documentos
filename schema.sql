@@ -207,3 +207,25 @@ alter table perfis enable row level security;
 
 create policy "ler proprio perfil" on perfis
   for select using (auth.uid() = user_id);
+
+
+-- Notificações push: um aparelho = uma linha
+create table if not exists push_inscricoes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  criado_em timestamptz default now()
+);
+
+alter table push_inscricoes enable row level security;
+
+create policy "ver proprias inscricoes" on push_inscricoes
+  for select using (auth.uid() = user_id);
+create policy "criar proprias inscricoes" on push_inscricoes
+  for insert with check (auth.uid() = user_id);
+create policy "atualizar proprias inscricoes" on push_inscricoes
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "apagar proprias inscricoes" on push_inscricoes
+  for delete using (auth.uid() = user_id);

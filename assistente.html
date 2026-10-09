@@ -3,7 +3,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="description" content="DocTrack — organize seus documentos, controle vencimentos e receba lembretes.">
@@ -418,6 +418,10 @@
   .app-shell { overflow-x: clip; max-width: 100%; }
   .conteudo-principal { min-width: 0; max-width: 100%; }
   .glow-fundo { max-width: 85vw; }
+  /* chat: a tela inteira é exatamente a área visível (não depende de vh/dvh, que erram em alguns celulares) */
+  html, body { height: 100%; overflow: hidden; }
+  .app-shell { position: fixed; top: 0; right: 0; bottom: 0; left: 0; height: auto; }
+  .conteudo-principal { height: 100%; }
 </style>
 </head>
 <body>
