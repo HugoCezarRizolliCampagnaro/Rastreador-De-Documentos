@@ -1,13 +1,13 @@
 {
-  "name": "Rastreador de Documentos",
-  "short_name": "Documentos",
+  "name": "DocTrack — Rastreador de Documentos",
+  "short_name": "DocTrack",
   "description": "Organize seus documentos, controle vencimentos e nunca mais perca um prazo.",
-  "start_url": "/index.html",
-  "scope": "/",
+  "start_url": "index.html",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F7F8FA",
-  "theme_color": "#3D4FE0",
+  "background_color": "#0B0E14",
+  "theme_color": "#0B0E14",
   "icons": [
     {
       "src": "icons/icon-192.png",

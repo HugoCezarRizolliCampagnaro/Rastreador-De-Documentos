@@ -5,10 +5,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="description" content="DocTrack — organize seus documentos, controle vencimentos e receba lembretes.">
+<meta property="og:title" content="DocTrack">
+<meta property="og:description" content="Organize seus documentos, controle vencimentos e nunca mais perca um prazo.">
+<meta property="og:image" content="https://rastreador-de-documentos.vercel.app/icons/icon-512.png">
+<meta property="og:type" content="website">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
 <meta name="theme-color" content="#0B0E14">
-<title>Adicionar documento — Rastreador de Documentos</title>
+<title>Adicionar documento — DocTrack</title>
 <script>
   if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
   if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
@@ -229,6 +235,38 @@
 
   .arquivo-atual a { color: var(--marca); font-weight: 600; text-decoration: none; }
 
+  .btn-ia-preencher {
+    margin-top: 10px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(91, 110, 245, 0.12);
+    border: 1px dashed var(--marca);
+    color: var(--marca);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .btn-ia-preencher:hover { background: rgba(91, 110, 245, 0.2); }
+
+  .btn-ia-preencher:disabled { opacity: 0.65; cursor: wait; }
+
+  .ia-preencher-status {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--texto-muted);
+  }
+
+  .ia-preencher-status.erro { color: var(--status-vermelho); }
+
+  .ia-preencher-status.sucesso { color: var(--status-verde); }
+
   /* checklist / histórico */
 
   .checklist-cabecalho { display: flex; justify-content: space-between; align-items: center; }
@@ -288,6 +326,72 @@
 
   .btn-secundario-linha.perigo { color: var(--status-vermelho); }
   .btn-secundario-linha:disabled { opacity: 0.6; cursor: default; }
+
+  /* ---------- instalar app (pwa) ---------- */
+
+  .banner-instalar {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 92px;
+    z-index: 45;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    max-width: 400px;
+    margin: 0 auto;
+    animation: instalarSubir 0.3s ease both;
+  }
+
+  @keyframes instalarSubir {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (min-width: 960px) {
+    .banner-instalar { left: auto; right: 24px; margin: 0; }
+  }
+
+  .banner-instalar[hidden] { display: none; }
+
+  .banner-instalar-logo { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; object-fit: cover; }
+
+  .banner-instalar-conteudo { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+  .banner-instalar-conteudo strong { font-size: 13.5px; color: var(--texto); }
+
+  .banner-instalar-conteudo span { font-size: 12px; color: var(--texto-muted); line-height: 1.4; }
+
+  .banner-instalar-acoes { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+
+  .banner-instalar-cta {
+    background: var(--marca);
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .banner-instalar-cta:hover { background: var(--marca-hover); }
+
+  .banner-instalar-fechar {
+    background: none;
+    border: none;
+    color: var(--texto-muted);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 2px;
+    text-decoration: underline;
+  }
 </style>
 </head>
 <body>
@@ -297,10 +401,10 @@
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-marca">
-        <span class="sidebar-logo" id="sidebar-logo"></span>
+        <img class="sidebar-logo" src="icons/icon-192.png" alt="DocTrack" style="object-fit: cover;">
         <div>
-          <div class="sidebar-titulo">Rastreador</div>
-          <div class="sidebar-subtitulo">de Documentos</div>
+          <div class="sidebar-titulo">DocTrack</div>
+          <div class="sidebar-subtitulo">Rastreador de Documentos</div>
         </div>
       </div>
       <nav class="sidebar-nav" id="sidebar-nav"></nav>
@@ -328,6 +432,21 @@
         <div id="confirmacao" class="confirmacao" hidden></div>
 
         <form id="doc-form" onsubmit="return false">
+
+          <div class="secao-card">
+            <div class="secao-cabecalho">
+              <span class="secao-icone" id="icone-secao-anexo"></span>
+              <span class="secao-titulo">Documento anexado</span>
+            </div>
+            <p class="secao-descricao" style="margin: -8px 0 12px;">Adicione uma foto ou PDF para manter o documento sempre disponível.</p>
+            <input type="file" id="arquivo" name="arquivo" accept="application/pdf,image/*" capture="environment">
+            <div id="arquivo-atual" class="arquivo-atual" hidden></div>
+            <button type="button" class="btn-ia-preencher" id="btn-ia-preencher" hidden>
+              <span id="icone-ia-preencher"></span>
+              <span id="texto-ia-preencher">Preencher automaticamente com IA</span>
+            </button>
+            <p class="ia-preencher-status" id="ia-preencher-status" hidden></p>
+          </div>
 
           <div class="secao-card">
             <div class="secao-cabecalho">
@@ -370,6 +489,7 @@
                   <option value="trabalho" selected>Trabalho</option>
                   <option value="casa">Casa</option>
                   <option value="outro">Outro</option>
+                  <option value="__novo__">+ Nova categoria...</option>
                 </select>
               </div>
             </div>
@@ -470,16 +590,6 @@
 
           <div class="secao-card">
             <div class="secao-cabecalho">
-              <span class="secao-icone" id="icone-secao-anexo"></span>
-              <span class="secao-titulo">Documento anexado</span>
-            </div>
-            <p class="secao-descricao" style="margin: -8px 0 12px;">Adicione uma foto ou PDF para manter o documento sempre disponível.</p>
-            <input type="file" id="arquivo" name="arquivo" accept="application/pdf,image/*" capture="environment">
-            <div id="arquivo-atual" class="arquivo-atual" hidden></div>
-          </div>
-
-          <div class="secao-card">
-            <div class="secao-cabecalho">
               <span class="secao-icone" id="icone-secao-obs"></span>
               <span class="secao-titulo">Observações <span class="opcional" style="font-weight:400;">(opcional)</span></span>
             </div>
@@ -520,6 +630,17 @@
     </div>
   </div>
 
+  <div class="banner-instalar" id="banner-instalar" hidden>
+    <img class="banner-instalar-logo" src="icons/icon-192.png" alt="">
+    <div class="banner-instalar-conteudo">
+      <strong>Instalar o DocTrack</strong>
+      <span>Acesse mais rápido, direto da tela inicial.</span>
+    </div>
+    <div class="banner-instalar-acoes">
+      <button type="button" class="banner-instalar-cta" id="btn-instalar-banner">Instalar</button>
+      <button type="button" class="banner-instalar-fechar" id="btn-fechar-banner">Agora não</button>
+    </div>
+  </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
@@ -546,6 +667,7 @@
       alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
       copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
       trash2: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
+      zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
     };
 
     function icone(nome, tamanho, corTraco) {
@@ -554,7 +676,6 @@
       return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
     }
 
-    document.getElementById('sidebar-logo').innerHTML = icone('fileText', 18, '#FFFFFF');
     document.getElementById('botao-menu').innerHTML = icone('menu', 18);
     document.getElementById('icone-voltar').innerHTML = icone('arrowLeft', 15);
     document.getElementById('sidebar-perfil-seta').innerHTML = icone('chevronRight', 16);
@@ -570,6 +691,112 @@
     document.getElementById('icone-secao-historico').innerHTML = icone('clock', 16);
     document.getElementById('icone-duplicar').innerHTML = icone('copy', 15);
     document.getElementById('icone-excluir').innerHTML = icone('trash2', 15);
+    document.getElementById('icone-ia-preencher').innerHTML = icone('zap', 15);
+
+    /* ---------- preencher automaticamente com IA (foto/PDF do documento) ---------- */
+
+    function arquivoParaBase64(arquivo) {
+      return new Promise(function (resolve, reject) {
+        const leitor = new FileReader();
+        leitor.onload = function () {
+          const resultado = leitor.result || '';
+          const virgula = resultado.indexOf(',');
+          resolve(virgula >= 0 ? resultado.slice(virgula + 1) : resultado);
+        };
+        leitor.onerror = function () { reject(new Error('Não foi possível ler o arquivo.')); };
+        leitor.readAsDataURL(arquivo);
+      });
+    }
+
+    // reduz a foto (máx. 1600px, JPEG) antes de enviar: foto de celular pesa vários MB
+    // e o servidor só aceita requisições de até ~4 MB
+    function reduzirImagem(arquivo) {
+      return new Promise(function (resolve, reject) {
+        const url = URL.createObjectURL(arquivo);
+        const img = new Image();
+        img.onload = function () {
+          const maximo = 1600;
+          const escala = Math.min(1, maximo / Math.max(img.width, img.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * escala);
+          canvas.height = Math.round(img.height * escala);
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(url);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          resolve(dataUrl.slice(dataUrl.indexOf(',') + 1));
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Não foi possível abrir a imagem.')); };
+        img.src = url;
+      });
+    }
+
+    document.getElementById('arquivo').addEventListener('change', function () {
+      const statusIA = document.getElementById('ia-preencher-status');
+      statusIA.hidden = true;
+      const arquivo = this.files[0];
+      const botaoIA = document.getElementById('btn-ia-preencher');
+      botaoIA.hidden = !arquivo || !arquivo.type.startsWith('image/');
+      if (arquivo && !arquivo.type.startsWith('image/')) {
+        statusIA.className = 'ia-preencher-status';
+        statusIA.textContent = 'A leitura automática funciona com foto (JPG/PNG). Para PDF, preencha os campos manualmente.';
+        statusIA.hidden = false;
+      }
+    });
+
+    document.getElementById('btn-ia-preencher').addEventListener('click', async function () {
+      const arquivo = form.arquivo.files[0];
+      const statusIA = document.getElementById('ia-preencher-status');
+      const textoBotao = document.getElementById('texto-ia-preencher');
+      if (!arquivo) return;
+
+      this.disabled = true;
+      textoBotao.textContent = 'Analisando com IA...';
+      statusIA.hidden = true;
+
+      try {
+        const base64 = await reduzirImagem(arquivo);
+        const resp = await fetch('/api/analisar-documento', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imagemBase64: base64, mimeType: 'image/jpeg' }),
+        });
+        const dados = await resp.json();
+
+        if (!resp.ok || !dados.extraido) {
+          throw new Error(dados.erro || 'Não consegui analisar o arquivo agora.');
+        }
+
+        const campos = dados.extraido;
+        const tiposValidos = ['aso', 'nr', 'alvara', 'contrato', 'certificacao', 'outro'];
+        const categoriasValidas = ['pessoal', 'veiculo', 'trabalho', 'casa', 'outro'];
+
+        if (campos.nome) form.nome.value = campos.nome;
+        if (campos.tipo && tiposValidos.includes(campos.tipo)) form.tipo.value = campos.tipo;
+        if (campos.numero_documento) form.numero_documento.value = campos.numero_documento;
+        if (campos.data_emissao && /^\d{4}-\d{2}-\d{2}$/.test(campos.data_emissao)) form.data_emissao.value = campos.data_emissao;
+        if (campos.data_vencimento && /^\d{4}-\d{2}-\d{2}$/.test(campos.data_vencimento)) {
+          form.data_vencimento.value = campos.data_vencimento;
+          atualizarPreviewVencimento();
+        }
+        if (campos.categoria_sugerida && categoriasValidas.includes(campos.categoria_sugerida)) {
+          form.categoria.value = campos.categoria_sugerida;
+        }
+        if (campos.observacoes) {
+          form.observacoes.value = form.observacoes.value ? form.observacoes.value + '\n' + campos.observacoes : campos.observacoes;
+        }
+
+        statusIA.className = 'ia-preencher-status sucesso';
+        statusIA.textContent = 'Preenchido com IA! Revise os campos antes de salvar — a IA pode errar.';
+        statusIA.hidden = false;
+      } catch (erro) {
+        statusIA.className = 'ia-preencher-status erro';
+        statusIA.textContent = erro.message || 'Não consegui analisar o arquivo agora. Preencha manualmente.';
+        statusIA.hidden = false;
+      } finally {
+        this.disabled = false;
+        textoBotao.textContent = 'Preencher automaticamente com IA';
+      }
+    });
 
     document.getElementById('sidebar-nav').innerHTML = [
       { href: 'index.html', nome: 'home', label: 'Início' },
@@ -749,6 +976,62 @@
       }
     });
 
+    /* ---------- categorias ---------- */
+
+    const CATEGORIAS_PADRAO = [
+      { valor: 'pessoal', rotulo: 'Pessoal' },
+      { valor: 'veiculo', rotulo: 'Veículo' },
+      { valor: 'trabalho', rotulo: 'Trabalho' },
+      { valor: 'casa', rotulo: 'Casa' },
+      { valor: 'outro', rotulo: 'Outro' },
+    ];
+
+    function slugificarCategoria(texto) {
+      return texto.trim().toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-+|-+$)/g, '');
+    }
+
+    function rotularCategoriaSlug(valor) {
+      return valor.split('-').filter(Boolean).map(function (parte) {
+        return parte.charAt(0).toUpperCase() + parte.slice(1);
+      }).join(' ');
+    }
+
+    async function carregarCategorias(selecionarValor) {
+      const { data } = await sb.from('documentos').select('categoria').eq('user_id', usuarioAtual.id);
+      const valoresPadrao = CATEGORIAS_PADRAO.map(function (c) { return c.valor; });
+      const extras = Array.from(new Set((data || []).map(function (d) { return d.categoria; }).filter(Boolean)))
+        .filter(function (v) { return !valoresPadrao.includes(v); });
+      const todas = CATEGORIAS_PADRAO.concat(extras.map(function (v) {
+        return { valor: v, rotulo: rotularCategoriaSlug(v) };
+      }));
+      const select = document.getElementById('categoria');
+      const opcoes = todas.map(function (c) { return `<option value="${c.valor}">${escapeHtml(c.rotulo)}</option>`; }).join('');
+      select.innerHTML = `${opcoes}<option value="__novo__">+ Nova categoria...</option>`;
+      select.value = selecionarValor || 'trabalho';
+    }
+
+    document.getElementById('categoria').addEventListener('change', function () {
+      if (this.value !== '__novo__') return;
+      const nome = prompt('Nome da nova categoria:');
+      if (nome && nome.trim()) {
+        const valor = slugificarCategoria(nome);
+        if (!valor) { this.value = 'trabalho'; return; }
+        const existente = Array.from(this.options).some(function (o) { return o.value === valor; });
+        if (!existente) {
+          const novaOpcao = document.createElement('option');
+          novaOpcao.value = valor;
+          novaOpcao.textContent = nome.trim();
+          this.insertBefore(novaOpcao, this.querySelector('option[value="__novo__"]'));
+        }
+        this.value = valor;
+      } else {
+        this.value = 'trabalho';
+      }
+    });
+
     /* ---------- sessão / carregar edição ---------- */
 
     sb.auth.getSession().then(async function (resultado) {
@@ -758,6 +1041,7 @@
       document.getElementById('sidebar-avatar').textContent = usuarioAtual.email.charAt(0).toUpperCase();
 
       await carregarPessoas();
+      await carregarCategorias();
 
       if (idEdicao) {
         tituloPagina.textContent = 'Editar documento';
@@ -829,7 +1113,9 @@
 
       if (!idEdicao) {
         const { count } = await sb.from('documentos').select('id', { count: 'exact', head: true });
-        if ((count || 0) >= 3) {
+        const { data: perfilPlano } = await sb.from('perfis').select('plano, plano_valido_ate').maybeSingle();
+        const planoPago = !!perfilPlano && perfilPlano.plano !== 'gratis' && perfilPlano.plano_valido_ate >= new Date().toLocaleDateString('sv-SE');
+        if (!planoPago && (count || 0) >= 3) {
           confirmacao.style.borderLeftColor = 'var(--status-vermelho)';
           confirmacao.innerHTML = `
             <strong>Limite do plano Grátis atingido</strong>
@@ -974,6 +1260,67 @@
       }
       window.location.href = 'novo-documento.html?id=' + novo.id;
     });
+      /* ---------- instalar app (pwa) ---------- */
+
+    let eventoInstalacao = null;
+    const appJaInstalado = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+    function mostrarBannerInstalar() {
+      if (appJaInstalado || localStorage.getItem('app-instalado') === 'true' || localStorage.getItem('instalar-app-dispensado') === 'true') return;
+      const banner = document.getElementById('banner-instalar');
+      if (banner) banner.hidden = false;
+      atualizarOpcaoInstalarPerfil();
+    }
+
+    function ocultarBannerInstalar() {
+      const banner = document.getElementById('banner-instalar');
+      if (banner) banner.hidden = true;
+    }
+
+    function atualizarOpcaoInstalarPerfil() {
+      const grupo = document.getElementById('grupo-instalar-app');
+      const card = document.getElementById('card-instalar-app');
+      if (!grupo || !card) return;
+      const podeMostrar = !appJaInstalado && localStorage.getItem('app-instalado') !== 'true';
+      grupo.hidden = !podeMostrar;
+      card.hidden = !podeMostrar;
+    }
+
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      eventoInstalacao = e;
+      mostrarBannerInstalar();
+    });
+
+    window.addEventListener('appinstalled', function () {
+      localStorage.setItem('app-instalado', 'true');
+      eventoInstalacao = null;
+      ocultarBannerInstalar();
+      atualizarOpcaoInstalarPerfil();
+    });
+
+    const btnInstalarBanner = document.getElementById('btn-instalar-banner');
+    if (btnInstalarBanner) {
+      btnInstalarBanner.addEventListener('click', async function () {
+        if (!eventoInstalacao) { ocultarBannerInstalar(); return; }
+        ocultarBannerInstalar();
+        eventoInstalacao.prompt();
+        const resultado = await eventoInstalacao.userChoice;
+        if (resultado.outcome === 'accepted') localStorage.setItem('app-instalado', 'true');
+        eventoInstalacao = null;
+        atualizarOpcaoInstalarPerfil();
+      });
+    }
+
+    const btnFecharBanner = document.getElementById('btn-fechar-banner');
+    if (btnFecharBanner) {
+      btnFecharBanner.addEventListener('click', function () {
+        localStorage.setItem('instalar-app-dispensado', 'true');
+        ocultarBannerInstalar();
+      });
+    }
+
+    atualizarOpcaoInstalarPerfil();
   </script>
 
 </body>

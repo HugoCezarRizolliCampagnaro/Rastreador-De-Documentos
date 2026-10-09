@@ -5,12 +5,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="description" content="DocTrack — organize seus documentos, controle vencimentos e receba lembretes.">
+<meta property="og:title" content="DocTrack">
+<meta property="og:description" content="Organize seus documentos, controle vencimentos e nunca mais perca um prazo.">
+<meta property="og:image" content="https://rastreador-de-documentos.vercel.app/icons/icon-512.png">
+<meta property="og:type" content="website">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
 <meta name="theme-color" content="#0B0E14">
-<title>Entrar — Rastreador de Documentos</title>
+<title>Entrar — DocTrack</title>
 <script>
   if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+  if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -138,7 +145,7 @@
 
   <div class="cartao-auth">
     <div class="logo-topo">
-      <span class="logo-icone" id="logo-icone"></span>
+      <img class="logo-icone" src="icons/icon-192.png" alt="DocTrack" style="object-fit: cover; width: 60px; height: 60px; border-radius: 16px;">
       <h1>Bem-vindo de volta</h1>
       <p class="subtitulo">Entre na sua conta para continuar organizando seus documentos.</p>
     </div>
@@ -208,7 +215,6 @@
       return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
     }
 
-    document.getElementById('logo-icone').innerHTML = icone('fileText', 20, '#FFFFFF');
     document.getElementById('icone-email').innerHTML = icone('mail', 17);
     document.getElementById('icone-senha').innerHTML = icone('lock', 17);
     document.getElementById('icone-confirmar').innerHTML = icone('lock', 17);

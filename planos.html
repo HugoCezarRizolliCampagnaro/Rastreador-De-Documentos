@@ -5,12 +5,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="description" content="DocTrack — organize seus documentos, controle vencimentos e receba lembretes.">
+<meta property="og:title" content="DocTrack">
+<meta property="og:description" content="Organize seus documentos, controle vencimentos e nunca mais perca um prazo.">
+<meta property="og:image" content="https://rastreador-de-documentos.vercel.app/icons/icon-512.png">
+<meta property="og:type" content="website">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
 <meta name="theme-color" content="#0B0E14">
-<title>Planos — Rastreador de Documentos</title>
+<title>Planos — DocTrack</title>
 <script>
   if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+  if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -197,6 +204,9 @@
   /* comparação */
 
   .secao-card { background: var(--superficie); border: 1px solid var(--borda); border-radius: 16px; padding: 22px; overflow-x: auto; }
+  .secao-card::-webkit-scrollbar { height: 4px; }
+  .secao-card::-webkit-scrollbar-track { background: transparent; }
+  .secao-card::-webkit-scrollbar-thumb { background: var(--borda); border-radius: 999px; }
   .secao-titulo-grande { font-size: 16px; font-weight: 700; margin: 0 0 16px; }
 
   table.tabela-comparacao { width: 100%; border-collapse: collapse; min-width: 560px; font-size: 13px; }
@@ -222,6 +232,89 @@
 
   @keyframes pulso { 0%, 100% { box-shadow: 0 6px 20px rgba(91,110,245,0.5); } 50% { box-shadow: 0 6px 26px rgba(91,110,245,0.75); } }
   .fab:hover { background: var(--marca-hover); transform: scale(1.06); }
+
+  /* ---------- instalar app (pwa) ---------- */
+
+  .banner-instalar {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 92px;
+    z-index: 45;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    max-width: 400px;
+    margin: 0 auto;
+    animation: instalarSubir 0.3s ease both;
+  }
+
+  @keyframes instalarSubir {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (min-width: 960px) {
+    .banner-instalar { left: auto; right: 24px; margin: 0; }
+  }
+
+  .banner-instalar[hidden] { display: none; }
+
+  .banner-instalar-logo { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; object-fit: cover; }
+
+  .banner-instalar-conteudo { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+  .banner-instalar-conteudo strong { font-size: 13.5px; color: var(--texto); }
+
+  .banner-instalar-conteudo span { font-size: 12px; color: var(--texto-muted); line-height: 1.4; }
+
+  .banner-instalar-acoes { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+
+  .banner-instalar-cta {
+    background: var(--marca);
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .banner-instalar-cta:hover { background: var(--marca-hover); }
+
+  .banner-instalar-fechar {
+    background: none;
+    border: none;
+    color: var(--texto-muted);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 2px;
+    text-decoration: underline;
+  }
+
+  .plano-cancelar { margin-top: 10px; width: 100%; background: none; border: none; color: var(--texto-muted); font-size: 12px; text-decoration: underline; cursor: pointer; }
+  .plano-cancelado { margin: 10px 0 0; font-size: 12px; color: var(--texto-muted); text-align: center; }
+
+  .modal-assinatura { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+  .modal-assinatura[hidden] { display: none; }
+  .modal-card { background: var(--superficie); border: 1px solid var(--borda); border-radius: 18px; padding: 22px; width: 100%; max-width: 400px; }
+  .modal-card h2 { margin: 0 0 6px; font-size: 18px; }
+  .modal-card p { margin: 0 0 14px; font-size: 13px; color: var(--texto-muted); line-height: 1.5; }
+  .modal-card label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; }
+  .modal-card input { width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--borda); color: var(--texto); border-radius: 10px; padding: 11px 12px; font-size: 14px; margin-bottom: 12px; font-family: inherit; }
+  .modal-card input:focus { outline: none; border-color: var(--marca); }
+  .modal-botao { width: 100%; background: var(--marca); color: #fff; border: none; border-radius: 10px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none; display: block; box-sizing: border-box; }
+  .modal-botao:hover { background: var(--marca-hover); }
+  .modal-botao:disabled { opacity: 0.6; cursor: wait; }
+  .modal-botao.secundario { background: none; color: var(--texto-muted); font-weight: 500; margin-top: 8px; }
+  .modal-msg { color: var(--status-vermelho); font-size: 12.5px; margin: 0 0 12px; }
 </style>
 </head>
 <body>
@@ -231,10 +324,10 @@
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-marca">
-        <span class="sidebar-logo" id="sidebar-logo"></span>
+        <img class="sidebar-logo" src="icons/icon-192.png" alt="DocTrack" style="object-fit: cover;">
         <div>
-          <div class="sidebar-titulo">Rastreador</div>
-          <div class="sidebar-subtitulo">de Documentos</div>
+          <div class="sidebar-titulo">DocTrack</div>
+          <div class="sidebar-subtitulo">Rastreador de Documentos</div>
         </div>
       </div>
       <nav class="sidebar-nav" id="sidebar-nav"></nav>
@@ -279,6 +372,40 @@
 
   <a class="fab" href="novo-documento.html" aria-label="Cadastrar documento" id="fab-adicionar"></a>
 
+  <div class="modal-assinatura" id="modal-assinatura" hidden>
+    <div class="modal-card">
+      <div id="modal-conteudo-form">
+        <h2>Teste o Premium por 30 dias</h2>
+        <p>Sem cobrar nada agora. Depois dos 30 dias, a primeira mensalidade (R$ 9,90) vence e você escolhe pagar por Pix, boleto ou cartão. Pode cancelar quando quiser.</p>
+        <label for="modal-nome">Nome completo</label>
+        <input type="text" id="modal-nome" autocomplete="name" placeholder="Seu nome">
+        <label for="modal-cpf">CPF</label>
+        <input type="text" id="modal-cpf" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00">
+        <p class="modal-msg" id="modal-msg" hidden></p>
+        <button type="button" class="modal-botao" id="modal-confirmar">Começar meus 30 dias grátis</button>
+        <button type="button" class="modal-botao secundario" id="modal-fechar">Agora não</button>
+      </div>
+      <div id="modal-conteudo-ok" hidden>
+        <h2>Premium ativado!</h2>
+        <p>Seu teste grátis já está valendo. A primeira cobrança vence em <strong id="modal-ok-data"></strong>. O Asaas vai te avisar por e-mail com as opções de pagamento.</p>
+        <a class="modal-botao" id="modal-ok-link" href="#" target="_blank" rel="noopener" hidden>Ver opções de pagamento</a>
+        <button type="button" class="modal-botao secundario" id="modal-ok-fechar">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="banner-instalar" id="banner-instalar" hidden>
+    <img class="banner-instalar-logo" src="icons/icon-192.png" alt="">
+    <div class="banner-instalar-conteudo">
+      <strong>Instalar o DocTrack</strong>
+      <span>Acesse mais rápido, direto da tela inicial.</span>
+    </div>
+    <div class="banner-instalar-acoes">
+      <button type="button" class="banner-instalar-cta" id="btn-instalar-banner">Instalar</button>
+      <button type="button" class="banner-instalar-fechar" id="btn-fechar-banner">Agora não</button>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
@@ -310,7 +437,6 @@
       return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
     }
 
-    document.getElementById('sidebar-logo').innerHTML = icone('fileText', 18, '#FFFFFF');
     document.getElementById('botao-menu').innerHTML = icone('menu', 18);
     document.getElementById('pagina-icone').innerHTML = icone('creditCard', 22, '#FFFFFF');
     document.getElementById('sidebar-perfil-seta').innerHTML = icone('chevronRight', 16);
@@ -340,7 +466,9 @@
 
     /* ---------- planos ---------- */
 
-    function renderPlanos(usoAtual) {
+    function renderPlanos(usoAtual, perfil) {
+      const premiumAtivo = !!perfil;
+      const validoAteTxt = premiumAtivo ? new Date(perfil.plano_valido_ate + 'T00:00:00').toLocaleDateString('pt-BR') : '';
       const percentualUso = Math.min(100, Math.round((usoAtual / LIMITE_GRATIS) * 100));
 
       const grade = document.getElementById('planos-grade');
@@ -361,7 +489,9 @@
             <li>${icone('check', 14)} Calendário</li>
             <li>${icone('check', 14)} Notificações básicas</li>
           </ul>
-          <button type="button" class="plano-botao atual" disabled>Seu plano atual</button>
+          ${premiumAtivo
+            ? '<button type="button" class="plano-botao em-breve" disabled>Plano gratuito</button>'
+            : '<button type="button" class="plano-botao atual" disabled>Seu plano atual</button>'}
         </div>
 
         <div class="plano-card destaque">
@@ -379,8 +509,14 @@
             <li>${icone('check', 14)} Compartilhamento e assistente inteligente</li>
             <li>${icone('check', 14)} OCR de documentos</li>
           </ul>
-          <div class="plano-trial">30 dias grátis para testar</div>
-          <button type="button" class="plano-botao principal" id="btn-premium">Começar teste grátis</button>
+          ${premiumAtivo
+            ? `<div class="plano-trial">Ativo até ${validoAteTxt}</div>
+               <button type="button" class="plano-botao atual" disabled>Seu plano atual</button>
+               ${perfil.asaas_subscription_id
+                 ? '<button type="button" class="plano-cancelar" id="btn-cancelar">Cancelar assinatura</button>'
+                 : '<p class="plano-cancelado">Assinatura cancelada — o Premium vale até a data acima.</p>'}`
+            : `<div class="plano-trial">30 dias grátis para testar</div>
+               <button type="button" class="plano-botao principal" id="btn-premium">Começar teste grátis</button>`}
         </div>
 
         <div class="plano-card">
@@ -411,9 +547,11 @@
         </div>
       `;
 
-      document.getElementById('btn-premium').addEventListener('click', function () {
-        alert('O pagamento do Premium ainda está em preparação. Assim que estiver pronto, você vai poder testar 30 dias grátis por aqui mesmo.');
-      });
+      const btnPremium = document.getElementById('btn-premium');
+      if (btnPremium) btnPremium.addEventListener('click', abrirModalAssinatura);
+
+      const btnCancelar = document.getElementById('btn-cancelar');
+      if (btnCancelar) btnCancelar.addEventListener('click', cancelarAssinatura);
     }
 
     function renderComparacao() {
@@ -434,6 +572,94 @@
       }).join('');
     }
 
+    /* ---------- assinatura (Asaas) ---------- */
+
+    let usoDocumentos = 0;
+
+    async function carregarPlano() {
+      const { data } = await sb.from('perfis').select('*').maybeSingle();
+      const hoje = new Date().toLocaleDateString('sv-SE');
+      const ativo = data && data.plano !== 'gratis' && data.plano_valido_ate && data.plano_valido_ate >= hoje;
+      renderPlanos(usoDocumentos, ativo ? data : null);
+    }
+
+    async function tokenDeLogin() {
+      const { data } = await sb.auth.getSession();
+      return data.session ? data.session.access_token : null;
+    }
+
+    const modalEl = document.getElementById('modal-assinatura');
+    const modalMsgEl = document.getElementById('modal-msg');
+    const modalBtnEl = document.getElementById('modal-confirmar');
+
+    function abrirModalAssinatura() {
+      modalMsgEl.hidden = true;
+      modalBtnEl.disabled = false;
+      modalBtnEl.textContent = 'Começar meus 30 dias grátis';
+      document.getElementById('modal-conteudo-form').hidden = false;
+      document.getElementById('modal-conteudo-ok').hidden = true;
+      modalEl.hidden = false;
+    }
+
+    function fecharModalAssinatura() {
+      modalEl.hidden = true;
+    }
+
+    document.getElementById('modal-fechar').addEventListener('click', fecharModalAssinatura);
+    document.getElementById('modal-ok-fechar').addEventListener('click', function () { fecharModalAssinatura(); carregarPlano(); });
+    modalEl.addEventListener('click', function (e) { if (e.target === modalEl) fecharModalAssinatura(); });
+
+    document.getElementById('modal-cpf').addEventListener('input', function () {
+      const n = this.value.replace(/\D/g, '').slice(0, 11);
+      this.value = n.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    });
+
+    modalBtnEl.addEventListener('click', async function () {
+      const nome = document.getElementById('modal-nome').value.trim();
+      const cpf = document.getElementById('modal-cpf').value;
+
+      modalMsgEl.hidden = true;
+      modalBtnEl.disabled = true;
+      modalBtnEl.textContent = 'Criando sua assinatura...';
+
+      try {
+        const resp = await fetch('/api/criar-assinatura', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (await tokenDeLogin()) },
+          body: JSON.stringify({ plano: 'premium', nome: nome, cpf: cpf }),
+        });
+        const dados = await resp.json();
+        if (!resp.ok) throw new Error(dados.erro || 'Não foi possível iniciar agora.');
+
+        document.getElementById('modal-ok-data').textContent = new Date(dados.primeiroVencimento + 'T00:00:00').toLocaleDateString('pt-BR');
+        const linkEl = document.getElementById('modal-ok-link');
+        linkEl.hidden = !dados.linkPagamento;
+        if (dados.linkPagamento) linkEl.href = dados.linkPagamento;
+        document.getElementById('modal-conteudo-form').hidden = true;
+        document.getElementById('modal-conteudo-ok').hidden = false;
+      } catch (erro) {
+        modalMsgEl.textContent = erro.message;
+        modalMsgEl.hidden = false;
+        modalBtnEl.disabled = false;
+        modalBtnEl.textContent = 'Começar meus 30 dias grátis';
+      }
+    });
+
+    async function cancelarAssinatura() {
+      if (!confirm('Cancelar a assinatura? Você continua com o Premium até o fim do período já pago.')) return;
+      try {
+        const resp = await fetch('/api/cancelar-assinatura', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + (await tokenDeLogin()) },
+        });
+        const dados = await resp.json();
+        if (!resp.ok) throw new Error(dados.erro);
+        await carregarPlano();
+      } catch (erro) {
+        alert(erro.message || 'Não foi possível cancelar agora.');
+      }
+    }
+
     /* ---------- sessão ---------- */
 
     sb.auth.getSession().then(async function (resultado) {
@@ -446,9 +672,71 @@
       document.getElementById('sidebar-avatar').textContent = email.charAt(0).toUpperCase();
 
       const { count } = await sb.from('documentos').select('id', { count: 'exact', head: true });
-      renderPlanos(count || 0);
+      usoDocumentos = count || 0;
       renderComparacao();
+      await carregarPlano();
     });
+      /* ---------- instalar app (pwa) ---------- */
+
+    let eventoInstalacao = null;
+    const appJaInstalado = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+    function mostrarBannerInstalar() {
+      if (appJaInstalado || localStorage.getItem('app-instalado') === 'true' || localStorage.getItem('instalar-app-dispensado') === 'true') return;
+      const banner = document.getElementById('banner-instalar');
+      if (banner) banner.hidden = false;
+      atualizarOpcaoInstalarPerfil();
+    }
+
+    function ocultarBannerInstalar() {
+      const banner = document.getElementById('banner-instalar');
+      if (banner) banner.hidden = true;
+    }
+
+    function atualizarOpcaoInstalarPerfil() {
+      const grupo = document.getElementById('grupo-instalar-app');
+      const card = document.getElementById('card-instalar-app');
+      if (!grupo || !card) return;
+      const podeMostrar = !appJaInstalado && localStorage.getItem('app-instalado') !== 'true';
+      grupo.hidden = !podeMostrar;
+      card.hidden = !podeMostrar;
+    }
+
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      eventoInstalacao = e;
+      mostrarBannerInstalar();
+    });
+
+    window.addEventListener('appinstalled', function () {
+      localStorage.setItem('app-instalado', 'true');
+      eventoInstalacao = null;
+      ocultarBannerInstalar();
+      atualizarOpcaoInstalarPerfil();
+    });
+
+    const btnInstalarBanner = document.getElementById('btn-instalar-banner');
+    if (btnInstalarBanner) {
+      btnInstalarBanner.addEventListener('click', async function () {
+        if (!eventoInstalacao) { ocultarBannerInstalar(); return; }
+        ocultarBannerInstalar();
+        eventoInstalacao.prompt();
+        const resultado = await eventoInstalacao.userChoice;
+        if (resultado.outcome === 'accepted') localStorage.setItem('app-instalado', 'true');
+        eventoInstalacao = null;
+        atualizarOpcaoInstalarPerfil();
+      });
+    }
+
+    const btnFecharBanner = document.getElementById('btn-fechar-banner');
+    if (btnFecharBanner) {
+      btnFecharBanner.addEventListener('click', function () {
+        localStorage.setItem('instalar-app-dispensado', 'true');
+        ocultarBannerInstalar();
+      });
+    }
+
+    atualizarOpcaoInstalarPerfil();
   </script>
 
 </body>

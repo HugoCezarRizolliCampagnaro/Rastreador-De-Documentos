@@ -5,12 +5,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="description" content="DocTrack — organize seus documentos, controle vencimentos e receba lembretes.">
+<meta property="og:title" content="DocTrack">
+<meta property="og:description" content="Organize seus documentos, controle vencimentos e nunca mais perca um prazo.">
+<meta property="og:image" content="https://rastreador-de-documentos.vercel.app/icons/icon-512.png">
+<meta property="og:type" content="website">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
 <meta name="theme-color" content="#0B0E14">
-<title>Perfil — Rastreador de Documentos</title>
+<title>Perfil — DocTrack</title>
 <script>
   if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+  if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -296,6 +303,72 @@
 
   @keyframes pulso { 0%, 100% { box-shadow: 0 6px 20px rgba(91,110,245,0.5); } 50% { box-shadow: 0 6px 26px rgba(91,110,245,0.75); } }
   .fab:hover { background: var(--marca-hover); transform: scale(1.06); }
+
+  /* ---------- instalar app (pwa) ---------- */
+
+  .banner-instalar {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 92px;
+    z-index: 45;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    max-width: 400px;
+    margin: 0 auto;
+    animation: instalarSubir 0.3s ease both;
+  }
+
+  @keyframes instalarSubir {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (min-width: 960px) {
+    .banner-instalar { left: auto; right: 24px; margin: 0; }
+  }
+
+  .banner-instalar[hidden] { display: none; }
+
+  .banner-instalar-logo { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; object-fit: cover; }
+
+  .banner-instalar-conteudo { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+  .banner-instalar-conteudo strong { font-size: 13.5px; color: var(--texto); }
+
+  .banner-instalar-conteudo span { font-size: 12px; color: var(--texto-muted); line-height: 1.4; }
+
+  .banner-instalar-acoes { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+
+  .banner-instalar-cta {
+    background: var(--marca);
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .banner-instalar-cta:hover { background: var(--marca-hover); }
+
+  .banner-instalar-fechar {
+    background: none;
+    border: none;
+    color: var(--texto-muted);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 2px;
+    text-decoration: underline;
+  }
 </style>
 </head>
 <body>
@@ -305,10 +378,10 @@
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-marca">
-        <span class="sidebar-logo" id="sidebar-logo"></span>
+        <img class="sidebar-logo" src="icons/icon-192.png" alt="DocTrack" style="object-fit: cover;">
         <div>
-          <div class="sidebar-titulo">Rastreador</div>
-          <div class="sidebar-subtitulo">de Documentos</div>
+          <div class="sidebar-titulo">DocTrack</div>
+          <div class="sidebar-subtitulo">Rastreador de Documentos</div>
         </div>
       </div>
       <nav class="sidebar-nav" id="sidebar-nav"></nav>
@@ -339,7 +412,7 @@
           <div class="conta-info">
             <div class="conta-email" id="conta-email">Carregando...</div>
             <div class="conta-plano-linha">
-              <span class="conta-plano-selo">Plano Grátis</span>
+              <span class="conta-plano-selo" id="conta-plano-selo">Plano Grátis</span>
             </div>
           </div>
           <a href="planos.html" class="btn-ver-planos">Ver planos</a>
@@ -379,6 +452,17 @@
           </a>
         </div>
 
+        <p class="secao-titulo-grupo" id="grupo-instalar-app" hidden>Aplicativo</p>
+        <div class="opcao-card" id="card-instalar-app" hidden>
+          <button type="button" class="opcao-linha" id="btn-instalar-app">
+            <span class="opcao-icone" id="icone-instalar-app"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo">Instalar aplicativo</div>
+              <div class="opcao-descricao">Adicione o DocTrack à tela inicial do seu celular</div>
+            </div>
+          </button>
+        </div>
+
         <p class="secao-titulo-grupo">Suporte</p>
         <div class="opcao-card">
           <a href="mailto:suporte@rastreadordedocumentos.com.br" class="opcao-linha">
@@ -414,6 +498,18 @@
 
   <a class="fab" href="novo-documento.html" aria-label="Cadastrar documento" id="fab-adicionar"></a>
 
+  <div class="banner-instalar" id="banner-instalar" hidden>
+    <img class="banner-instalar-logo" src="icons/icon-192.png" alt="">
+    <div class="banner-instalar-conteudo">
+      <strong>Instalar o DocTrack</strong>
+      <span>Acesse mais rápido, direto da tela inicial.</span>
+    </div>
+    <div class="banner-instalar-acoes">
+      <button type="button" class="banner-instalar-cta" id="btn-instalar-banner">Instalar</button>
+      <button type="button" class="banner-instalar-fechar" id="btn-fechar-banner">Agora não</button>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
@@ -437,6 +533,7 @@
       helpCircle: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
       shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
       logOut: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+      smartphone: '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
     };
 
     function icone(nome, tamanho, corTraco) {
@@ -445,7 +542,6 @@
       return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
     }
 
-    document.getElementById('sidebar-logo').innerHTML = icone('fileText', 18, '#FFFFFF');
     document.getElementById('botao-menu').innerHTML = icone('menu', 18);
     document.getElementById('sidebar-perfil-seta').innerHTML = icone('chevronRight', 16);
     document.getElementById('fab-adicionar').innerHTML = icone('plus', 26, '#FFFFFF');
@@ -453,6 +549,7 @@
     document.getElementById('icone-aparencia').innerHTML = icone('moon', 17);
     document.getElementById('icone-exportar').innerHTML = icone('download', 17);
     document.getElementById('icone-planos').innerHTML = icone('creditCard', 17);
+    document.getElementById('icone-instalar-app').innerHTML = icone('smartphone', 17);
     document.getElementById('icone-suporte').innerHTML = icone('helpCircle', 17);
     document.getElementById('icone-termos').innerHTML = icone('fileText', 17);
     document.getElementById('icone-privacidade').innerHTML = icone('shield', 17);
@@ -499,6 +596,26 @@
     document.getElementById('btn-sair').addEventListener('click', async function () {
       await sb.auth.signOut();
       window.location.href = 'login.html';
+    });
+
+    /* ---------- instalar app (atalho no perfil) ---------- */
+
+    document.getElementById('btn-instalar-app').addEventListener('click', async function () {
+      if (eventoInstalacao) {
+        eventoInstalacao.prompt();
+        const resultado = await eventoInstalacao.userChoice;
+        if (resultado.outcome === 'accepted') localStorage.setItem('app-instalado', 'true');
+        eventoInstalacao = null;
+        ocultarBannerInstalar();
+        atualizarOpcaoInstalarPerfil();
+        return;
+      }
+      const iOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+      if (iOS) {
+        alert('No Safari, toque no ícone de compartilhar e escolha "Adicionar à Tela de Início".');
+      } else {
+        alert('Seu navegador ainda não liberou a instalação automática. Procure por "Instalar app" no menu do navegador, ou recarregue a página e tente de novo.');
+      }
     });
 
     /* ---------- exportar CSV ---------- */
@@ -551,7 +668,77 @@
       document.getElementById('conta-avatar').textContent = email.charAt(0).toUpperCase();
       document.getElementById('sidebar-email').textContent = email;
       document.getElementById('sidebar-avatar').textContent = email.charAt(0).toUpperCase();
+
+      sb.from('perfis').select('plano, plano_valido_ate').maybeSingle().then(function (r) {
+        const p = r.data;
+        const ativo = p && p.plano !== 'gratis' && p.plano_valido_ate >= new Date().toLocaleDateString('sv-SE');
+        if (ativo) {
+          const nomes = { premium: 'Premium', familia: 'Família', profissional: 'Profissional' };
+          document.getElementById('conta-plano-selo').textContent = 'Plano ' + (nomes[p.plano] || 'Premium');
+        }
+      });
     });
+      /* ---------- instalar app (pwa) ---------- */
+
+    let eventoInstalacao = null;
+    const appJaInstalado = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+    function mostrarBannerInstalar() {
+      if (appJaInstalado || localStorage.getItem('app-instalado') === 'true' || localStorage.getItem('instalar-app-dispensado') === 'true') return;
+      const banner = document.getElementById('banner-instalar');
+      if (banner) banner.hidden = false;
+      atualizarOpcaoInstalarPerfil();
+    }
+
+    function ocultarBannerInstalar() {
+      const banner = document.getElementById('banner-instalar');
+      if (banner) banner.hidden = true;
+    }
+
+    function atualizarOpcaoInstalarPerfil() {
+      const grupo = document.getElementById('grupo-instalar-app');
+      const card = document.getElementById('card-instalar-app');
+      if (!grupo || !card) return;
+      const podeMostrar = !appJaInstalado && localStorage.getItem('app-instalado') !== 'true';
+      grupo.hidden = !podeMostrar;
+      card.hidden = !podeMostrar;
+    }
+
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      eventoInstalacao = e;
+      mostrarBannerInstalar();
+    });
+
+    window.addEventListener('appinstalled', function () {
+      localStorage.setItem('app-instalado', 'true');
+      eventoInstalacao = null;
+      ocultarBannerInstalar();
+      atualizarOpcaoInstalarPerfil();
+    });
+
+    const btnInstalarBanner = document.getElementById('btn-instalar-banner');
+    if (btnInstalarBanner) {
+      btnInstalarBanner.addEventListener('click', async function () {
+        if (!eventoInstalacao) { ocultarBannerInstalar(); return; }
+        ocultarBannerInstalar();
+        eventoInstalacao.prompt();
+        const resultado = await eventoInstalacao.userChoice;
+        if (resultado.outcome === 'accepted') localStorage.setItem('app-instalado', 'true');
+        eventoInstalacao = null;
+        atualizarOpcaoInstalarPerfil();
+      });
+    }
+
+    const btnFecharBanner = document.getElementById('btn-fechar-banner');
+    if (btnFecharBanner) {
+      btnFecharBanner.addEventListener('click', function () {
+        localStorage.setItem('instalar-app-dispensado', 'true');
+        ocultarBannerInstalar();
+      });
+    }
+
+    atualizarOpcaoInstalarPerfil();
   </script>
 
 </body>
