@@ -716,7 +716,12 @@
         });
         if (!resp.ok) {
           const j = await resp.json().catch(function () { return {}; });
-          throw new Error(j.erro || ('Erro ' + resp.status));
+          const motivoServidor = (j.erro || ('Erro ' + resp.status)) + (j.detalhe ? ' [' + j.detalhe + ']' : '');
+          // plano B: grava direto pelo navegador (vale para o dono da conta)
+          const { error } = await sb.from('push_inscricoes').upsert({
+            user_id: sessao.user.id, endpoint: d.endpoint, p256dh: d.keys.p256dh, auth: d.keys.auth,
+          }, { onConflict: 'endpoint' });
+          if (error) throw new Error(motivoServidor + ' | direto: ' + (error.message || error.code));
         }
       }
 
@@ -774,7 +779,7 @@
           if (toggle.checked) await ativar(); else await desativar();
         } catch (e) {
           console.error('Notificações:', e);
-          avisar('Não foi possível alterar agora. Tente de novo em instantes.');
+          avisar('Não foi possível alterar agora: ' + (e && e.message ? e.message : 'tente de novo em instantes.'));
           toggle.checked = !toggle.checked;
           toggle.disabled = false;
           return;
