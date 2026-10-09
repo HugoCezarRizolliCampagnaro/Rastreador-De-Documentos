@@ -704,11 +704,38 @@
         return navigator.serviceWorker.ready;
       }
 
+      // grava (ou regrava) a inscrição deste aparelho no servidor; é seguro repetir
+      async function sincronizar(sub) {
+        const sessao = (await sb.auth.getSession()).data.session;
+        if (!sessao) throw new Error('Sessão expirada. Entre de novo.');
+        const d = sub.toJSON();
+        const resp = await fetch('/api/registrar-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
+          body: JSON.stringify({ endpoint: d.endpoint, p256dh: d.keys.p256dh, auth: d.keys.auth }),
+        });
+        if (!resp.ok) {
+          const j = await resp.json().catch(function () { return {}; });
+          throw new Error(j.erro || ('Erro ' + resp.status));
+        }
+      }
+
+      function mesmaChave(sub) {
+        try {
+          const k = sub.options && sub.options.applicationServerKey;
+          if (!k) return true;
+          const a = new Uint8Array(k), b = chaveParaBytes(VAPID_PUBLIC_KEY);
+          return a.length === b.length && a.every(function (v, i) { return v === b[i]; });
+        } catch (e) { return true; }
+      }
+
       async function atualizar() {
         try {
           const reg = await registro();
           const sub = await reg.pushManager.getSubscription();
           toggle.checked = !!sub && Notification.permission === 'granted';
+          // conserta sozinho se o aparelho tem inscrição mas o servidor não
+          if (toggle.checked) { try { await sincronizar(sub); } catch (e) { console.warn('Sincronização:', e.message); } }
           btnTeste.hidden = !toggle.checked;
           if (Notification.permission === 'denied') {
             toggle.checked = false;
@@ -728,17 +755,9 @@
 
         const reg = await registro();
         let sub = await reg.pushManager.getSubscription();
+        if (sub && !mesmaChave(sub)) { await sub.unsubscribe(); sub = null; }
         if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveParaBytes(VAPID_PUBLIC_KEY) });
-
-        const dados = sub.toJSON();
-        const { data: sessao } = await sb.auth.getSession();
-        const { error } = await sb.from('push_inscricoes').upsert({
-          user_id: sessao.session.user.id,
-          endpoint: dados.endpoint,
-          p256dh: dados.keys.p256dh,
-          auth: dados.keys.auth,
-        }, { onConflict: 'endpoint' });
-        if (error) throw error;
+        await sincronizar(sub);
       }
 
       async function desativar() {
@@ -767,15 +786,23 @@
       btnTeste.addEventListener('click', async function () {
         textoTeste.textContent = 'Enviando...';
         try {
+          const reg = await registro();
+          const sub = await reg.pushManager.getSubscription();
+          if (!sub) {
+            textoTeste.textContent = 'Desligue e ligue o interruptor de avisos.';
+            setTimeout(function () { textoTeste.textContent = 'Enviar notificação de teste'; }, 4000);
+            return;
+          }
+          await sincronizar(sub);
           const sessao = (await sb.auth.getSession()).data.session;
           const resp = await fetch('/api/testar-notificacao', {
             method: 'POST',
             headers: { Authorization: 'Bearer ' + (sessao ? sessao.access_token : '') },
           });
           const dados = await resp.json().catch(function () { return {}; });
-          textoTeste.textContent = resp.ok ? 'Enviada! Veja o aparelho.' : (dados.erro || 'Não foi possível enviar.');
+          textoTeste.textContent = resp.ok ? 'Enviada! Veja o aparelho.' : ((dados.erro || 'Não foi possível enviar.') + (dados.detalhe ? ' (' + dados.detalhe + ')' : ''));
         } catch (e) {
-          textoTeste.textContent = 'Sem conexão. Tente de novo.';
+          textoTeste.textContent = e && e.message ? e.message : 'Sem conexão. Tente de novo.';
         }
         setTimeout(function () { textoTeste.textContent = 'Enviar notificação de teste'; }, 4000);
       });

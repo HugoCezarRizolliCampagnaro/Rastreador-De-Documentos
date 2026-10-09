@@ -31,18 +31,23 @@ module.exports = async function handler(req, res) {
     }
 
     let enviadas = 0;
+    let detalhe = '';
     for (const insc of inscricoes) {
       try {
         const r = await push.enviar(insc, { title: 'DocTrack', body: 'Tudo certo! Você vai receber os avisos de vencimento aqui.', url: '/perfil.html' });
         if (r === 'ok') enviadas++;
-        else await supabaseAdmin('push_inscricoes?id=eq.' + insc.id, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        else {
+          detalhe = 'inscrição expirada';
+          await supabaseAdmin('push_inscricoes?id=eq.' + insc.id, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        }
       } catch (e) {
-        console.error('Falha no teste de push:', e.statusCode || '', e.message);
+        detalhe = 'código ' + (e.statusCode || '?') + ' ' + String(e.body || e.message || '').slice(0, 80);
+        console.error('Falha no teste de push:', e.statusCode || '', e.message, e.body || '');
       }
     }
 
     if (enviadas === 0) {
-      res.status(502).json({ erro: 'Não consegui entregar no seu aparelho. Desative e ative as notificações de novo.' });
+      res.status(502).json({ erro: 'Não consegui entregar no seu aparelho. Desligue e ligue os avisos de novo.', detalhe: detalhe });
       return;
     }
     res.status(200).json({ ok: true, enviadas: enviadas });
