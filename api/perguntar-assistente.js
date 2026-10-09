@@ -8,6 +8,23 @@
 
 const MODELO_IA = 'mistral-small-latest';
 
+
+// A Mistral grátis limita quantas chamadas por segundo/minuto. Se der 429, espera um pouco e tenta de novo.
+async function chamarMistral(apiKey, corpo) {
+  const esperas = [1500, 3000];
+  let resposta;
+  for (let tentativa = 0; tentativa <= esperas.length; tentativa++) {
+    resposta = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(corpo),
+    });
+    if (resposta.status !== 429 || tentativa === esperas.length) break;
+    await new Promise(function (r) { setTimeout(r, esperas[tentativa]); });
+  }
+  return resposta;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ erro: 'Método não permitido.' });
@@ -54,13 +71,7 @@ Data de hoje: ${dataHoje}
 Documentos do usuário:
 ${resumoDocumentos || '(nenhum documento cadastrado ainda)'}`;
 
-    const resposta = await fetch('https://api.mistral.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
+    const resposta = await chamarMistral(apiKey, {
         model: MODELO_IA,
         temperature: 0.3,
         max_tokens: 500,
@@ -68,8 +79,7 @@ ${resumoDocumentos || '(nenhum documento cadastrado ainda)'}`;
           { role: 'system', content: instrucoes },
           { role: 'user', content: pergunta.trim() },
         ],
-      }),
-    });
+      });
 
     const dados = await resposta.json();
 
