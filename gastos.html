@@ -561,6 +561,11 @@
     padding: 2px;
     text-decoration: underline;
   }
+
+  /* ---------- correção mobile: nada pode ser mais largo que a tela ---------- */
+  .app-shell { overflow-x: clip; max-width: 100%; }
+  .conteudo-principal { min-width: 0; max-width: 100%; }
+  .glow-fundo { max-width: 85vw; }
 </style>
 </head>
 <body>

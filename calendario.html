@@ -190,7 +190,8 @@
 
   .conteudo { max-width: 1040px; margin: 0 auto; padding: 20px 20px 60px; }
 
-  .layout-calendario { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  .layout-calendario { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .layout-calendario > * { min-width: 0; }
   @media (min-width: 960px) { .layout-calendario { grid-template-columns: 1.6fr 1fr; align-items: start; } }
 
   .secao-card { background: var(--superficie); border: 1px solid var(--borda); border-radius: 14px; padding: 18px; }
@@ -217,7 +218,8 @@
 
   /* navegação de mês */
 
-  .mes-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+  .mes-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  @media (max-width: 480px) { .mes-nav { justify-content: center; } .btn-hoje { padding: 6px 12px; } }
   .mes-nav-esquerda { display: flex; align-items: center; gap: 10px; }
 
   .mes-btn {
@@ -243,9 +245,9 @@
 
   /* grade */
 
-  .grade-dias-semana { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; color: var(--texto-muted); margin-bottom: 6px; }
+  .grade-dias-semana { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); text-align: center; font-size: 11px; color: var(--texto-muted); margin-bottom: 6px; }
 
-  .grade-calendario { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .grade-calendario { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 
   .dia-cel {
     aspect-ratio: 1;
@@ -394,6 +396,11 @@
     padding: 2px;
     text-decoration: underline;
   }
+
+  /* ---------- correção mobile: nada pode ser mais largo que a tela ---------- */
+  .app-shell { overflow-x: clip; max-width: 100%; }
+  .conteudo-principal { min-width: 0; max-width: 100%; }
+  .glow-fundo { max-width: 85vw; }
 </style>
 </head>
 <body>

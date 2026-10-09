@@ -7,6 +7,8 @@
 // Env var necessária na Vercel: MISTRAL_API_KEY
 
 // Modelo com limites bem mais altos na conta grátis. Dá pra trocar sem mexer no código: variável MISTRAL_MODEL na Vercel.
+const { usuarioDaRequisicao } = require('./_comum');
+
 const MODELO_IA = process.env.MISTRAL_MODEL || 'ministral-8b-2512';
 
 
@@ -29,6 +31,13 @@ async function chamarMistral(apiKey, corpo) {
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ erro: 'Método não permitido.' });
+    return;
+  }
+
+  // só quem está logado no DocTrack pode usar a IA (senão qualquer pessoa gastaria a sua cota da Mistral)
+  const usuario = await usuarioDaRequisicao(req).catch(function () { return null; });
+  if (!usuario) {
+    res.status(401).json({ erro: 'Sessão inválida. Entre de novo na sua conta.' });
     return;
   }
 

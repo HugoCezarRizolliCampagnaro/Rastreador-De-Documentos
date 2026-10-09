@@ -79,7 +79,7 @@
 
   /* ---------- estrutura ---------- */
 
-  .app-shell { display: flex; height: 100vh; position: relative; z-index: 1; }
+  .app-shell { display: flex; height: 100vh; height: 100dvh; position: relative; z-index: 1; }
 
   .sidebar {
     position: fixed; top: 0; left: 0; height: 100vh; width: 250px;
@@ -141,7 +141,7 @@
 
   /* ---------- coluna principal do assistente ---------- */
 
-  .conteudo-principal { display: flex; flex-direction: column; height: 100vh; min-width: 0; }
+  .conteudo-principal { display: flex; flex-direction: column; height: 100vh; height: 100dvh; min-width: 0; }
 
   .cabecalho-assistente {
     display: flex; align-items: center; gap: 14px;
@@ -248,6 +248,12 @@
 
   .bolha.assistente { background: var(--superficie); border: 1px solid var(--borda); border-top-left-radius: 4px; }
   .bolha.usuario { background: var(--marca); color: #FFFFFF; border-top-right-radius: 4px; }
+  .btn-nova-conversa {
+    margin-left: auto; flex-shrink: 0; background: transparent; color: var(--texto-muted);
+    border: 1px solid var(--borda); border-radius: 999px; padding: 7px 13px;
+    font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .btn-nova-conversa:hover { border-color: var(--marca); color: var(--marca); }
   .bolha.assistente strong { font-weight: 700; color: var(--texto); }
   .bolha.assistente p { margin: 0; }
   .bolha.assistente p + p, .bolha.assistente p + ul, .bolha.assistente ul + p { margin-top: 8px; }
@@ -407,6 +413,11 @@
     padding: 2px;
     text-decoration: underline;
   }
+
+  /* ---------- correção mobile: nada pode ser mais largo que a tela ---------- */
+  .app-shell { overflow-x: clip; max-width: 100%; }
+  .conteudo-principal { min-width: 0; max-width: 100%; }
+  .glow-fundo { max-width: 85vw; }
 </style>
 </head>
 <body>
@@ -441,6 +452,7 @@
           <h1>Assistente</h1>
           <p>Seu assistente para documentos, prazos e organização.</p>
         </div>
+        <button type="button" class="btn-nova-conversa" id="btn-nova-conversa" hidden>Nova conversa</button>
       </div>
 
       <div class="area-conversa" id="area-conversa">
@@ -771,9 +783,10 @@
           };
         });
 
+        const sessaoIA = (await sb.auth.getSession()).data.session;
         const resp = await fetch('/api/perguntar-assistente', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (sessaoIA ? sessaoIA.access_token : '') },
           body: JSON.stringify({
             pergunta: pergunta,
             documentos: resumo,
@@ -798,10 +811,62 @@
 
     /* ---------- envio ---------- */
 
+    /* ---------- conversa salva (por usuário, neste aparelho) ---------- */
+
+    const CHAT_MAX_MENSAGENS = 40;
+    const CHAT_VALIDADE_MS = 7 * 24 * 60 * 60 * 1000;
+    let mensagensChat = []; // { tipo: 'usuario' | 'assistente', texto }
+
+    function chaveChat() { return 'doctrack-chat-' + (usuarioAtual ? usuarioAtual.id : 'anonimo'); }
+
+    function salvarChat() {
+      try {
+        mensagensChat = mensagensChat.slice(-CHAT_MAX_MENSAGENS);
+        localStorage.setItem(chaveChat(), JSON.stringify({ salvoEm: Date.now(), mensagens: mensagensChat }));
+      } catch (e) { /* sem armazenamento: o chat continua funcionando, só não é lembrado */ }
+      atualizarBotaoNovaConversa();
+    }
+
+    function atualizarBotaoNovaConversa() {
+      document.getElementById('btn-nova-conversa').hidden = mensagensChat.length === 0;
+    }
+
+    function restaurarChat() {
+      try {
+        const bruto = localStorage.getItem(chaveChat());
+        if (!bruto) return;
+        const salvo = JSON.parse(bruto);
+        if (!salvo || !Array.isArray(salvo.mensagens) || Date.now() - salvo.salvoEm > CHAT_VALIDADE_MS) {
+          localStorage.removeItem(chaveChat());
+          return;
+        }
+        mensagensChat = salvo.mensagens.filter(function (m) { return m && typeof m.texto === 'string' && (m.tipo === 'usuario' || m.tipo === 'assistente'); });
+        if (mensagensChat.length === 0) return;
+        document.getElementById('boas-vindas').style.display = 'none';
+        mensagensChat.forEach(function (m) {
+          if (m.tipo === 'usuario') adicionarTurnoUsuario(m.texto);
+          else adicionarTurnoAssistente(m.texto);
+          historicoChat.push({ role: m.tipo === 'usuario' ? 'user' : 'assistant', content: m.texto });
+        });
+        atualizarBotaoNovaConversa();
+      } catch (e) { /* conversa salva ilegível: começa do zero */ }
+    }
+
+    document.getElementById('btn-nova-conversa').addEventListener('click', function () {
+      mensagensChat = [];
+      historicoChat.length = 0;
+      try { localStorage.removeItem(chaveChat()); } catch (e) {}
+      turnosEl.innerHTML = '';
+      document.getElementById('boas-vindas').style.display = '';
+      atualizarBotaoNovaConversa();
+    });
+
     async function enviarPergunta(texto) {
       ultimaPergunta = texto;
       document.getElementById('boas-vindas').style.display = 'none';
       adicionarTurnoUsuario(texto);
+      mensagensChat.push({ tipo: 'usuario', texto: texto });
+      salvarChat();
       adicionarDigitando();
 
       try {
@@ -813,6 +878,8 @@
         const resposta = await responder(texto, data || []);
         removerDigitando();
         adicionarTurnoAssistente(resposta.texto, resposta.extraHtml || (resposta.docs ? cardsDocumentos(resposta.docs) : ''));
+        mensagensChat.push({ tipo: 'assistente', texto: resposta.texto });
+        salvarChat();
       } catch (err) {
         removerDigitando();
         adicionarErro();
@@ -879,10 +946,6 @@
       enviarPergunta(texto);
     });
 
-    document.getElementById('sugestoes').querySelectorAll('.sugestao-chip').forEach(function (chip) {
-      chip.addEventListener('click', function () { enviarPergunta(chip.dataset.pergunta); });
-    });
-
     /* ---------- sessão ---------- */
 
     sb.auth.getSession().then(function (resultado) {
@@ -894,6 +957,7 @@
       document.getElementById('sidebar-email').textContent = usuarioAtual.email;
       document.getElementById('sidebar-avatar').textContent = usuarioAtual.email.charAt(0).toUpperCase();
       montarBoasVindas();
+      restaurarChat();
     });
       /* ---------- instalar app (pwa) ---------- */
 
