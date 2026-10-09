@@ -65,12 +65,29 @@ async function usuarioDaRequisicao(req) {
 }
 
 // acesso ao banco com a chave secreta (ignora o RLS — por isso só roda no servidor)
+function chaveAdmin() {
+  const chave = (process.env.SUPABASE_SECRET_KEY || '').trim();
+  // erros comuns: colar a chave pública no lugar da secreta (ela não ignora o RLS)
+  if (chave.indexOf('sb_publishable_') === 0) {
+    throw new Error('SUPABASE_SECRET_KEY está com a chave PUBLICÁVEL (sb_publishable_...). Troque pela chave SECRETA (sb_secret_...).');
+  }
+  if (chave.indexOf('eyJ') === 0) {
+    try {
+      const papel = JSON.parse(Buffer.from(chave.split('.')[1], 'base64').toString('utf8')).role;
+      if (papel !== 'service_role') throw new Error('SUPABASE_SECRET_KEY está com a chave "' + papel + '". Use a chave secreta (sb_secret_...) ou a service_role.');
+    } catch (e) {
+      if (e.message.indexOf('SUPABASE_SECRET_KEY') === 0) throw e;
+    }
+  }
+  return chave;
+}
+
 async function supabaseAdmin(caminho, opcoes) {
   const resp = await fetch(SUPABASE_URL + '/rest/v1/' + caminho, {
     method: (opcoes && opcoes.method) || 'GET',
     headers: Object.assign(
       {
-        apikey: process.env.SUPABASE_SECRET_KEY,
+        apikey: chaveAdmin(),
         'Content-Type': 'application/json',
       },
       (opcoes && opcoes.headers) || {}
