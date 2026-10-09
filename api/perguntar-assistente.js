@@ -75,7 +75,7 @@ ${resumoDocumentos || '(nenhum documento cadastrado ainda)'}`;
 
     if (!resposta.ok) {
       console.error('Erro Mistral (texto):', JSON.stringify(dados));
-      res.status(502).json({ erro: 'A IA não respondeu agora. Tenta de novo em alguns segundos.' });
+      res.status(502).json({ erro: 'A IA não respondeu agora. (erro '+resposta.status+': '+String((dados && (dados.message || (dados.error && dados.error.message) || dados.detail)) || 'sem detalhe').slice(0,200)+')' });
       return;
     }
 

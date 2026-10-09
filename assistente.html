@@ -714,18 +714,8 @@
         return Object.assign({}, doc, { dias: diasRestantes(doc.data_vencimento) });
       });
 
-      // categoria mencionada
-      const categoriasChave = { carro: 'veiculo', veículo: 'veiculo', veiculo: 'veiculo', casa: 'casa', trabalho: 'trabalho', pessoal: 'pessoal' };
-      for (const chave in categoriasChave) {
-        if (p.includes(chave)) {
-          const cat = categoriasChave[chave];
-          const docsCategoria = comDias.filter(function (d) { return d.categoria === cat; });
-          if (docsCategoria.length === 0) return { texto: `Não encontrei documentos na categoria ${categoriaLabelMap[cat]}.` };
-          return { texto: `${docsCategoria.length} documento(s) em ${categoriaLabelMap[cat]}:`, docs: docsCategoria };
-        }
-      }
-
-      // checklist / renovação de um documento específico
+      // checklist / renovação de um documento específico — continua sem IA, porque mostra
+      // o checklist interativo de verdade (com o progresso real salvo no banco)
       if (p.includes('checklist') || p.includes('renovar') || p.includes('renovação') || p.includes('renovacao')) {
         const docMencionado = comDias.find(function (d) { return p.includes(d.nome.toLowerCase()); });
         const alvo = docMencionado || comDias.slice().sort(function (a, b) { return a.dias - b.dias; })[0];
@@ -743,49 +733,42 @@
         return { texto: `Checklist de renovação de "${alvo.nome}" — ${concluidos}/${itens.length} concluído:`, extraHtml: listaHtml };
       }
 
-      if (p.includes('urgente') || p.includes('primeiro') || p.includes('mais perto') || p.includes('mais próximo') || p.includes('mais cedo')) {
-        const ordenado = comDias.slice().sort(function (a, b) { return a.dias - b.dias; });
-        return { texto: 'O mais urgente é:', docs: [ordenado[0]] };
-      }
+      // tudo o resto: pergunta livre pra uma IA de verdade, usando os documentos reais como contexto
+      try {
+        const resumo = comDias.map(function (d) {
+          return {
+            nome: d.nome,
+            tipo: d.tipo,
+            categoria: d.categoria,
+            cliente: d.cliente || null,
+            numero_documento: d.numero_documento || null,
+            data_vencimento: d.data_vencimento,
+            dias_restantes: d.dias,
+            custo_valor: d.custo_valor || null,
+            proximo_pagamento_status: d.proximo_pagamento_status || null,
+          };
+        });
 
-      if (p.includes('vencid') || p.includes('venceu')) {
-        const vencidos = comDias.filter(function (d) { return d.dias < 0; });
-        if (vencidos.length === 0) return { texto: 'Nenhum documento vencido. 🎉' };
-        return { texto: `${vencidos.length} documento(s) vencido(s):`, docs: vencidos };
-      }
+        const resp = await fetch('/api/perguntar-assistente', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pergunta: pergunta,
+            documentos: resumo,
+            dataHoje: new Date().toISOString().slice(0, 10),
+          }),
+        });
 
-      if (p.includes('em dia')) {
-        const emDia = comDias.filter(function (d) { return d.dias >= 30; });
-        if (emDia.length === 0) return { texto: 'Nenhum documento está com mais de 30 dias de folga no momento.' };
-        return { texto: `${emDia.length} documento(s) em dia:`, docs: emDia };
-      }
+        const dados = await resp.json();
 
-      if (p.includes('atenção') || p.includes('atencao')) {
-        const atencao = comDias.filter(function (d) { return d.dias < 30; });
-        if (atencao.length === 0) return { texto: 'Nenhum documento precisa de atenção agora.' };
-        return { texto: `${atencao.length} documento(s) precisando de atenção:`, docs: atencao };
-      }
-
-      if (p.includes('próximos') || p.includes('proximos') || p.includes('30 dias') || p.includes('esse mês') || p.includes('este mês') || p.includes('mes')) {
-        let filtrados;
-        if (p.includes('mes')) {
-          const agora = new Date();
-          filtrados = comDias.filter(function (d) {
-            const dt = new Date(d.data_vencimento + 'T00:00:00');
-            return dt.getMonth() === agora.getMonth() && dt.getFullYear() === agora.getFullYear();
-          });
-        } else {
-          filtrados = comDias.filter(function (d) { return d.dias >= 0 && d.dias < 30; });
+        if (!resp.ok || !dados.resposta) {
+          return { texto: dados.erro || 'Não consegui pensar numa resposta agora. Tenta de novo em alguns segundos.' };
         }
-        if (filtrados.length === 0) return { texto: 'Nenhum documento vencendo nesse período.' };
-        return { texto: `${filtrados.length} documento(s) encontrados:`, docs: filtrados.sort(function (a, b) { return a.dias - b.dias; }) };
-      }
 
-      if (p.includes('quantos') || p.includes('total')) {
-        return { texto: `Você tem ${documentos.length} documento(s) cadastrado(s) no total.` };
+        return { texto: dados.resposta };
+      } catch (err) {
+        return { texto: 'Não consegui falar com a IA agora. Confere sua internet e tenta de novo.' };
       }
-
-      return { texto: 'Não encontrei essa informação nos seus documentos. Posso te dizer: o que está vencido, o que vence este mês, o mais urgente, documentos por categoria, ou o checklist de renovação de um deles.' };
     }
 
     /* ---------- envio ---------- */

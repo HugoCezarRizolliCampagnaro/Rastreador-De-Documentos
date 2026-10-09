@@ -79,7 +79,7 @@ Se não tiver certeza de um campo, use null nele em vez de chutar. Nunca invente
 
     if (!resposta.ok) {
       console.error('Erro Mistral (visão):', JSON.stringify(dados));
-      res.status(502).json({ erro: 'A IA não conseguiu analisar a foto agora. Tenta de novo.' });
+      res.status(502).json({ erro: 'A IA não conseguiu analisar a foto agora. (erro '+resposta.status+': '+String((dados && (dados.message || (dados.error && dados.error.message) || dados.detail)) || 'sem detalhe').slice(0,200)+')' });
       return;
     }
 
