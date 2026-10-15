@@ -7,6 +7,23 @@
 const { supabaseAdmin } = require('./_comum');
 const push = require('./_push');
 
+const ENVIOS_AO_MESMO_TEMPO = 10;
+
+// O Supabase devolve no máximo ~1000 linhas por consulta. Aqui lemos em páginas até acabar,
+// pra ninguém ficar sem aviso quando houver muita gente.
+async function buscarTudo(caminho) {
+  const separador = caminho.indexOf('?') === -1 ? '?' : '&';
+  const todos = [];
+  let inicio = 0;
+  for (let pagina = 0; pagina < 500; pagina++) {
+    const lote = (await supabaseAdmin(caminho + separador + 'order=id&limit=1000&offset=' + inicio)) || [];
+    if (lote.length === 0) break;
+    todos.push.apply(todos, lote);
+    inicio += lote.length;
+  }
+  return todos;
+}
+
 module.exports = async function handler(req, res) {
   const segredo = process.env.CRON_SECRET;
   if (!segredo || req.headers.authorization !== 'Bearer ' + segredo) {
@@ -22,13 +39,13 @@ module.exports = async function handler(req, res) {
   try {
     const hoje = push.hojeBrasilia();
 
-    const inscricoes = (await supabaseAdmin('push_inscricoes?select=*')) || [];
+    const inscricoes = await buscarTudo('push_inscricoes?select=*');
     if (inscricoes.length === 0) {
       res.status(200).json({ ok: true, inscricoes: 0, enviadas: 0 });
       return;
     }
 
-    const documentos = (await supabaseAdmin('documentos?select=user_id,nome,data_vencimento,avisos_dias&data_vencimento=not.is.null&limit=5000')) || [];
+    const documentos = await buscarTudo('documentos?select=id,user_id,nome,data_vencimento,avisos_dias&data_vencimento=not.is.null');
 
     const porUsuario = {};
     documentos.forEach(function (d) {
@@ -41,21 +58,28 @@ module.exports = async function handler(req, res) {
     let removidas = 0;
     let falhas = 0;
 
-    for (const insc of inscricoes) {
+    const alvos = inscricoes.filter(function (insc) {
       const docs = porUsuario[insc.user_id];
-      if (!docs || docs.length === 0) continue;
-      docs.sort(function (a, b) { return a.dias - b.dias; });
-      try {
-        const r = await push.enviar(insc, push.montarMensagem(docs));
-        if (r === 'ok') enviadas++;
-        else {
-          removidas++;
-          await supabaseAdmin('push_inscricoes?id=eq.' + insc.id, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      return docs && docs.length > 0;
+    });
+
+    // manda em grupos, pra não estourar o tempo da função quando houver muitos aparelhos
+    for (let i = 0; i < alvos.length; i += ENVIOS_AO_MESMO_TEMPO) {
+      await Promise.all(alvos.slice(i, i + ENVIOS_AO_MESMO_TEMPO).map(async function (insc) {
+        const docs = porUsuario[insc.user_id].slice().sort(function (a, b) { return a.dias - b.dias; });
+        try {
+          const r = await push.enviar(insc, push.montarMensagem(docs));
+          if (r === 'ok') {
+            enviadas++;
+          } else {
+            removidas++;
+            await supabaseAdmin('push_inscricoes?id=eq.' + insc.id, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+          }
+        } catch (e) {
+          falhas++;
+          console.error('Falha ao enviar push:', e.statusCode || '', e.message);
         }
-      } catch (e) {
-        falhas++;
-        console.error('Falha ao enviar push:', e.statusCode || '', e.message);
-      }
+      }));
     }
 
     res.status(200).json({ ok: true, inscricoes: inscricoes.length, enviadas: enviadas, removidas: removidas, falhas: falhas });

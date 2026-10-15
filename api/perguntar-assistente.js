@@ -27,6 +27,14 @@ async function chamarMistral(apiKey, corpo) {
   return resposta;
 }
 
+// Limites de tamanho: protegem a cota da Mistral de perguntas/listas gigantes.
+const LIMITE_PERGUNTA = 800; // caracteres
+const LIMITE_DOCUMENTOS = 300; // documentos enviados no resumo
+
+function corta(valor, tamanho) {
+  return String(valor == null ? '' : valor).slice(0, tamanho);
+}
+
 function ehDataISO(s) {
   return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
@@ -74,11 +82,17 @@ module.exports = async function handler(req, res) {
   try {
     const corpo = req.body || {};
     const pergunta = corpo.pergunta;
-    const documentos = Array.isArray(corpo.documentos) ? corpo.documentos : [];
+    const documentos = (Array.isArray(corpo.documentos) ? corpo.documentos : [])
+      .filter(function (d) { return d && typeof d === 'object'; })
+      .slice(0, LIMITE_DOCUMENTOS);
     const dataHoje = ehDataISO(corpo.dataHoje) ? corpo.dataHoje : new Date().toISOString().slice(0, 10);
 
     if (!pergunta || typeof pergunta !== 'string' || !pergunta.trim()) {
       res.status(400).json({ erro: 'Pergunta inválida.' });
+      return;
+    }
+    if (pergunta.length > LIMITE_PERGUNTA) {
+      res.status(400).json({ erro: 'Pergunta muito longa. Resuma em até ' + LIMITE_PERGUNTA + ' caracteres.' });
       return;
     }
 
@@ -94,11 +108,11 @@ module.exports = async function handler(req, res) {
 
     const resumoDocumentos = ordenados.map(function (doc) {
       const extras = [];
-      if (doc.cliente) extras.push('pessoa/empresa: ' + doc.cliente);
-      if (doc.numero_documento) extras.push('número: ' + doc.numero_documento);
-      if (doc.custo_valor != null) extras.push('custo: R$ ' + doc.custo_valor);
-      if (doc.proximo_pagamento_status) extras.push('pagamento: ' + doc.proximo_pagamento_status);
-      return '- ' + doc.nome + ' (' + (doc.tipo || 'documento') + ', categoria ' + (doc.categoria || 'outro') + ') — ' +
+      if (doc.cliente) extras.push('pessoa/empresa: ' + corta(doc.cliente, 120));
+      if (doc.numero_documento) extras.push('número: ' + corta(doc.numero_documento, 60));
+      if (doc.custo_valor != null) extras.push('custo: R$ ' + corta(doc.custo_valor, 20));
+      if (doc.proximo_pagamento_status) extras.push('pagamento: ' + corta(doc.proximo_pagamento_status, 30));
+      return '- ' + corta(doc.nome, 120) + ' (' + corta(doc.tipo || 'documento', 40) + ', categoria ' + corta(doc.categoria || 'outro', 40) + ') — ' +
         situacao(doc.data_vencimento, dataHoje) + (extras.length ? ' — ' + extras.join(', ') : '');
     }).join('\n');
 
