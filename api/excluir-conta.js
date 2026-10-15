@@ -58,12 +58,16 @@ module.exports = async function handler(req, res) {
     const id = usuario.id;
 
     etapa = 'assinatura';
-    try {
-      const perfil = await lerPerfil(id);
-      if (perfil && perfil.asaas_subscription_id && process.env.ASAAS_API_KEY) {
+    const perfil = await lerPerfil(id);
+    if (perfil && perfil.asaas_subscription_id && process.env.ASAAS_API_KEY) {
+      try {
         await asaas('/subscriptions/' + perfil.asaas_subscription_id, { method: 'DELETE' });
+      } catch (e) {
+        // 404 = já estava cancelada (ou o código é de outro ambiente): segue.
+        // Qualquer outro erro PARA a exclusão, pra não apagar a conta e deixar a cobrança mensal rodando.
+        if (e.status !== 404) throw e;
       }
-    } catch (e) { /* já cancelada ou sem pagamento configurado: segue */ }
+    }
 
     etapa = 'arquivos';
     await apagarArquivos(id);
