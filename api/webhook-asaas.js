@@ -7,7 +7,8 @@ const { DIAS_TOLERANCIA, dataISO, somarDias, asaas, salvarPerfil } = require('./
 
 function somarUmMes(dataStr) {
   const [a, m, d] = dataStr.split('-').map(Number);
-  const nova = new Date(Date.UTC(a, m, d)); // mês seguinte (m já é base 1)
+  // mês seguinte (m já é base 1). Meio-dia UTC pra não "voltar um dia" ao converter pro horário de Brasília
+  const nova = new Date(Date.UTC(a, m, d, 12));
   return nova;
 }
 
