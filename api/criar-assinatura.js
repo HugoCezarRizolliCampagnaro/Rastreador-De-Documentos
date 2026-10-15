@@ -91,12 +91,18 @@ module.exports = async function handler(req, res) {
 
     const validoAte = dataISO(somarDias(hoje, DIAS_TESTE_GRATIS + DIAS_TOLERANCIA));
 
-    await salvarPerfil(usuario.id, {
-      plano: corpo.plano,
-      plano_valido_ate: validoAte,
-      asaas_customer_id: clienteId,
-      asaas_subscription_id: assinatura.id,
-    });
+    try {
+      await salvarPerfil(usuario.id, {
+        plano: corpo.plano,
+        plano_valido_ate: validoAte,
+        asaas_customer_id: clienteId,
+        asaas_subscription_id: assinatura.id,
+      });
+    } catch (erroSalvar) {
+      // não deixa uma assinatura solta no Asaas (cobrança duplicada numa nova tentativa)
+      try { await asaas('/subscriptions/' + assinatura.id, { method: 'DELETE' }); } catch (e) { /* já removida */ }
+      throw erroSalvar;
+    }
 
     // link pra pagar já (opcional) — a primeira cobrança pode demorar a aparecer
     let linkPagamento = null;
