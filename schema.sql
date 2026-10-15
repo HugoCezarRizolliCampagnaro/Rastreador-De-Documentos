@@ -229,3 +229,53 @@ create policy "atualizar proprias inscricoes" on push_inscricoes
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "apagar proprias inscricoes" on push_inscricoes
   for delete using (auth.uid() = user_id);
+
+-- ---------- limite do plano Grátis (3 documentos), valendo no servidor ----------
+-- Vale pra qualquer jeito de criar documento (formulário, duplicar, chamada direta à API).
+-- Só bloqueia documentos NOVOS; quem já tem mais de 3 não perde nada.
+-- Plano pago = mesma regra do app: plano <> 'gratis' e plano_valido_ate >= hoje (horário de Brasília).
+
+create or replace function public.limitar_documentos_gratis()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_pago boolean;
+  v_total integer;
+begin
+  -- chamadas sem usuário logado (servidor com chave secreta, SQL Editor) não são limitadas
+  if auth.uid() is null or new.user_id is null then
+    return new;
+  end if;
+
+  -- evita que dois cadastros ao mesmo tempo passem juntos do limite
+  perform pg_advisory_xact_lock(hashtext('limite_docs_' || new.user_id::text));
+
+  select exists (
+    select 1 from public.perfis p
+    where p.user_id = new.user_id
+      and p.plano <> 'gratis'
+      and p.plano_valido_ate >= (now() at time zone 'America/Sao_Paulo')::date
+  ) into v_pago;
+
+  if v_pago then
+    return new;
+  end if;
+
+  select count(*) into v_total from public.documentos d where d.user_id = new.user_id;
+
+  if v_total >= 3 then
+    raise exception 'Limite do plano Grátis atingido (3 documentos). Faça upgrade para o Premium e tenha documentos ilimitados.';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists limitar_documentos_gratis on public.documentos;
+
+create trigger limitar_documentos_gratis
+  before insert on public.documentos
+  for each row execute function public.limitar_documentos_gratis();
