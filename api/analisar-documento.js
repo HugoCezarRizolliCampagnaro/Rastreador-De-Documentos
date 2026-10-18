@@ -1,6 +1,6 @@
 // api/analisar-documento.js
 //
-// Recebe a foto de um documento em base64 e devolve os campos extraídos
+// Recebe a foto (ou PDF) de um documento em base64 e devolve os campos extraídos
 // por uma IA com visão (Mistral), pra preencher o formulário de cadastro automaticamente.
 // O usuário sempre revisa os campos antes de salvar — essa função nunca salva nada.
 //
@@ -57,9 +57,35 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    if (!String(mimeType).startsWith('image/')) {
-      res.status(400).json({ erro: 'A leitura automática funciona com foto (JPG ou PNG). Para PDF, preencha manualmente.' });
+    const ehPdf = mimeType === 'application/pdf';
+    if (!ehPdf && !String(mimeType).startsWith('image/')) {
+      res.status(400).json({ erro: 'A leitura automática funciona com foto (JPG ou PNG) ou PDF.' });
       return;
+    }
+
+    // PDF: primeiro o OCR da Mistral transforma as páginas em texto
+    let textoPdf = null;
+    if (ehPdf) {
+      const respOcr = await fetch('https://api.mistral.ai/v1/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: process.env.MISTRAL_OCR_MODEL || 'mistral-ocr-latest',
+          document: { type: 'document_url', document_url: `data:application/pdf;base64,${imagemBase64}` },
+          pages: [0, 1, 2],
+        }),
+      });
+      const dadosOcr = await respOcr.json().catch(function () { return {}; });
+      if (!respOcr.ok) {
+        console.error('Erro Mistral (OCR):', JSON.stringify(dadosOcr));
+        res.status(502).json({ erro: 'A IA não conseguiu ler esse PDF agora. Tente uma foto do documento ou preencha manualmente.' });
+        return;
+      }
+      textoPdf = (dadosOcr.pages || []).map(function (pg) { return pg.markdown || ''; }).join('\n\n').slice(0, 12000);
+      if (!textoPdf.trim()) {
+        res.status(422).json({ erro: 'Não encontrei texto nesse PDF. Tente uma foto do documento ou preencha manualmente.' });
+        return;
+      }
     }
 
     const prompt = `Você está analisando a foto de um documento real: pode ser ASO, NR, alvará, contrato, certificação, RG, CNH ou outro documento com data de validade.
@@ -87,10 +113,12 @@ Se não tiver certeza de um campo, use null nele em vez de chutar. Nunca invente
         messages: [
           {
             role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              { type: 'image_url', image_url: `data:${mimeType};base64,${imagemBase64}` },
-            ],
+            content: ehPdf
+              ? [{ type: 'text', text: prompt.replace('a foto de um documento real', 'o texto extraído de um PDF de documento real').replace('na imagem', 'no texto') + '\n\nTEXTO DO DOCUMENTO:\n' + textoPdf }]
+              : [
+                  { type: 'text', text: prompt },
+                  { type: 'image_url', image_url: `data:${mimeType};base64,${imagemBase64}` },
+                ],
           },
         ],
       });

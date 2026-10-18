@@ -735,15 +735,28 @@
       });
     }
 
+    const LIMITE_PDF_IA = 3 * 1024 * 1024;
+
+    function lerComoBase64(arquivo) {
+      return new Promise(function (resolve, reject) {
+        const leitor = new FileReader();
+        leitor.onload = function () { resolve(String(leitor.result).split(',')[1]); };
+        leitor.onerror = function () { reject(new Error('Não consegui ler o arquivo.')); };
+        leitor.readAsDataURL(arquivo);
+      });
+    }
+
     document.getElementById('arquivo').addEventListener('change', function () {
       const statusIA = document.getElementById('ia-preencher-status');
       statusIA.hidden = true;
       const arquivo = this.files[0];
       const botaoIA = document.getElementById('btn-ia-preencher');
-      botaoIA.hidden = !arquivo || !arquivo.type.startsWith('image/');
-      if (arquivo && !arquivo.type.startsWith('image/')) {
+      const ehPdf = !!arquivo && arquivo.type === 'application/pdf';
+      botaoIA.hidden = !arquivo || !(arquivo.type.startsWith('image/') || ehPdf);
+      if (ehPdf && arquivo.size > LIMITE_PDF_IA) {
+        botaoIA.hidden = true;
         statusIA.className = 'ia-preencher-status';
-        statusIA.textContent = 'A leitura automática funciona com foto (JPG/PNG). Para PDF, preencha os campos manualmente.';
+        statusIA.textContent = 'Esse PDF é grande demais para a leitura automática (máx. 3 MB). Preencha os campos manualmente.';
         statusIA.hidden = false;
       }
     });
@@ -759,12 +772,14 @@
       statusIA.hidden = true;
 
       try {
-        const base64 = await reduzirImagem(arquivo);
+        const ehPdf = arquivo.type === 'application/pdf';
+        if (ehPdf) textoBotao.textContent = 'Lendo o PDF com IA...';
+        const base64 = ehPdf ? await lerComoBase64(arquivo) : await reduzirImagem(arquivo);
         const sessaoIA = (await sb.auth.getSession()).data.session;
         const resp = await fetch('/api/analisar-documento', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (sessaoIA ? sessaoIA.access_token : '') },
-          body: JSON.stringify({ imagemBase64: base64, mimeType: 'image/jpeg' }),
+          body: JSON.stringify({ imagemBase64: base64, mimeType: ehPdf ? 'application/pdf' : 'image/jpeg' }),
         });
         const dados = await resp.json();
 
