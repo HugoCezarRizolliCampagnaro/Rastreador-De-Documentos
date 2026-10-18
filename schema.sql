@@ -279,3 +279,26 @@ drop trigger if exists limitar_documentos_gratis on public.documentos;
 create trigger limitar_documentos_gratis
   before insert on public.documentos
   for each row execute function public.limitar_documentos_gratis();
+
+-- ---------- lembretes por e-mail (Edge Function enviar-lembretes + pg_cron às 08:00) ----------
+create table if not exists public.lembretes_enviados (
+  documento_id uuid not null references public.documentos(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  dias_aviso integer not null,
+  data_vencimento date not null,
+  enviado_em timestamptz not null default now(),
+  primary key (documento_id, data_vencimento, dias_aviso)
+);
+alter table public.lembretes_enviados enable row level security;
+
+-- preferência do usuário: receber ou não lembrete por e-mail
+create table if not exists public.preferencias (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  email_lembretes boolean not null default true,
+  atualizado_em timestamptz not null default now()
+);
+alter table public.preferencias enable row level security;
+-- (policies: ver/criar/atualizar as próprias preferências)
+
+-- pessoas: renomear e excluir as próprias; documentos da pessoa excluída ficam sem pessoa
+-- (policies de update/delete em pessoas + documentos_pessoa_id_fkey on delete set null)
