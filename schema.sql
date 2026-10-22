@@ -302,3 +302,9 @@ alter table public.preferencias enable row level security;
 
 -- pessoas: renomear e excluir as próprias; documentos da pessoa excluída ficam sem pessoa
 -- (policies de update/delete em pessoas + documentos_pessoa_id_fkey on delete set null)
+
+-- ---------- assinatura por Pix mensal (ZuckPay) ----------
+-- perfis ganhou: assinatura_ativa, teste_usado, cobranca_nome, cobranca_cpf, cobranca_telefone
+-- pagamentos: cada Pix gerado (external_id único, status PENDING/PAID/...). Só o servidor grava;
+--             o usuário só lê os próprios (RLS).
+-- avisos_assinatura: e-mails de "mensalidade vencendo" já enviados (5, 1 e 0 dias antes).

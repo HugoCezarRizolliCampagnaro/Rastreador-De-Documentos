@@ -4,7 +4,7 @@
 // pessoas, perfil e o próprio login. Não tem volta. Só funciona se o usuário digitou
 // a confirmação certa na tela de Perfil.
 
-const { SUPABASE_URL, asaas, usuarioDaRequisicao, supabaseAdmin, lerPerfil } = require('./_comum');
+const { SUPABASE_URL, usuarioDaRequisicao, supabaseAdmin, lerPerfil } = require('./_comum');
 
 const BUCKET = 'documentos-arquivos';
 
@@ -56,18 +56,6 @@ module.exports = async function handler(req, res) {
     }
 
     const id = usuario.id;
-
-    etapa = 'assinatura';
-    const perfil = await lerPerfil(id);
-    if (perfil && perfil.asaas_subscription_id && process.env.ASAAS_API_KEY) {
-      try {
-        await asaas('/subscriptions/' + perfil.asaas_subscription_id, { method: 'DELETE' });
-      } catch (e) {
-        // 404 = já estava cancelada (ou o código é de outro ambiente): segue.
-        // Qualquer outro erro PARA a exclusão, pra não apagar a conta e deixar a cobrança mensal rodando.
-        if (e.status !== 404) throw e;
-      }
-    }
 
     etapa = 'arquivos';
     await apagarArquivos(id);

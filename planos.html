@@ -315,6 +315,13 @@
   .modal-botao:disabled { opacity: 0.6; cursor: wait; }
   .modal-botao.secundario { background: none; color: var(--texto-muted); font-weight: 500; margin-top: 8px; }
   .modal-msg { color: var(--status-vermelho); font-size: 12.5px; margin: 0 0 12px; }
+  .pix-qr { display: block; width: 210px; height: 210px; margin: 4px auto 14px; background: #fff; border-radius: 12px; padding: 8px; box-sizing: border-box; object-fit: contain; }
+  .pix-codigo { width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--borda); color: var(--texto); border-radius: 10px; padding: 10px 12px; font-size: 12px; font-family: ui-monospace, monospace; resize: none; height: 64px; margin-bottom: 10px; word-break: break-all; }
+  .pix-status { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 12.5px; color: var(--texto-muted); margin: 12px 0 4px; }
+  .pix-status.pago { color: var(--status-verde); font-weight: 700; }
+  .pix-ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--status-amarelo, #D9930D); animation: pix-pulsar 1.4s ease-in-out infinite; }
+  @keyframes pix-pulsar { 50% { opacity: 0.3; } }
+  .plano-pagar { margin-top: 10px; }
 
   /* ---------- correção mobile: nada pode ser mais largo que a tela ---------- */
   .app-shell { overflow-x: clip; max-width: 100%; }
@@ -380,21 +387,40 @@
   <div class="modal-assinatura" id="modal-assinatura" hidden>
     <div class="modal-card">
       <div id="modal-conteudo-form">
-        <h2>Teste o Premium por 30 dias</h2>
-        <p>Sem cobrar nada agora. Depois dos 30 dias, a primeira mensalidade (R$ 9,90) vence e você escolhe pagar por Pix, boleto ou cartão. Pode cancelar quando quiser.</p>
+        <h2 id="modal-form-titulo-teste">Teste o Premium por 30 dias</h2>
+        <h2 id="modal-form-titulo" hidden>Assinar o Premium</h2>
+        <p id="modal-form-texto">Sem cobrar nada agora. Depois dos 30 dias, você paga R$ 9,90 por mês com Pix, direto no app. Não tem cobrança automática: é só não pagar pra parar.</p>
         <label for="modal-nome">Nome completo</label>
         <input type="text" id="modal-nome" autocomplete="name" placeholder="Seu nome">
         <label for="modal-cpf">CPF</label>
         <input type="text" id="modal-cpf" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00">
+        <label for="modal-telefone">Celular com DDD</label>
+        <input type="tel" id="modal-telefone" inputmode="numeric" autocomplete="tel-national" placeholder="(51) 99999-8888">
+        <p style="font-size: 11.5px; margin-top: -4px;">Esses dados são exigidos pelo banco pra gerar o Pix.</p>
         <p class="modal-msg" id="modal-msg" hidden></p>
         <button type="button" class="modal-botao" id="modal-confirmar">Começar meus 30 dias grátis</button>
         <button type="button" class="modal-botao secundario" id="modal-fechar">Agora não</button>
       </div>
       <div id="modal-conteudo-ok" hidden>
         <h2>Premium ativado!</h2>
-        <p>Seu teste grátis já está valendo. A primeira cobrança vence em <strong id="modal-ok-data"></strong>. O Asaas vai te avisar por e-mail com as opções de pagamento.</p>
-        <a class="modal-botao" id="modal-ok-link" href="#" target="_blank" rel="noopener" hidden>Ver opções de pagamento</a>
+        <p>Seu teste grátis vale até <strong id="modal-ok-data"></strong>. Perto dessa data a gente te avisa por e-mail pra pagar o Pix do mês aqui no app.</p>
         <button type="button" class="modal-botao secundario" id="modal-ok-fechar">Fechar</button>
+      </div>
+      <div id="modal-conteudo-pix" hidden>
+        <h2>Pague com Pix</h2>
+        <p>Mensalidade do Premium: <strong id="pix-valor">R$ 9,90</strong>. Abra o app do seu banco e escaneie o QR Code, ou use o Pix copia e cola.</p>
+        <img class="pix-qr" id="pix-qr" alt="QR Code do Pix" hidden>
+        <textarea class="pix-codigo" id="pix-codigo" readonly></textarea>
+        <button type="button" class="modal-botao" id="pix-copiar">Copiar código Pix</button>
+        <a class="modal-botao secundario" id="pix-checkout" href="#" target="_blank" rel="noopener" hidden>Abrir página de pagamento</a>
+        <div class="pix-status" id="pix-status"><span class="pix-ponto"></span><span id="pix-status-texto">Aguardando pagamento...</span></div>
+        <button type="button" class="modal-botao secundario" id="pix-ja-paguei">Já paguei</button>
+        <button type="button" class="modal-botao secundario" id="pix-fechar">Fechar</button>
+      </div>
+      <div id="modal-conteudo-pago" hidden>
+        <h2>Pagamento confirmado!</h2>
+        <p>Obrigado! Seu Premium vale até <strong id="pago-data"></strong>.</p>
+        <button type="button" class="modal-botao" id="pago-fechar">Fechar</button>
       </div>
     </div>
   </div>
@@ -471,7 +497,7 @@
 
     /* ---------- planos ---------- */
 
-    function renderPlanos(usoAtual, perfil) {
+    function renderPlanos(usoAtual, perfil, perfilBruto) {
       const premiumAtivo = !!perfil;
       const validoAteTxt = premiumAtivo ? new Date(perfil.plano_valido_ate + 'T00:00:00').toLocaleDateString('pt-BR') : '';
       const percentualUso = Math.min(100, Math.round((usoAtual / LIMITE_GRATIS) * 100));
@@ -516,11 +542,16 @@
           ${premiumAtivo
             ? `<div class="plano-trial">Ativo até ${validoAteTxt}</div>
                <button type="button" class="plano-botao atual" disabled>Seu plano atual</button>
-               ${perfil.asaas_subscription_id
-                 ? '<button type="button" class="plano-cancelar" id="btn-cancelar">Cancelar assinatura</button>'
-                 : '<p class="plano-cancelado">Assinatura cancelada — o Premium vale até a data acima.</p>'}`
-            : `<div class="plano-trial">30 dias grátis para testar</div>
-               <button type="button" class="plano-botao principal" id="btn-premium">Começar teste grátis</button>`}
+               ${perfil.assinatura_ativa
+                 ? `<button type="button" class="plano-botao principal plano-pagar" id="btn-pagar">Pagar próximo mês com Pix</button>
+                    <button type="button" class="plano-cancelar" id="btn-cancelar">Cancelar assinatura</button>`
+                 : `<p class="plano-cancelado">Assinatura cancelada — o Premium vale até a data acima.</p>
+                    <button type="button" class="plano-botao principal plano-pagar" id="btn-pagar">Reativar e pagar com Pix</button>`}`
+            : perfilBruto && perfilBruto.teste_usado
+              ? `<div class="plano-trial">Pague com Pix, sem fidelidade</div>
+                 <button type="button" class="plano-botao principal" id="btn-assinar">Assinar por R$ 9,90/mês</button>`
+              : `<div class="plano-trial">30 dias grátis para testar</div>
+                 <button type="button" class="plano-botao principal" id="btn-premium">Começar teste grátis</button>`}
         </div>
 
         <div class="plano-card">
@@ -552,7 +583,13 @@
       `;
 
       const btnPremium = document.getElementById('btn-premium');
-      if (btnPremium) btnPremium.addEventListener('click', abrirModalAssinatura);
+      if (btnPremium) btnPremium.addEventListener('click', function () { abrirModalAssinatura(false); });
+
+      const btnAssinar = document.getElementById('btn-assinar');
+      if (btnAssinar) btnAssinar.addEventListener('click', function () { pagarComPix(); });
+
+      const btnPagar = document.getElementById('btn-pagar');
+      if (btnPagar) btnPagar.addEventListener('click', function () { pagarComPix(); });
 
       const btnCancelar = document.getElementById('btn-cancelar');
       if (btnCancelar) btnCancelar.addEventListener('click', cancelarAssinatura);
@@ -576,15 +613,18 @@
       }).join('');
     }
 
-    /* ---------- assinatura (Asaas) ---------- */
+    /* ---------- assinatura (Pix mensal via ZuckPay) ---------- */
 
     let usoDocumentos = 0;
 
+    let perfilAtual = null;
+
     async function carregarPlano() {
       const { data } = await sb.from('perfis').select('*').maybeSingle();
+      perfilAtual = data || null;
       const hoje = new Date().toLocaleDateString('sv-SE');
       const ativo = data && data.plano !== 'gratis' && data.plano_valido_ate && data.plano_valido_ate >= hoje;
-      renderPlanos(usoDocumentos, ativo ? data : null);
+      renderPlanos(usoDocumentos, ativo ? data : null, data || null);
     }
 
     async function tokenDeLogin() {
@@ -596,18 +636,146 @@
     const modalMsgEl = document.getElementById('modal-msg');
     const modalBtnEl = document.getElementById('modal-confirmar');
 
-    function abrirModalAssinatura() {
-      modalMsgEl.hidden = true;
-      modalBtnEl.disabled = false;
-      modalBtnEl.textContent = 'Começar meus 30 dias grátis';
-      document.getElementById('modal-conteudo-form').hidden = false;
-      document.getElementById('modal-conteudo-ok').hidden = true;
+    let modoPagamento = false; // false = começar teste grátis; true = preencher dados e ir pro Pix
+
+    function textoBotaoForm() {
+      return modoPagamento ? 'Continuar para o Pix' : 'Começar meus 30 dias grátis';
+    }
+
+    function mostrarConteudo(qual) {
+      ['form', 'ok', 'pix', 'pago'].forEach(function (nome) {
+        document.getElementById('modal-conteudo-' + nome).hidden = nome !== qual;
+      });
       modalEl.hidden = false;
     }
 
+    function abrirModalAssinatura(pagamento) {
+      modoPagamento = !!pagamento;
+      modalMsgEl.hidden = true;
+      modalBtnEl.disabled = false;
+      modalBtnEl.textContent = textoBotaoForm();
+      document.getElementById('modal-form-titulo').hidden = !modoPagamento;
+      document.getElementById('modal-form-titulo-teste').hidden = modoPagamento;
+      document.getElementById('modal-form-texto').textContent = modoPagamento
+        ? 'R$ 9,90 por mês, pago com Pix direto no app. Não tem cobrança automática: é só não pagar pra parar.'
+        : 'Sem cobrar nada agora. Depois dos 30 dias, você paga R$ 9,90 por mês com Pix, direto no app. Não tem cobrança automática: é só não pagar pra parar.';
+      if (perfilAtual) {
+        if (perfilAtual.cobranca_nome) document.getElementById('modal-nome').value = perfilAtual.cobranca_nome;
+        if (perfilAtual.cobranca_cpf) { const c = document.getElementById('modal-cpf'); c.value = perfilAtual.cobranca_cpf; c.dispatchEvent(new Event('input')); }
+        if (perfilAtual.cobranca_telefone) { const t = document.getElementById('modal-telefone'); t.value = perfilAtual.cobranca_telefone; t.dispatchEvent(new Event('input')); }
+      }
+      mostrarConteudo('form');
+    }
+
     function fecharModalAssinatura() {
+      pararVerificacao();
       modalEl.hidden = true;
     }
+
+    /* ----- Pix ----- */
+
+    let timerVerificacao = null;
+    let inicioVerificacao = 0;
+
+    function pararVerificacao() {
+      if (timerVerificacao) clearInterval(timerVerificacao);
+      timerVerificacao = null;
+    }
+
+    async function chamarPix(acao) {
+      const resp = await fetch('/api/pix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (await tokenDeLogin()) },
+        body: JSON.stringify({ acao: acao }),
+      });
+      const dados = await resp.json().catch(function () { return {}; });
+      if (!resp.ok) {
+        const erro = new Error(dados.erro || 'Não foi possível falar com o pagamento agora.');
+        erro.precisaDados = !!dados.precisaDados;
+        throw erro;
+      }
+      return dados;
+    }
+
+    function mostrarPago(validoAte) {
+      pararVerificacao();
+      document.getElementById('pago-data').textContent = validoAte
+        ? new Date(validoAte + 'T00:00:00').toLocaleDateString('pt-BR')
+        : 'o próximo mês';
+      mostrarConteudo('pago');
+      carregarPlano();
+    }
+
+    async function verificarPix(manual) {
+      const statusTxt = document.getElementById('pix-status-texto');
+      try {
+        const r = await chamarPix('verificar');
+        if (r.status === 'PAID') { mostrarPago(r.validoAte); return; }
+        if (['EXPIRED', 'EXPIRADO', 'FAILED', 'REFUSED', 'CANCELED', 'CANCELLED'].includes(r.status)) {
+          pararVerificacao();
+          statusTxt.textContent = 'Esse Pix expirou. Feche e gere outro.';
+          return;
+        }
+        if (manual) statusTxt.textContent = 'Ainda não recebemos. Se você já pagou, espere alguns segundos.';
+      } catch (e) {
+        if (manual) statusTxt.textContent = e.message;
+      }
+      if (Date.now() - inicioVerificacao > 10 * 60 * 1000) pararVerificacao();
+    }
+
+    async function pagarComPix() {
+      if (!perfilAtual || !perfilAtual.cobranca_cpf || !perfilAtual.cobranca_telefone) {
+        abrirModalAssinatura(true);
+        return;
+      }
+      document.getElementById('pix-status-texto').textContent = 'Gerando seu Pix...';
+      document.getElementById('pix-codigo').value = '';
+      document.getElementById('pix-qr').hidden = true;
+      document.getElementById('pix-checkout').hidden = true;
+      mostrarConteudo('pix');
+      try {
+        const pix = await chamarPix('gerar');
+        document.getElementById('pix-valor').textContent = 'R$ ' + Number(pix.valor || 9.9).toFixed(2).replace('.', ',');
+        document.getElementById('pix-codigo').value = pix.qrcode || '';
+        const qr = document.getElementById('pix-qr');
+        if (pix.qrcodeImagem) {
+          qr.src = /^(https?:|data:)/.test(pix.qrcodeImagem) ? pix.qrcodeImagem : 'data:image/png;base64,' + pix.qrcodeImagem;
+          qr.hidden = false;
+        }
+        const link = document.getElementById('pix-checkout');
+        if (pix.checkoutUrl) { link.href = pix.checkoutUrl; link.hidden = false; }
+        document.getElementById('pix-status-texto').textContent = 'Aguardando pagamento...';
+        pararVerificacao();
+        inicioVerificacao = Date.now();
+        timerVerificacao = setInterval(function () { verificarPix(false); }, 5000);
+      } catch (e) {
+        if (e.precisaDados) { abrirModalAssinatura(true); return; }
+        document.getElementById('pix-status-texto').textContent = e.message;
+      }
+    }
+
+    document.getElementById('pix-copiar').addEventListener('click', async function () {
+      const codigo = document.getElementById('pix-codigo');
+      try {
+        await navigator.clipboard.writeText(codigo.value);
+      } catch (e) {
+        codigo.select();
+        document.execCommand('copy');
+      }
+      this.textContent = 'Código copiado!';
+      const btn = this;
+      setTimeout(function () { btn.textContent = 'Copiar código Pix'; }, 2500);
+    });
+    document.getElementById('pix-ja-paguei').addEventListener('click', function () { verificarPix(true); });
+    document.getElementById('pix-fechar').addEventListener('click', function () { fecharModalAssinatura(); carregarPlano(); });
+    document.getElementById('pago-fechar').addEventListener('click', fecharModalAssinatura);
+
+    document.getElementById('modal-telefone').addEventListener('input', function () {
+      const n = this.value.replace(/\D/g, '').slice(0, 11);
+      this.value = n.length > 10
+        ? n.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3')
+        : n.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
+    });
 
     document.getElementById('modal-fechar').addEventListener('click', fecharModalAssinatura);
     document.getElementById('modal-ok-fechar').addEventListener('click', function () { fecharModalAssinatura(); carregarPlano(); });
@@ -621,36 +789,38 @@
     modalBtnEl.addEventListener('click', async function () {
       const nome = document.getElementById('modal-nome').value.trim();
       const cpf = document.getElementById('modal-cpf').value;
+      const telefone = document.getElementById('modal-telefone').value;
 
       modalMsgEl.hidden = true;
       modalBtnEl.disabled = true;
-      modalBtnEl.textContent = 'Criando sua assinatura...';
+      modalBtnEl.textContent = modoPagamento ? 'Salvando seus dados...' : 'Ativando seu teste...';
 
       try {
         const resp = await fetch('/api/criar-assinatura', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (await tokenDeLogin()) },
-          body: JSON.stringify({ plano: 'premium', nome: nome, cpf: cpf }),
+          body: JSON.stringify({ plano: 'premium', nome: nome, cpf: cpf, telefone: telefone }),
         });
         const dados = await resp.json();
         if (!resp.ok) throw new Error(dados.erro || 'Não foi possível iniciar agora.');
 
-        document.getElementById('modal-ok-data').textContent = new Date(dados.primeiroVencimento + 'T00:00:00').toLocaleDateString('pt-BR');
-        const linkEl = document.getElementById('modal-ok-link');
-        linkEl.hidden = !dados.linkPagamento;
-        if (dados.linkPagamento) linkEl.href = dados.linkPagamento;
-        document.getElementById('modal-conteudo-form').hidden = true;
-        document.getElementById('modal-conteudo-ok').hidden = false;
+        if (dados.precisaPagar) {
+          await carregarPlano();
+          await pagarComPix();
+          return;
+        }
+        document.getElementById('modal-ok-data').textContent = new Date(dados.validoAte + 'T00:00:00').toLocaleDateString('pt-BR');
+        mostrarConteudo('ok');
       } catch (erro) {
         modalMsgEl.textContent = erro.message;
         modalMsgEl.hidden = false;
         modalBtnEl.disabled = false;
-        modalBtnEl.textContent = 'Começar meus 30 dias grátis';
+        modalBtnEl.textContent = textoBotaoForm();
       }
     });
 
     async function cancelarAssinatura() {
-      if (!confirm('Cancelar a assinatura? Você continua com o Premium até o fim do período já pago.')) return;
+      if (!confirm('Cancelar a assinatura? Você continua com o Premium até o fim do período já pago, e a gente para de pedir o Pix dos próximos meses.')) return;
       try {
         const resp = await fetch('/api/cancelar-assinatura', {
           method: 'POST',

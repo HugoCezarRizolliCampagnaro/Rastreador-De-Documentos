@@ -84,6 +84,71 @@ const RESERVAR = `
   select c.* from c join r on r.id = c.id and r.faixa = c.faixa
 `
 
+// Assinaturas cujo período pago (ou teste grátis) termina em 5, 1 ou 0 dias e que ainda
+// não receberam esse aviso. Reserva antes de enviar, igual aos lembretes de documento.
+const RESERVAR_MENSALIDADE = `
+  with h as (select (now() at time zone 'America/Sao_Paulo')::date as d),
+  c as (
+    select
+      pf.user_id,
+      u.email,
+      pf.plano_valido_ate,
+      to_char(pf.plano_valido_ate, 'DD/MM/YYYY') as valido_br,
+      (pf.plano_valido_ate - h.d)::int as dias,
+      (select min(a) from unnest(array[5, 1, 0]) as a where a >= (pf.plano_valido_ate - h.d)) as faixa,
+      not exists (select 1 from public.pagamentos pg where pg.user_id = pf.user_id and pg.status = 'PAID') as em_teste
+    from public.perfis pf
+    cross join h
+    join auth.users u on u.id = pf.user_id
+    where pf.assinatura_ativa
+      and pf.plano <> 'gratis'
+      and pf.plano_valido_ate between h.d and h.d + 5
+      and u.email is not null
+  ),
+  r as (
+    insert into public.avisos_assinatura (user_id, valido_ate, dias)
+    select user_id, plano_valido_ate, faixa from c where faixa is not null
+    on conflict do nothing
+    returning user_id, dias
+  )
+  select c.user_id::text as user_id, c.email, c.valido_br, c.dias, c.faixa, c.em_teste,
+         to_char(c.plano_valido_ate, 'YYYY-MM-DD') as valido_ate
+  from c join r on r.user_id = c.user_id and r.dias = c.faixa
+`
+
+type AvisoMensalidade = {
+  user_id: string
+  email: string
+  valido_br: string
+  valido_ate: string
+  dias: number
+  faixa: number
+  em_teste: boolean
+}
+
+function emailMensalidade(a: AvisoMensalidade) {
+  const quando = a.dias === 0 ? 'hoje' : a.dias === 1 ? 'amanhã' : `em ${a.dias} dias`
+  const assunto = a.em_teste
+    ? `Seu teste grátis do DocTrack termina ${quando}`
+    : `Sua mensalidade do DocTrack vence ${quando}`
+  const intro = a.em_teste
+    ? `Seu teste do Premium vai até ${a.valido_br}. Pra continuar com documentos ilimitados e todos os recursos, pague o Pix de R$ 9,90 direto no app.`
+    : `Seu Premium vale até ${a.valido_br}. Pra continuar, pague o Pix do próximo mês (R$ 9,90) direto no app. Leva menos de um minuto.`
+  const link = APP_URL + 'planos.html'
+  const html = `
+  <div style="background:#f4f5fb;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;">
+    <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px;">
+      <p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;font-weight:bold;color:#3D4FE0;">DOCTRACK</p>
+      <h1 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:#14162b;">${esc(assunto)}</h1>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:#4a4d68;">${esc(intro)}</p>
+      <a href="${link}" style="display:inline-block;background:#3D4FE0;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 28px;border-radius:12px;">Pagar com Pix</a>
+      <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#7b7e96;">Não tem cobrança automática. Se não pagar, sua conta volta pro plano Grátis e nenhum documento é apagado.</p>
+    </div>
+  </div>`
+  const texto = `${assunto}\n\n${intro}\n\nPagar com Pix: ${link}`
+  return { assunto, html, texto }
+}
+
 function resposta(corpo: unknown, status = 200) {
   return new Response(JSON.stringify(corpo), {
     status,
@@ -264,9 +329,26 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Envio real
+  // Envio real — 1) avisos de mensalidade
+  const avisos = (await sql.unsafe(RESERVAR_MENSALIDADE)) as unknown as AvisoMensalidade[]
+  let mensalidades = 0
+  for (const a of avisos) {
+    const { assunto, html, texto } = emailMensalidade(a)
+    try {
+      await transporte.sendMail({ from: `"DocTrack" <${REMETENTE}>`, to: a.email, subject: assunto, html, text: texto })
+      mensalidades += 1
+    } catch (e) {
+      console.error('falha ao enviar aviso de mensalidade', e instanceof Error ? e.message : e)
+      await sql`
+        delete from public.avisos_assinatura
+        where user_id = ${a.user_id}::uuid and valido_ate = ${a.valido_ate}::date and dias = ${a.faixa}
+      `
+    }
+  }
+
+  // 2) lembretes de documentos
   const reservados = (await sql.unsafe(RESERVAR)) as unknown as Lembrete[]
-  if (reservados.length === 0) return resposta({ modo, emails: 0, lembretes: 0 })
+  if (reservados.length === 0) return resposta({ modo, emails: 0, lembretes: 0, mensalidades })
 
   const porUsuario = new Map<string, Lembrete[]>()
   for (const l of reservados) {
@@ -297,6 +379,6 @@ Deno.serve(async (req) => {
     }
   }
 
-  console.log('lembretes', { emails, falhas, lembretes: reservados.length })
-  return resposta({ modo, emails, falhas, lembretes: reservados.length })
+  console.log('lembretes', { emails, falhas, lembretes: reservados.length, mensalidades })
+  return resposta({ modo, emails, falhas, lembretes: reservados.length, mensalidades })
 })

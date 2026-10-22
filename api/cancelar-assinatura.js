@@ -1,9 +1,10 @@
 // api/cancelar-assinatura.js
 //
-// Cancela a cobrança mensal no Asaas. O plano continua valendo até o fim do período já pago
-// (plano_valido_ate), depois volta sozinho pro Grátis.
+// Cancela a renovação mensal: o app para de pedir o Pix do próximo mês e de mandar o aviso de
+// mensalidade. O plano continua valendo até o fim do período já pago (plano_valido_ate) e
+// depois volta sozinho pro Grátis.
 
-const { asaas, usuarioDaRequisicao, lerPerfil, salvarPerfil } = require('./_comum');
+const { usuarioDaRequisicao, lerPerfil, salvarPerfil } = require('./_comum');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -19,19 +20,12 @@ module.exports = async function handler(req, res) {
     }
 
     const perfil = await lerPerfil(usuario.id);
-    if (!perfil || !perfil.asaas_subscription_id) {
+    if (!perfil || !perfil.assinatura_ativa) {
       res.status(400).json({ erro: 'Você não tem assinatura ativa.' });
       return;
     }
 
-    try {
-      await asaas('/subscriptions/' + perfil.asaas_subscription_id, { method: 'DELETE' });
-    } catch (e) {
-      if (e.status !== 404) throw e;
-    }
-
-    await salvarPerfil(usuario.id, { asaas_subscription_id: null });
-
+    await salvarPerfil(usuario.id, { assinatura_ativa: false });
     res.status(200).json({ ok: true, validoAte: perfil.plano_valido_ate });
   } catch (erro) {
     console.error('Erro em cancelar-assinatura:', erro.message);

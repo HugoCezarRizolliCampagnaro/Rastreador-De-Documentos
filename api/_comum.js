@@ -4,10 +4,9 @@
 // NÃO expor este arquivo como uma rota pública.
 //
 // Variáveis de ambiente (Vercel):
-//   ASAAS_API_KEY        chave de API do Asaas (sandbox ou produção)
-//   ASAAS_BASE_URL       https://api-sandbox.asaas.com/v3  (testes)  ou  https://api.asaas.com/v3  (valendo)
-//   ASAAS_WEBHOOK_TOKEN  texto secreto qualquer; o mesmo vai no cadastro do webhook no Asaas
-//   SUPABASE_SECRET_KEY  chave sb_secret_... do Supabase (só no servidor, nunca no navegador)
+//   ZUCKPAY_CLIENT_ID      client_id da ZuckPay (painel > Desenvolvedores > Credenciais API)
+//   ZUCKPAY_CLIENT_SECRET  client_secret da ZuckPay (mesmo lugar)
+//   SUPABASE_SECRET_KEY    chave sb_secret_... do Supabase (só no servidor, nunca no navegador)
 
 const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_brDnSPSCu4ry9QTe-pYwag_zRqB6hkL';
@@ -30,25 +29,109 @@ function somarDias(data, dias) {
   return nova;
 }
 
-async function asaas(caminho, opcoes) {
-  const resp = await fetch(process.env.ASAAS_BASE_URL + caminho, {
-    method: (opcoes && opcoes.method) || 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      access_token: process.env.ASAAS_API_KEY,
-      'User-Agent': 'DocTrack',
-    },
-    body: opcoes && opcoes.body ? JSON.stringify(opcoes.body) : undefined,
-  });
+const ZUCKPAY_BASE_URL = 'https://www.zuckpay.com.br/conta'; // com "www": sem ele o POST vira GET num redirecionamento
+
+function zuckpayConfigurado() {
+  return !!(process.env.ZUCKPAY_CLIENT_ID && process.env.ZUCKPAY_CLIENT_SECRET);
+}
+
+async function zuckpay(caminho, opcoes) {
+  const metodo = (opcoes && opcoes.method) || 'GET';
+  const url = new URL(ZUCKPAY_BASE_URL + caminho);
+  if (opcoes && opcoes.query) {
+    Object.keys(opcoes.query).forEach(function (k) { url.searchParams.set(k, opcoes.query[k]); });
+  }
+  const credencial = Buffer.from(
+    String(process.env.ZUCKPAY_CLIENT_ID).trim() + ':' + String(process.env.ZUCKPAY_CLIENT_SECRET).trim(),
+    'utf8'
+  ).toString('base64');
+  const controle = new AbortController();
+  const timer = setTimeout(function () { controle.abort(); }, 30000);
+  let resp;
+  try {
+    resp = await fetch(url.toString(), {
+      method: metodo,
+      redirect: 'error',
+      signal: controle.signal,
+      headers: Object.assign(
+        { Authorization: 'Basic ' + credencial, Accept: 'application/json', 'User-Agent': 'DocTrack' },
+        opcoes && opcoes.body ? { 'Content-Type': 'application/json' } : {}
+      ),
+      body: opcoes && opcoes.body ? JSON.stringify(opcoes.body) : undefined,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
   const dados = await resp.json().catch(function () { return {}; });
-  if (!resp.ok) {
-    const msg = dados && dados.errors && dados.errors[0] && dados.errors[0].description;
-    const erro = new Error(msg || 'Erro no Asaas (' + resp.status + ')');
+  if (!resp.ok || dados.success === false || dados.status === 'error') {
+    const msg = dados.message || dados.mensagem || dados.error || dados.erro;
+    const erro = new Error(typeof msg === 'string' ? msg : 'Erro na ZuckPay (' + resp.status + ')');
     erro.status = resp.status;
     erro.detalhes = dados;
     throw erro;
   }
   return dados;
+}
+
+function cpfValido(cpf) {
+  if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
+  for (let t = 9; t < 11; t++) {
+    let soma = 0;
+    for (let i = 0; i < t; i++) soma += Number(cpf[i]) * (t + 1 - i);
+    const digito = ((soma * 10) % 11) % 10;
+    if (digito !== Number(cpf[t])) return false;
+  }
+  return true;
+}
+
+// soma N meses a uma data AAAA-MM-DD (31/01 + 1 mês = 28/02 ou 29/02)
+function somarMeses(dataStr, meses) {
+  const [a, m, d] = dataStr.split('-').map(Number);
+  const ultimoDia = new Date(Date.UTC(a, m - 1 + meses + 1, 0)).getUTCDate();
+  const nova = new Date(Date.UTC(a, m - 1 + meses, Math.min(d, ultimoDia), 12));
+  return nova.toISOString().slice(0, 10);
+}
+
+function statusPago(status) {
+  return ['PAID', 'APPROVED', 'COMPLETED', 'PAGO'].includes(String(status || '').toUpperCase());
+}
+
+// Confere na ZuckPay se a cobrança foi paga e, se foi, estende o plano 1 mês.
+// Pode ser chamada várias vezes (webhook + botão "Já paguei"): o plano só é estendido uma vez.
+async function confirmarPagamento(externalId) {
+  const linhas = await supabaseAdmin('pagamentos?external_id=eq.' + encodeURIComponent(externalId) + '&select=*');
+  const pagamento = linhas && linhas[0];
+  if (!pagamento) return { status: 'DESCONHECIDO' };
+  if (pagamento.status === 'PAID') return { status: 'PAID', jaProcessado: true };
+
+  const consulta = await zuckpay('/v3/pix/status', { query: { external_id_client: externalId } });
+  const status = String(consulta.status || (consulta.data && consulta.data.status) || '').toUpperCase();
+
+  if (!statusPago(status)) {
+    if (['EXPIRED', 'EXPIRADO', 'FAILED', 'REFUSED', 'CANCELED', 'CANCELLED'].includes(status)) {
+      await supabaseAdmin('pagamentos?id=eq.' + pagamento.id + '&status=eq.PENDING', {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: { status: status },
+      });
+    }
+    return { status: status || 'PENDING' };
+  }
+
+  // marca como pago só se ainda não estava (evita estender o plano duas vezes)
+  const marcados = await supabaseAdmin('pagamentos?id=eq.' + pagamento.id + '&status=neq.PAID', {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: { status: 'PAID', pago_em: new Date().toISOString() },
+  });
+  if (!marcados || marcados.length === 0) return { status: 'PAID', jaProcessado: true };
+
+  const perfil = await lerPerfil(pagamento.user_id);
+  const hoje = dataISO(new Date());
+  const base = perfil && perfil.plano === pagamento.plano && perfil.plano_valido_ate && perfil.plano_valido_ate > hoje
+    ? perfil.plano_valido_ate
+    : hoje;
+  const validoAte = somarMeses(base, 1);
+  await salvarPerfil(pagamento.user_id, { plano: pagamento.plano, plano_valido_ate: validoAte, assinatura_ativa: true });
+  return { status: 'PAID', validoAte: validoAte };
 }
 
 // confirma quem é o usuário a partir do token de login enviado pelo navegador
@@ -119,7 +202,12 @@ module.exports = {
   DIAS_TOLERANCIA,
   dataISO,
   somarDias,
-  asaas,
+  ZUCKPAY_BASE_URL,
+  zuckpayConfigurado,
+  zuckpay,
+  cpfValido,
+  somarMeses,
+  confirmarPagamento,
   usuarioDaRequisicao,
   supabaseAdmin,
   lerPerfil,
