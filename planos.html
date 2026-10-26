@@ -322,6 +322,7 @@
   .pix-ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--status-amarelo, #D9930D); animation: pix-pulsar 1.4s ease-in-out infinite; }
   @keyframes pix-pulsar { 50% { opacity: 0.3; } }
   .plano-pagar { margin-top: 10px; }
+  .modal-card p.pix-aviso-recebedor { font-size: 11.5px; margin: 0 0 12px; text-align: center; }
 
   /* ---------- correção mobile: nada pode ser mais largo que a tela ---------- */
   .app-shell { overflow-x: clip; max-width: 100%; }
@@ -411,6 +412,7 @@
         <p>Mensalidade do Premium: <strong id="pix-valor">R$ 9,90</strong>. Abra o app do seu banco e escaneie o QR Code, ou use o Pix copia e cola.</p>
         <img class="pix-qr" id="pix-qr" alt="QR Code do Pix" hidden>
         <textarea class="pix-codigo" id="pix-codigo" readonly></textarea>
+        <p class="pix-aviso-recebedor">No app do banco, o recebedor aparece como <strong>ON TECH DIGITAL LTDA</strong>, a intermediadora que processa os pagamentos do DocTrack.</p>
         <button type="button" class="modal-botao" id="pix-copiar">Copiar código Pix</button>
         <a class="modal-botao secundario" id="pix-checkout" href="#" target="_blank" rel="noopener" hidden>Abrir página de pagamento</a>
         <div class="pix-status" id="pix-status"><span class="pix-ponto"></span><span id="pix-status-texto">Aguardando pagamento...</span></div>
