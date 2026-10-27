@@ -512,7 +512,14 @@
                 <option value="__novo__">+ Adicionar pessoa...</option>
               </select>
             </div>
-            <div class="campo">
+            <div class="campo" id="campo-cliente-cadastrado" hidden>
+              <label for="cliente-id">Cliente <span class="opcional">(opcional)</span></label>
+              <select id="cliente-id" name="cliente_id">
+                <option value="">Nenhum cliente</option>
+                <option value="__novo__">+ Cadastrar cliente...</option>
+              </select>
+            </div>
+            <div class="campo" id="campo-cliente-texto">
               <label for="cliente">Cliente / Empresa <span class="opcional">(opcional)</span></label>
               <input type="text" id="cliente" name="cliente" placeholder="Nome do cliente">
             </div>
@@ -991,10 +998,52 @@
       const nome = prompt('Nome da pessoa:');
       if (nome && nome.trim()) {
         const { data, error } = await sb.from('pessoas').insert([{ user_id: usuarioAtual.id, nome: nome.trim() }]).select().single();
-        if (!error && data) await carregarPessoas(data.id);
+        if (!error && data) {
+          await carregarPessoas(data.id);
+        } else {
+          this.value = '';
+          const msg = (error && error.message) || 'Não foi possível adicionar agora.';
+          if (/plano/i.test(msg) && confirm(msg + '\n\nQuer ver os planos?')) window.location.href = 'planos.html';
+          else if (!/plano/i.test(msg)) alert(msg);
+        }
       } else {
         this.value = '';
       }
+    });
+
+    /* ---------- clientes cadastrados (plano Profissional) ---------- */
+
+    let clientesDoc = [];
+    let clienteIdOriginal = null;
+    let planoProfissional = false;
+
+    async function carregarClientesDoc(selecionarId) {
+      const { data: perfilPlano } = await sb.from('perfis').select('plano, plano_valido_ate').maybeSingle();
+      const hoje = new Date().toLocaleDateString('sv-SE');
+      planoProfissional = !!perfilPlano && perfilPlano.plano === 'profissional' && perfilPlano.plano_valido_ate >= hoje;
+      const { data } = await sb.from('clientes').select('id, nome').order('nome');
+      clientesDoc = data || [];
+      // quem tem clientes cadastrados (mesmo se o plano mudou) escolhe na lista
+      const usarLista = planoProfissional || clientesDoc.length > 0;
+      document.getElementById('campo-cliente-cadastrado').hidden = !usarLista;
+      document.getElementById('campo-cliente-texto').hidden = usarLista;
+      const select = document.getElementById('cliente-id');
+      const opcoes = clientesDoc.map(function (c) { return `<option value="${c.id}">${escapeHtml(c.nome)}</option>`; }).join('');
+      select.innerHTML = `<option value="">Nenhum cliente</option>${opcoes}${planoProfissional ? '<option value="__novo__">+ Cadastrar cliente...</option>' : ''}`;
+      if (selecionarId) select.value = selecionarId;
+    }
+
+    document.getElementById('cliente-id').addEventListener('change', async function () {
+      if (this.value !== '__novo__') return;
+      const nome = prompt('Nome do cliente (dá pra completar CNPJ e e-mail depois em Minha conta):');
+      if (!nome || !nome.trim()) { this.value = ''; return; }
+      const { data, error } = await sb.from('clientes').insert([{ user_id: usuarioAtual.id, nome: nome.trim().slice(0, 120) }]).select('id').single();
+      if (error || !data) {
+        this.value = '';
+        alert((error && error.message) || 'Não foi possível cadastrar o cliente agora.');
+        return;
+      }
+      await carregarClientesDoc(data.id);
     });
 
     /* ---------- categorias ---------- */
@@ -1062,6 +1111,7 @@
       document.getElementById('sidebar-avatar').textContent = usuarioAtual.email.charAt(0).toUpperCase();
 
       await carregarPessoas();
+      await carregarClientesDoc();
       await carregarCategorias();
 
       if (idEdicao) {
@@ -1078,6 +1128,8 @@
           form.categoria.value = data.categoria || 'outro';
           if (data.pessoa_id) carregarPessoas(data.pessoa_id);
           form.cliente.value = data.cliente || '';
+          clienteIdOriginal = data.cliente_id || null;
+          if (data.cliente_id) document.getElementById('cliente-id').value = data.cliente_id;
           form.observacoes.value = data.observacoes || '';
           form.data_emissao.value = data.data_emissao || '';
           form.data_vencimento.value = data.data_vencimento;
@@ -1159,6 +1211,7 @@
         categoria: form.categoria.value,
         pessoa_id: (form.pessoa.value && form.pessoa.value !== '__novo__') ? form.pessoa.value : null,
         cliente: form.cliente.value.trim() || null,
+        cliente_id: null,
         observacoes: form.observacoes.value.trim() || null,
         data_emissao: form.data_emissao.value || null,
         data_vencimento: form.data_vencimento.value,
@@ -1169,6 +1222,18 @@
         proximo_pagamento_status: form.proximo_pagamento_data.value ? form.proximo_pagamento_status.value : null,
         user_id: usuarioAtual ? usuarioAtual.id : null,
       };
+
+      // cliente escolhido na lista: guarda o vínculo e o nome (o nome aparece na busca e nos avisos)
+      if (!document.getElementById('campo-cliente-cadastrado').hidden) {
+        const idCliente = document.getElementById('cliente-id').value;
+        const escolhido = clientesDoc.find(function (c) { return c.id === idCliente; });
+        if (escolhido) {
+          dados.cliente_id = escolhido.id;
+          dados.cliente = escolhido.nome;
+        } else if (clienteIdOriginal) {
+          dados.cliente = null; // tirou o cliente do documento
+        }
+      }
 
       const arquivo = form.arquivo.files[0];
       if (arquivo) {

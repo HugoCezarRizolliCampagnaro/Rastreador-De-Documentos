@@ -310,3 +310,11 @@ alter table public.preferencias enable row level security;
 -- avisos_assinatura: e-mails de "mensalidade vencendo" já enviados (5, 1 e 0 dias antes).
 -- pagamentos ganhou: metodo ('pix' | 'cartao'), erro_mensagem, cartao_final (só os 4 últimos dígitos).
 -- Nenhum outro dado de cartão é gravado.
+
+-- ---------- planos Família e Profissional ----------
+-- plano_ativo(uid): plano pago válido ou 'gratis'.
+-- pessoas: trigger limitar_pessoas — Grátis/Premium só você; Família você + 4; Profissional ilimitadas.
+-- clientes: cadastro do plano Profissional (nome, CPF/CNPJ, e-mail, telefone, avisar_email), até 20,
+--           trigger limitar_clientes; RLS só do dono.
+-- documentos.cliente_id: vínculo com o cliente (on delete set null). O texto "cliente" continua.
+-- preferencias.nome_empresa: aparece no topo do relatório e assina o aviso enviado ao cliente.

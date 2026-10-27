@@ -50,6 +50,7 @@ module.exports = async function handler(req, res) {
     }
 
     const acao = (req.body || {}).acao;
+    const planoPedido = (req.body || {}).plano;
 
     if (acao === 'verificar') {
       const ultimo = await ultimoPagamento(usuario.id, true);
@@ -72,12 +73,15 @@ module.exports = async function handler(req, res) {
       res.status(400).json({ erro: 'Preencha seus dados de cobrança primeiro.', precisaDados: true });
       return;
     }
-    const chavePlano = perfil.plano && PLANOS[perfil.plano] ? perfil.plano : 'premium';
+    // plano escolhido na tela; se não vier, o plano atual da pessoa
+    const chavePlano = planoPedido && PLANOS[planoPedido]
+      ? planoPedido
+      : (perfil.plano && PLANOS[perfil.plano] ? perfil.plano : 'premium');
     const plano = PLANOS[chavePlano];
 
     // reaproveita o Pix pendente recente, em vez de criar outro
     const ultimo = await ultimoPagamento(usuario.id);
-    if (ultimo && ultimo.status === 'PENDING' && ultimo.qrcode &&
+    if (ultimo && ultimo.status === 'PENDING' && ultimo.qrcode && ultimo.plano === chavePlano &&
         Date.now() - new Date(ultimo.criado_em).getTime() < MINUTOS_REAPROVEITAR * 60000) {
       res.status(200).json(respostaPix(ultimo));
       return;

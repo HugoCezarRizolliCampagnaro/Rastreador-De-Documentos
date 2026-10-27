@@ -2,6 +2,8 @@
 // Chamada 1x por dia pelo pg_cron. Busca documentos que entraram numa faixa de
 // aviso (coluna avisos_dias de cada documento), manda 1 email por usuário pelo
 // Gmail (SMTP porta 465) e registra em lembretes_enviados pra não repetir.
+// Plano Profissional: também avisa o cliente (se marcado), assinando com o nome da empresa.
+// Também avisa a mensalidade/teste vencendo (5, 1 e 0 dias antes).
 //
 // Modos (campo "modo" no corpo JSON):
 //   (vazio)          envio real
@@ -30,6 +32,11 @@ type Lembrete = {
   vencimento_br: string // DD/MM/YYYY
   dias: number
   faixa: number
+  // aviso pro cliente (plano Profissional)
+  cliente_email: string | null
+  cliente_nome: string | null
+  avisar_cliente: boolean
+  nome_empresa: string | null
 }
 
 // Documentos que vencem hoje ou no futuro, cuja faixa atual de aviso
@@ -46,7 +53,11 @@ const CANDIDATOS = `
     to_char(doc.data_vencimento, 'YYYY-MM-DD') as vencimento,
     to_char(doc.data_vencimento, 'DD/MM/YYYY') as vencimento_br,
     (doc.data_vencimento - h.d)::int as dias,
-    f.faixa
+    f.faixa,
+    cl.email as cliente_email,
+    cl.nome as cliente_nome,
+    (cl.avisar_email and cl.email is not null and public.plano_ativo(doc.user_id) = 'profissional') as avisar_cliente,
+    pr.nome_empresa
   from public.documentos doc
   cross join (select (now() at time zone 'America/Sao_Paulo')::date as d) h
   cross join lateral (
@@ -58,9 +69,12 @@ const CANDIDATOS = `
   join auth.users u on u.id = doc.user_id
   left join public.pessoas p on p.id = doc.pessoa_id
   left join public.preferencias pr on pr.user_id = doc.user_id
+  -- só cliente do próprio dono do documento (nunca o cliente de outra conta)
+  left join public.clientes cl on cl.id = doc.cliente_id and cl.user_id = doc.user_id
   where doc.data_vencimento >= h.d - 7
     and f.faixa is not null
-    and coalesce(pr.email_lembretes, true)
+    and (coalesce(pr.email_lembretes, true)
+         or (cl.avisar_email and cl.email is not null and public.plano_ativo(doc.user_id) = 'profissional'))
     and u.email is not null
     and u.email_confirmed_at is not null
     and not exists (
@@ -81,7 +95,10 @@ const RESERVAR = `
     on conflict do nothing
     returning documento_id::text as id, dias_aviso as faixa
   )
-  select c.* from c join r on r.id = c.id and r.faixa = c.faixa
+  select c.*, coalesce(pr2.email_lembretes, true) as avisar_dono
+  from c
+  join r on r.id = c.id and r.faixa = c.faixa
+  left join public.preferencias pr2 on pr2.user_id = c.user_id::uuid
 `
 
 // Assinaturas cujo período pago (ou teste grátis) termina em 5, 1 ou 0 dias e que ainda
@@ -93,6 +110,7 @@ const RESERVAR_MENSALIDADE = `
       pf.user_id,
       u.email,
       pf.plano_valido_ate,
+      pf.plano,
       to_char(pf.plano_valido_ate, 'DD/MM/YYYY') as valido_br,
       (pf.plano_valido_ate - h.d)::int as dias,
       (select min(a) from unnest(array[5, 1, 0]) as a where a >= (pf.plano_valido_ate - h.d)) as faixa,
@@ -111,7 +129,7 @@ const RESERVAR_MENSALIDADE = `
     on conflict do nothing
     returning user_id, dias
   )
-  select c.user_id::text as user_id, c.email, c.valido_br, c.dias, c.faixa, c.em_teste,
+  select c.user_id::text as user_id, c.email, c.valido_br, c.dias, c.faixa, c.em_teste, c.plano,
          to_char(c.plano_valido_ate, 'YYYY-MM-DD') as valido_ate
   from c join r on r.user_id = c.user_id and r.dias = c.faixa
 `
@@ -124,6 +142,13 @@ type AvisoMensalidade = {
   dias: number
   faixa: number
   em_teste: boolean
+  plano: string
+}
+
+const PLANOS: Record<string, { nome: string; preco: string }> = {
+  premium: { nome: 'Premium', preco: 'R$ 9,90' },
+  familia: { nome: 'Família', preco: 'R$ 14,90' },
+  profissional: { nome: 'Profissional', preco: 'R$ 29,90' },
 }
 
 function emailMensalidade(a: AvisoMensalidade) {
@@ -131,9 +156,10 @@ function emailMensalidade(a: AvisoMensalidade) {
   const assunto = a.em_teste
     ? `Seu teste grátis do DocTrack termina ${quando}`
     : `Sua mensalidade do DocTrack vence ${quando}`
+  const plano = PLANOS[a.plano] ?? PLANOS.premium
   const intro = a.em_teste
-    ? `Seu teste do Premium vai até ${a.valido_br}. Pra continuar com documentos ilimitados e todos os recursos, pague R$ 9,90 com Pix ou cartão direto no app.`
-    : `Seu Premium vale até ${a.valido_br}. Pra continuar, pague o próximo mês (R$ 9,90) com Pix ou cartão direto no app. Leva menos de um minuto.`
+    ? `Seu teste do plano ${plano.nome} vai até ${a.valido_br}. Pra continuar com todos os recursos, pague ${plano.preco} com Pix ou cartão direto no app.`
+    : `Seu plano ${plano.nome} vale até ${a.valido_br}. Pra continuar, pague o próximo mês (${plano.preco}) com Pix ou cartão direto no app. Leva menos de um minuto.`
   const link = APP_URL + 'planos.html'
   const html = `
   <div style="background:#f4f5fb;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;">
@@ -199,13 +225,14 @@ function montarEmail(itens: Lembrete[]) {
   const primeiro = ordenados[0]
 
   const vencidos = ordenados.filter((l) => l.dias < 0).length
+  const dePessoa = primeiro.pessoa ? ` de ${primeiro.pessoa}` : ''
   const assunto = unico
-    ? `${primeiro.nome} ${textoDias(primeiro.dias)}`
+    ? `${primeiro.nome}${dePessoa} ${textoDias(primeiro.dias)}`
     : vencidos > 0
       ? `${ordenados.length} documentos precisam de atenção`
       : `${ordenados.length} documentos vencendo em breve`
 
-  const titulo = unico ? `${primeiro.nome} ${textoDias(primeiro.dias)}` : 'Documentos que precisam de atenção'
+  const titulo = unico ? `${primeiro.nome}${dePessoa} ${textoDias(primeiro.dias)}` : 'Documentos que precisam de atenção'
   const intro = unico
     ? primeiro.dias < 0
       ? 'Renove o quanto antes e atualize a nova data no app.'
@@ -251,6 +278,45 @@ function montarEmail(itens: Lembrete[]) {
     `Abrir o DocTrack: ${APP_URL}`,
   ].join('\n')
 
+  return { assunto, html, texto }
+}
+
+// E-mail que vai pro CLIENTE do usuário Profissional (assinado com o nome da empresa dele)
+function montarEmailCliente(itens: Lembrete[], remetenteNome: string) {
+  const ordenados = [...itens].sort((a, b) => a.dias - b.dias)
+  const unico = ordenados.length === 1
+  const primeiro = ordenados[0]
+  const assunto = unico
+    ? `${primeiro.nome} ${textoDias(primeiro.dias)}`
+    : `${ordenados.length} documentos precisam de atenção`
+  const intro = `${remetenteNome} avisa: ${unico ? 'este documento precisa' : 'estes documentos precisam'} de atenção pra não ficar${unico ? '' : 'em'} vencido${unico ? '' : 's'}.`
+  const cartoes = ordenados
+    .map((l) => `
+      <div style="border:1px solid #e6e8f2;border-left:4px solid ${cor(l.dias)};border-radius:12px;padding:14px 16px;margin:0 0 12px;">
+        <p style="margin:0;font-size:15px;font-weight:bold;color:#14162b;">${esc(l.nome)}</p>
+        ${l.tipo ? `<p style="margin:4px 0 0;font-size:13px;color:#7b7e96;">${esc(l.tipo)}</p>` : ''}
+        <p style="margin:8px 0 0;font-size:14px;font-weight:bold;color:${cor(l.dias)};">${maiuscula(textoDias(l.dias))} · ${l.vencimento_br}</p>
+      </div>`)
+    .join('')
+  const html = `
+  <div style="background:#f4f5fb;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;">
+    <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px;">
+      <p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;font-weight:bold;color:#3D4FE0;">${esc(remetenteNome.toUpperCase())}</p>
+      <h1 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:#14162b;">Aviso de vencimento</h1>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:#4a4d68;">${esc(intro)}</p>
+      ${cartoes}
+      <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#7b7e96;">Dúvidas? É só responder este e-mail que a mensagem vai para ${esc(remetenteNome)}. Aviso enviado pelo DocTrack.</p>
+    </div>
+  </div>`
+  const texto = [
+    'Aviso de vencimento',
+    '',
+    intro,
+    '',
+    ...ordenados.map((l) => `- ${l.nome}: ${textoDias(l.dias)}, em ${l.vencimento_br}`),
+    '',
+    `Dúvidas? Responda este e-mail que a mensagem vai para ${remetenteNome}.`,
+  ].join('\n')
   return { assunto, html, texto }
 }
 
@@ -316,8 +382,8 @@ Deno.serve(async (req) => {
       return x.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
     }
     const exemplo: Lembrete[] = [
-      { id: '1', user_id: '0', email: REMETENTE, nome: 'ASO — Exemplo', tipo: 'ASO', cliente: 'Empresa Exemplo', pessoa: 'João', vencimento: '', vencimento_br: em(7), dias: 7, faixa: 7 },
-      { id: '2', user_id: '0', email: REMETENTE, nome: 'Alvará de funcionamento', tipo: 'Alvará', cliente: null, pessoa: null, vencimento: '', vencimento_br: em(30), dias: 30, faixa: 30 },
+      { id: '1', user_id: '0', email: REMETENTE, nome: 'ASO — Exemplo', tipo: 'ASO', cliente: 'Empresa Exemplo', pessoa: 'João', vencimento: '', vencimento_br: em(7), dias: 7, faixa: 7, cliente_email: null, cliente_nome: null, avisar_cliente: false, nome_empresa: null },
+      { id: '2', user_id: '0', email: REMETENTE, nome: 'Alvará de funcionamento', tipo: 'Alvará', cliente: null, pessoa: null, vencimento: '', vencimento_br: em(30), dias: 30, faixa: 30, cliente_email: null, cliente_nome: null, avisar_cliente: false, nome_empresa: null },
     ]
     const { assunto, html, texto } = montarEmail(exemplo)
     try {
@@ -359,8 +425,40 @@ Deno.serve(async (req) => {
 
   let emails = 0
   let falhas = 0
+  let clientes = 0
   for (const itens of porUsuario.values()) {
-    const { assunto, html, texto } = montarEmail(itens)
+    // 1) aviso pro cliente (Profissional): agrupado por e-mail do cliente; falha aqui não trava o resto
+    const porCliente = new Map<string, Lembrete[]>()
+    for (const l of itens) {
+      if (!l.avisar_cliente || !l.cliente_email) continue
+      const lista = porCliente.get(l.cliente_email) ?? []
+      lista.push(l)
+      porCliente.set(l.cliente_email, lista)
+    }
+    const remetenteNome = (itens[0].nome_empresa || '').trim() || itens[0].email
+    const avisadosCliente = new Set<string>()
+    for (const [emailCliente, docsCliente] of porCliente) {
+      const m = montarEmailCliente(docsCliente, remetenteNome)
+      try {
+        await transporte.sendMail({
+          from: `"${remetenteNome.replace(/["\r\n]/g, '')} via DocTrack" <${REMETENTE}>`,
+          to: emailCliente,
+          replyTo: itens[0].email,
+          subject: m.assunto,
+          html: m.html,
+          text: m.texto,
+        })
+        clientes += 1
+        docsCliente.forEach((l) => avisadosCliente.add(l.id))
+      } catch (e) {
+        console.error('falha ao avisar cliente', e instanceof Error ? e.message : e)
+      }
+    }
+
+    // 2) aviso pro dono da conta (se ele não desligou os e-mails)
+    const doDono = itens.filter((l) => (l as Lembrete & { avisar_dono: boolean }).avisar_dono)
+    if (doDono.length === 0) continue
+    const { assunto, html, texto } = montarEmail(doDono)
     try {
       await transporte.sendMail({ from: `"DocTrack" <${REMETENTE}>`, to: itens[0].email, subject: assunto, html, text: texto })
       emails += 1
@@ -368,7 +466,8 @@ Deno.serve(async (req) => {
       falhas += 1
       console.error('falha ao enviar lembrete', e instanceof Error ? e.message : e)
       // Libera a reserva para tentar de novo na próxima execução
-      for (const l of itens) {
+      // (menos os que o cliente já recebeu, pra ele não receber o mesmo aviso duas vezes)
+      for (const l of doDono.filter((d) => !avisadosCliente.has(d.id))) {
         await sql`
           delete from public.lembretes_enviados
           where documento_id = ${l.id}::uuid
@@ -379,6 +478,6 @@ Deno.serve(async (req) => {
     }
   }
 
-  console.log('lembretes', { emails, falhas, lembretes: reservados.length, mensalidades })
-  return resposta({ modo, emails, falhas, lembretes: reservados.length, mensalidades })
+  console.log('lembretes', { emails, falhas, clientes, lembretes: reservados.length, mensalidades })
+  return resposta({ modo, emails, falhas, clientes, lembretes: reservados.length, mensalidades })
 })

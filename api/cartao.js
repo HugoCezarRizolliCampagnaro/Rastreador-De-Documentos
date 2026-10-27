@@ -110,7 +110,9 @@ module.exports = async function handler(req, res) {
       res.status(400).json({ erro: 'Preencha seus dados de cobrança primeiro.', precisaDados: true });
       return;
     }
-    const chavePlano = perfil.plano && PLANOS[perfil.plano] ? perfil.plano : 'premium';
+    const chavePlano = corpo.plano && PLANOS[corpo.plano]
+      ? corpo.plano
+      : (perfil.plano && PLANOS[perfil.plano] ? perfil.plano : 'premium');
     const plano = PLANOS[chavePlano];
 
     // ---- limite de tentativas (proteção contra teste de cartão roubado) ----
@@ -175,7 +177,7 @@ module.exports = async function handler(req, res) {
       // recusada; o webhook ou a verificação da tela confirmam se foi paga.
       if (!httpStatus || httpStatus >= 500) {
         res.status(502).json({
-          erro: 'Não conseguimos confirmar o pagamento agora. Se a cobrança aparecer no seu cartão, o Premium é liberado sozinho em alguns minutos. Não tente de novo antes de conferir.',
+          erro: 'Não conseguimos confirmar o pagamento agora. Se a cobrança aparecer no seu cartão, o plano é liberado sozinho em alguns minutos. Não tente de novo antes de conferir.',
           verificar: true,
         });
         return;
@@ -230,7 +232,7 @@ module.exports = async function handler(req, res) {
     }
     res.status(500).json({
       erro: cobrancaEnviada
-        ? 'Não conseguimos confirmar o pagamento agora. Se a cobrança aparecer no seu cartão, o Premium é liberado sozinho em alguns minutos. Não tente de novo antes de conferir.'
+        ? 'Não conseguimos confirmar o pagamento agora. Se a cobrança aparecer no seu cartão, o plano é liberado sozinho em alguns minutos. Não tente de novo antes de conferir.'
         : 'Não foi possível processar o cartão agora. Nada foi cobrado. Tente de novo ou pague com Pix.',
       verificar: cobrancaEnviada,
     });

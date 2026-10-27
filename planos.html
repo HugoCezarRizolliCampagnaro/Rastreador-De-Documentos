@@ -395,8 +395,8 @@
   <div class="modal-assinatura" id="modal-assinatura" hidden>
     <div class="modal-card">
       <div id="modal-conteudo-form">
-        <h2 id="modal-form-titulo-teste">Teste o Premium por 30 dias</h2>
-        <h2 id="modal-form-titulo" hidden>Assinar o Premium</h2>
+        <h2 id="modal-form-titulo-teste">Teste o <span class="js-plano-nome">Premium</span> por 30 dias</h2>
+        <h2 id="modal-form-titulo" hidden>Assinar o <span class="js-plano-nome">Premium</span></h2>
         <p id="modal-form-texto">Sem cobrar nada agora. Depois dos 30 dias, você paga R$ 9,90 por mês com Pix, direto no app. Não tem cobrança automática: é só não pagar pra parar.</p>
         <label for="modal-nome">Nome completo</label>
         <input type="text" id="modal-nome" autocomplete="name" placeholder="Seu nome">
@@ -416,7 +416,7 @@
       </div>
       <div id="modal-conteudo-pix" hidden>
         <h2>Pague com Pix</h2>
-        <p>Mensalidade do Premium: <strong id="pix-valor">R$ 9,90</strong>. Abra o app do seu banco e escaneie o QR Code, ou use o Pix copia e cola.</p>
+        <p>Mensalidade do plano <span class="js-plano-nome">Premium</span>: <strong id="pix-valor">R$ 9,90</strong>. Abra o app do seu banco e escaneie o QR Code, ou use o Pix copia e cola.</p>
         <img class="pix-qr" id="pix-qr" alt="QR Code do Pix" hidden>
         <textarea class="pix-codigo" id="pix-codigo" readonly></textarea>
         <p class="pix-aviso-recebedor">No app do banco, o recebedor aparece como <strong>ON TECH DIGITAL LTDA</strong>, a intermediadora que processa os pagamentos do DocTrack.</p>
@@ -428,7 +428,7 @@
       </div>
       <div id="modal-conteudo-escolha" hidden>
         <h2>Como você quer pagar?</h2>
-        <p>Mensalidade do Premium: <strong>R$ 9,90</strong>. Sem cobrança automática: você paga um mês de cada vez.</p>
+        <p>Mensalidade do plano <span class="js-plano-nome">Premium</span>: <strong class="js-plano-preco">R$ 9,90</strong>. Sem cobrança automática: você paga um mês de cada vez.</p>
         <div class="escolha-metodo">
           <button type="button" id="escolher-pix"><span class="icone-metodo" id="icone-metodo-pix"></span><span>Pix<span class="sub">Aprovação na hora, pelo app do banco</span></span></button>
           <button type="button" id="escolher-cartao"><span class="icone-metodo" id="icone-metodo-cartao"></span><span>Cartão de crédito<span class="sub">Visa, Mastercard, Elo e outros</span></span></button>
@@ -437,7 +437,7 @@
       </div>
       <div id="modal-conteudo-cartao" hidden>
         <h2>Pagar com cartão</h2>
-        <p>Mensalidade do Premium: <strong>R$ 9,90</strong>, à vista.</p>
+        <p>Mensalidade do plano <span class="js-plano-nome">Premium</span>: <strong class="js-plano-preco">R$ 9,90</strong>, à vista.</p>
         <form id="form-cartao" autocomplete="on" novalidate>
           <label for="cartao-numero">Número do cartão</label>
           <input type="text" id="cartao-numero" name="cc-number" inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000" maxlength="23">
@@ -461,7 +461,7 @@
       </div>
       <div id="modal-conteudo-pago" hidden>
         <h2>Pagamento confirmado!</h2>
-        <p>Obrigado! Seu Premium vale até <strong id="pago-data"></strong>.</p>
+        <p>Obrigado! Seu plano <span class="js-plano-nome">Premium</span> vale até <strong id="pago-data"></strong>.</p>
         <button type="button" class="modal-botao" id="pago-fechar">Fechar</button>
       </div>
     </div>
@@ -541,9 +541,50 @@
 
     /* ---------- planos ---------- */
 
+    const PRECOS = { premium: 9.9, familia: 14.9, profissional: 29.9 };
+    const NOMES_PLANO = { premium: 'Premium', familia: 'Família', profissional: 'Profissional' };
+    let planoEscolhido = 'premium';
+
+    function precoTxt(chave) {
+      return 'R$ ' + PRECOS[chave].toFixed(2).replace('.', ',');
+    }
+
+    // atualiza nome e preço do plano em todas as telas do modal
+    function definirPlanoEscolhido(chave) {
+      planoEscolhido = PRECOS[chave] ? chave : 'premium';
+      document.querySelectorAll('.js-plano-nome').forEach(function (el) { el.textContent = NOMES_PLANO[planoEscolhido]; });
+      document.querySelectorAll('.js-plano-preco').forEach(function (el) { el.textContent = precoTxt(planoEscolhido); });
+      document.getElementById('pix-valor').textContent = precoTxt(planoEscolhido);
+      document.getElementById('cartao-pagar').textContent = 'Pagar ' + precoTxt(planoEscolhido);
+    }
+
+    // botões de cada plano pago, conforme a situação da conta
+    function acoesPlano(chave, perfilAtivo, perfilBruto) {
+      const nome = NOMES_PLANO[chave];
+      if (perfilAtivo && perfilAtivo.plano === chave) {
+        const validoAteTxt = new Date(perfilAtivo.plano_valido_ate + 'T00:00:00').toLocaleDateString('pt-BR');
+        return `<div class="plano-trial">Ativo até ${validoAteTxt}</div>
+          <button type="button" class="plano-botao atual" disabled>Seu plano atual</button>
+          ${perfilAtivo.assinatura_ativa
+            ? `<button type="button" class="plano-botao principal plano-pagar" data-acao="pagar" data-plano="${chave}">Pagar próximo mês</button>
+               <button type="button" class="plano-cancelar" data-acao="cancelar">Cancelar assinatura</button>`
+            : `<p class="plano-cancelado">Assinatura cancelada — o ${nome} vale até a data acima.</p>
+               <button type="button" class="plano-botao principal plano-pagar" data-acao="pagar" data-plano="${chave}">Reativar e pagar</button>`}`;
+      }
+      if (perfilAtivo) {
+        return `<div class="plano-trial">Vale na hora, somando os dias que você já tem</div>
+          <button type="button" class="plano-botao principal" data-acao="pagar" data-plano="${chave}">Mudar para ${nome}</button>`;
+      }
+      if (perfilBruto && perfilBruto.teste_usado) {
+        return `<div class="plano-trial">Pix ou cartão, sem fidelidade</div>
+          <button type="button" class="plano-botao principal" data-acao="pagar" data-plano="${chave}">Assinar por ${precoTxt(chave)}/mês</button>`;
+      }
+      return `<div class="plano-trial">30 dias grátis para testar</div>
+        <button type="button" class="plano-botao principal" data-acao="teste" data-plano="${chave}">Começar teste grátis</button>`;
+    }
+
     function renderPlanos(usoAtual, perfil, perfilBruto) {
-      const premiumAtivo = !!perfil;
-      const validoAteTxt = premiumAtivo ? new Date(perfil.plano_valido_ate + 'T00:00:00').toLocaleDateString('pt-BR') : '';
+      const planoPagoAtivo = !!perfil;
       const percentualUso = Math.min(100, Math.round((usoAtual / LIMITE_GRATIS) * 100));
 
       const grade = document.getElementById('planos-grade');
@@ -564,7 +605,7 @@
             <li>${icone('check', 14)} Calendário</li>
             <li>${icone('check', 14)} Notificações básicas</li>
           </ul>
-          ${premiumAtivo
+          ${planoPagoAtivo
             ? '<button type="button" class="plano-botao em-breve" disabled>Plano gratuito</button>'
             : '<button type="button" class="plano-botao atual" disabled>Seu plano atual</button>'}
         </div>
@@ -573,70 +614,58 @@
           <span class="plano-selo">MAIS POPULAR</span>
           <div class="plano-icone" style="background: rgba(91,110,245,0.16); color: var(--marca);">${icone('star', 18)}</div>
           <div class="plano-nome">Premium</div>
-          <div class="plano-desc">Tenha mais controle sobre seus documentos.</div>
+          <div class="plano-desc">Para organizar os seus documentos.</div>
           <div class="plano-preco">R$ 9,90<span>/mês</span></div>
           <ul class="plano-lista" style="margin-top: 14px;">
             <li>${icone('check', 14)} Documentos ilimitados</li>
             <li>${icone('check', 14)} Checklist completo de renovação</li>
             <li>${icone('check', 14)} Histórico avançado e score de conformidade</li>
             <li>${icone('check', 14)} Relatórios em PDF e backup</li>
-            <li>${icone('check', 14)} Compartilhamento e assistente inteligente</li>
-            <li>${icone('check', 14)} OCR de documentos</li>
+            <li>${icone('check', 14)} Assistente inteligente</li>
+            <li>${icone('check', 14)} Leitura automática de foto e PDF</li>
           </ul>
-          ${premiumAtivo
-            ? `<div class="plano-trial">Ativo até ${validoAteTxt}</div>
-               <button type="button" class="plano-botao atual" disabled>Seu plano atual</button>
-               ${perfil.assinatura_ativa
-                 ? `<button type="button" class="plano-botao principal plano-pagar" id="btn-pagar">Pagar próximo mês</button>
-                    <button type="button" class="plano-cancelar" id="btn-cancelar">Cancelar assinatura</button>`
-                 : `<p class="plano-cancelado">Assinatura cancelada — o Premium vale até a data acima.</p>
-                    <button type="button" class="plano-botao principal plano-pagar" id="btn-pagar">Reativar e pagar</button>`}`
-            : perfilBruto && perfilBruto.teste_usado
-              ? `<div class="plano-trial">Pague com Pix, sem fidelidade</div>
-                 <button type="button" class="plano-botao principal" id="btn-assinar">Assinar por R$ 9,90/mês</button>`
-              : `<div class="plano-trial">30 dias grátis para testar</div>
-                 <button type="button" class="plano-botao principal" id="btn-premium">Começar teste grátis</button>`}
+          ${acoesPlano('premium', perfil, perfilBruto)}
         </div>
 
         <div class="plano-card">
           <div class="plano-icone" style="background: rgba(168,128,246,0.18); color: #A880F6;">${icone('users', 18)}</div>
           <div class="plano-nome">Família</div>
-          <div class="plano-desc">Para organizar documentos de toda a família.</div>
+          <div class="plano-desc">Para organizar os documentos de toda a casa.</div>
           <div class="plano-preco">R$ 14,90<span>/mês</span></div>
           <ul class="plano-lista" style="margin-top: 14px;">
             <li>${icone('check', 14)} Tudo do Premium</li>
-            <li>${icone('check', 14)} Até 5 pessoas</li>
-            <li>${icone('check', 14)} Documentos organizados por pessoa</li>
+            <li>${icone('check', 14)} Até 5 pessoas (você + 4)</li>
+            <li>${icone('check', 14)} Filtro por pessoa no painel</li>
+            <li>${icone('check', 14)} Lembretes dizendo de quem é o documento</li>
           </ul>
-          <button type="button" class="plano-botao em-breve" disabled>Em breve</button>
+          ${acoesPlano('familia', perfil, perfilBruto)}
         </div>
 
         <div class="plano-card">
           <div class="plano-icone" style="background: rgba(34,197,94,0.16); color: var(--status-verde);">${icone('briefcase', 18)}</div>
           <div class="plano-nome">Profissional</div>
-          <div class="plano-desc">Para profissionais e pequenos negócios.</div>
+          <div class="plano-desc">Para quem cuida de documentos de clientes ou funcionários.</div>
           <div class="plano-preco">R$ 29,90<span>/mês</span></div>
           <ul class="plano-lista" style="margin-top: 14px;">
             <li>${icone('check', 14)} Tudo do Premium</li>
-            <li>${icone('check', 14)} Até 3 clientes/empresas</li>
-            <li>${icone('check', 14)} Até 100 documentos</li>
-            <li>${icone('check', 14)} Relatórios profissionais</li>
+            <li>${icone('check', 14)} Até 20 clientes com cadastro próprio</li>
+            <li>${icone('check', 14)} Pessoas e funcionários ilimitados</li>
+            <li>${icone('check', 14)} Relatório por cliente com o nome da sua empresa</li>
+            <li>${icone('check', 14)} Aviso de vencimento no e-mail do cliente</li>
           </ul>
-          <button type="button" class="plano-botao em-breve" disabled>Em breve</button>
+          ${acoesPlano('profissional', perfil, perfilBruto)}
         </div>
       `;
 
-      const btnPremium = document.getElementById('btn-premium');
-      if (btnPremium) btnPremium.addEventListener('click', function () { abrirModalAssinatura(false); });
-
-      const btnAssinar = document.getElementById('btn-assinar');
-      if (btnAssinar) btnAssinar.addEventListener('click', function () { escolherPagamento(); });
-
-      const btnPagar = document.getElementById('btn-pagar');
-      if (btnPagar) btnPagar.addEventListener('click', function () { escolherPagamento(); });
-
-      const btnCancelar = document.getElementById('btn-cancelar');
-      if (btnCancelar) btnCancelar.addEventListener('click', cancelarAssinatura);
+      grade.querySelectorAll('[data-acao]').forEach(function (botao) {
+        botao.addEventListener('click', function () {
+          const acao = botao.dataset.acao;
+          if (acao === 'cancelar') { cancelarAssinatura(); return; }
+          definirPlanoEscolhido(botao.dataset.plano);
+          if (acao === 'teste') abrirModalAssinatura(false);
+          else escolherPagamento();
+        });
+      });
     }
 
     function renderComparacao() {
@@ -649,8 +678,10 @@
         ['Histórico avançado', tr, check, check, check],
         ['Relatórios em PDF', check, check, check, check],
         ['Assistente inteligente', 'Básico', check, check, check],
-        ['Pessoas na conta', '1', '1', 'Até 5', '—'],
-        ['Clientes/empresas', tr, tr, tr, 'Até 3'],
+        ['Pessoas na conta', 'Só você', 'Só você', 'Até 5', 'Ilimitadas'],
+        ['Clientes com cadastro', tr, tr, tr, 'Até 20'],
+        ['Relatório por cliente', tr, tr, tr, check],
+        ['Aviso no e-mail do cliente', tr, tr, tr, check],
       ];
       document.getElementById('corpo-comparacao').innerHTML = linhas.map(function (l) {
         return `<tr><td>${l[0]}</td><td>${l[1]}</td><td>${l[2]}</td><td>${l[3]}</td><td>${l[4]}</td></tr>`;
@@ -701,8 +732,8 @@
       document.getElementById('modal-form-titulo').hidden = !modoPagamento;
       document.getElementById('modal-form-titulo-teste').hidden = modoPagamento;
       document.getElementById('modal-form-texto').textContent = modoPagamento
-        ? 'R$ 9,90 por mês, pago com Pix ou cartão direto no app. Não tem cobrança automática: é só não pagar pra parar.'
-        : 'Sem cobrar nada agora. Depois dos 30 dias, você paga R$ 9,90 por mês com Pix ou cartão, direto no app. Não tem cobrança automática: é só não pagar pra parar.';
+        ? precoTxt(planoEscolhido) + ' por mês, pago com Pix ou cartão direto no app. Não tem cobrança automática: é só não pagar pra parar.'
+        : 'Sem cobrar nada agora. Depois dos 30 dias, você paga ' + precoTxt(planoEscolhido) + ' por mês com Pix ou cartão, direto no app. Não tem cobrança automática: é só não pagar pra parar.';
       if (perfilAtual) {
         if (perfilAtual.cobranca_nome) document.getElementById('modal-nome').value = perfilAtual.cobranca_nome;
         if (perfilAtual.cobranca_cpf) { const c = document.getElementById('modal-cpf'); c.value = perfilAtual.cobranca_cpf; c.dispatchEvent(new Event('input')); }
@@ -732,7 +763,7 @@
       const resp = await fetch('/api/pix', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (await tokenDeLogin()) },
-        body: JSON.stringify({ acao: acao }),
+        body: JSON.stringify({ acao: acao, plano: planoEscolhido }),
       });
       const dados = await resp.json().catch(function () { return {}; });
       if (!resp.ok) {
@@ -795,7 +826,7 @@
       mostrarConteudo('pix');
       try {
         const pix = await chamarPix('gerar');
-        document.getElementById('pix-valor').textContent = 'R$ ' + Number(pix.valor || 9.9).toFixed(2).replace('.', ',');
+        document.getElementById('pix-valor').textContent = 'R$ ' + Number(pix.valor || PRECOS[planoEscolhido]).toFixed(2).replace('.', ',');
         document.getElementById('pix-codigo').value = pix.qrcode || '';
         const qr = document.getElementById('pix-qr');
         if (pix.qrcodeImagem) {
@@ -830,7 +861,7 @@
     function abrirCartao() {
       limparFormCartao();
       cartaoBtnEl.disabled = false;
-      cartaoBtnEl.textContent = 'Pagar R$ 9,90';
+      cartaoBtnEl.textContent = 'Pagar ' + precoTxt(planoEscolhido);
       mostrarConteudo('cartao');
       setTimeout(function () { document.getElementById('cartao-numero').focus(); }, 50);
     }
@@ -892,7 +923,7 @@
         resp = await fetch('/api/cartao', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (await tokenDeLogin()) },
-          body: JSON.stringify({ numero: numero, titular: titular, mes: mes, ano: ano, cvv: cvv }),
+          body: JSON.stringify({ numero: numero, titular: titular, mes: mes, ano: ano, cvv: cvv, plano: planoEscolhido }),
         });
         dados = await resp.json().catch(function () { return {}; });
       } catch (erroRede) {
@@ -903,7 +934,7 @@
       limparFormCartao();
       pagandoCartao = false;
       cartaoBtnEl.disabled = false;
-      cartaoBtnEl.textContent = 'Pagar R$ 9,90';
+      cartaoBtnEl.textContent = 'Pagar ' + precoTxt(planoEscolhido);
 
       if (resp && resp.ok && dados.status === 'PAID') {
         mostrarPago(dados.validoAte);
@@ -990,7 +1021,7 @@
         const resp = await fetch('/api/criar-assinatura', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (await tokenDeLogin()) },
-          body: JSON.stringify({ plano: 'premium', nome: nome, cpf: cpf, telefone: telefone }),
+          body: JSON.stringify({ plano: planoEscolhido, nome: nome, cpf: cpf, telefone: telefone }),
         });
         const dados = await resp.json();
         if (!resp.ok) throw new Error(dados.erro || 'Não foi possível iniciar agora.');

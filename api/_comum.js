@@ -13,6 +13,8 @@ const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_brDnSPSCu4ry9QTe-pYwag_zRqB6hkL
 
 const PLANOS = {
   premium: { nome: 'Premium', valor: 9.9 },
+  familia: { nome: 'Família', valor: 14.9 },
+  profissional: { nome: 'Profissional', valor: 29.9 },
 };
 
 const DIAS_TESTE_GRATIS = 30;
@@ -126,7 +128,9 @@ async function confirmarPagamento(externalId) {
 
   const perfil = await lerPerfil(pagamento.user_id);
   const hoje = dataISO(new Date());
-  const base = perfil && perfil.plano === pagamento.plano && perfil.plano_valido_ate && perfil.plano_valido_ate > hoje
+  // soma 1 mês a partir do fim do período que a pessoa já tem (ou de hoje, se já venceu).
+  // Trocando de plano, o novo plano passa a valer na hora e herda os dias que faltavam.
+  const base = perfil && perfil.plano !== 'gratis' && perfil.plano_valido_ate && perfil.plano_valido_ate > hoje
     ? perfil.plano_valido_ate
     : hoje;
   const validoAte = somarMeses(base, 1);

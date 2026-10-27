@@ -390,6 +390,25 @@
   .modal-excluir-confirmar { background: var(--status-vermelho); color: #FFFFFF; border: none; }
   .modal-excluir-confirmar:disabled { opacity: 0.4; cursor: default; }
   .opcao-linha[hidden] { display: none; }
+  /* clientes (plano Profissional) */
+  #lista-clientes .opcao-linha { cursor: default; }
+  .modal-cliente { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .modal-cliente[hidden] { display: none; }
+  .modal-cliente-card { width: 100%; max-width: 420px; max-height: 92vh; overflow-y: auto; background: var(--superficie); border: 1px solid var(--borda); border-radius: 18px; padding: 24px; box-sizing: border-box; }
+  .modal-cliente-card h2 { margin: 0 0 6px; font-size: 18px; color: var(--texto); }
+  .modal-cliente-card > p { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: var(--texto-muted); }
+  .modal-cliente-card label { display: block; font-size: 12.5px; font-weight: 600; margin: 12px 0 6px; color: var(--texto); }
+  .modal-cliente-card input[type="text"], .modal-cliente-card input[type="email"], .modal-cliente-card input[type="tel"] { width: 100%; box-sizing: border-box; padding: 11px 12px; font: inherit; font-size: 15px; color: var(--texto); background: var(--bg); border: 1.5px solid var(--borda); border-radius: 10px; }
+  .modal-cliente-card input:focus { outline: none; border-color: var(--marca); }
+  .modal-cliente-card .check-linha { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; font-size: 13px; line-height: 1.45; color: var(--texto-muted); cursor: pointer; }
+  .modal-cliente-card .check-linha input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--marca); flex-shrink: 0; }
+  .modal-cliente-erro { color: var(--status-vermelho); font-size: 12.5px; margin: 10px 0 0; }
+  .modal-cliente-acoes { display: flex; gap: 10px; margin-top: 18px; }
+  .modal-cliente-acoes button { flex: 1; padding: 12px; font: inherit; font-size: 14px; font-weight: 700; border-radius: 10px; cursor: pointer; }
+  .modal-cliente-cancelar { background: none; color: var(--texto); border: 1.5px solid var(--borda); }
+  .modal-cliente-salvar { background: var(--marca); color: #FFFFFF; border: none; }
+  .modal-cliente-salvar:disabled { opacity: 0.6; cursor: wait; }
+
   /* pessoas */
   #lista-pessoas .opcao-linha { cursor: default; }
   #lista-pessoas .opcao-linha:last-child { border-bottom: none; }
@@ -513,6 +532,35 @@
           <div id="lista-pessoas"></div>
         </div>
 
+        <p class="secao-titulo-grupo">Clientes</p>
+        <div class="opcao-card" id="card-clientes">
+          <a href="planos.html" class="opcao-linha" id="clientes-upsell">
+            <span class="opcao-icone" id="icone-clientes-upsell"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo">Cadastro de clientes</div>
+              <div class="opcao-descricao">No plano Profissional: até 20 clientes, relatório por cliente e aviso de vencimento no e-mail do cliente.</div>
+            </div>
+            <span class="opcao-seta" id="seta-clientes-upsell"></span>
+          </a>
+          <div id="clientes-pro" hidden>
+            <button type="button" class="opcao-linha" id="btn-nome-empresa">
+              <span class="opcao-icone" id="icone-nome-empresa"></span>
+              <div class="opcao-texto">
+                <div class="opcao-titulo">Nome da sua empresa</div>
+                <div class="opcao-descricao" id="desc-nome-empresa">Aparece no topo dos relatórios. Toque para definir.</div>
+              </div>
+            </button>
+            <div id="lista-clientes"></div>
+            <button type="button" class="opcao-linha" id="btn-novo-cliente">
+              <span class="opcao-icone" id="icone-novo-cliente"></span>
+              <div class="opcao-texto">
+                <div class="opcao-titulo">Novo cliente</div>
+                <div class="opcao-descricao" id="desc-novo-cliente">Até 20 clientes</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
         <p class="secao-titulo-grupo">Dados</p>
         <div class="opcao-card">
           <button type="button" class="opcao-linha" id="btn-exportar">
@@ -584,6 +632,27 @@
   </div>
 
 
+  <div class="modal-cliente" id="modal-cliente" hidden>
+    <form class="modal-cliente-card" id="form-cliente" role="dialog" aria-modal="true" aria-labelledby="modal-cliente-titulo" novalidate>
+      <h2 id="modal-cliente-titulo">Novo cliente</h2>
+      <p>Os documentos ligados a este cliente aparecem juntos no painel e no relatório.</p>
+      <label for="cliente-nome">Nome ou razão social</label>
+      <input type="text" id="cliente-nome" maxlength="120" autocomplete="off" placeholder="Ex.: Padaria Pão Quente">
+      <label for="cliente-documento">CPF ou CNPJ <span style="font-weight:400;color:var(--texto-muted)">(opcional)</span></label>
+      <input type="text" id="cliente-documento" inputmode="numeric" maxlength="18" autocomplete="off" placeholder="00.000.000/0000-00">
+      <label for="cliente-email">E-mail <span style="font-weight:400;color:var(--texto-muted)">(opcional)</span></label>
+      <input type="email" id="cliente-email" maxlength="200" autocomplete="off" placeholder="contato@empresa.com">
+      <label for="cliente-telefone">Telefone <span style="font-weight:400;color:var(--texto-muted)">(opcional)</span></label>
+      <input type="tel" id="cliente-telefone" inputmode="numeric" maxlength="15" autocomplete="off" placeholder="(51) 99999-8888">
+      <label class="check-linha"><input type="checkbox" id="cliente-avisar"> Avisar este cliente por e-mail quando um documento dele estiver perto de vencer ou vencido</label>
+      <p class="modal-cliente-erro" id="cliente-erro" hidden></p>
+      <div class="modal-cliente-acoes">
+        <button type="button" class="modal-cliente-cancelar" id="cliente-cancelar">Cancelar</button>
+        <button type="submit" class="modal-cliente-salvar" id="cliente-salvar">Salvar</button>
+      </div>
+    </form>
+  </div>
+
   <div class="modal-excluir" id="modal-excluir" hidden>
     <div class="modal-excluir-card" role="dialog" aria-modal="true" aria-labelledby="modal-excluir-titulo">
       <h2 id="modal-excluir-titulo">Excluir sua conta?</h2>
@@ -631,6 +700,7 @@
       fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
       menu: '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',
       plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+      briefcase: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
       chevronRight: '<polyline points="9 18 15 12 9 6"/>',
       moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
       download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
@@ -1046,6 +1116,175 @@
       carregarPessoas();
     });
 
+    /* ---------- plano em vigor ---------- */
+
+    async function planoEmVigor() {
+      const { data } = await sb.from('perfis').select('plano, plano_valido_ate').maybeSingle();
+      const hoje = new Date().toLocaleDateString('sv-SE');
+      return data && data.plano !== 'gratis' && data.plano_valido_ate >= hoje ? data.plano : 'gratis';
+    }
+
+    /* ---------- clientes (plano Profissional) ---------- */
+
+    const LIMITE_CLIENTES = 20;
+    let usuarioIdPerfil = null;
+    let clientesCarregados = [];
+    let clienteEditandoId = null;
+
+    document.getElementById('icone-clientes-upsell').innerHTML = icone('briefcase', 17);
+    document.getElementById('seta-clientes-upsell').innerHTML = icone('chevronRight', 16);
+    document.getElementById('icone-nome-empresa').innerHTML = icone('fileText', 17);
+    document.getElementById('icone-novo-cliente').innerHTML = icone('plus', 17);
+
+    function formatarDocumento(v) {
+      const n = String(v || '').replace(/\D/g, '').slice(0, 14);
+      if (n.length <= 11) return n.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+      return n.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
+    }
+
+    function formatarTelefone(v) {
+      const n = String(v || '').replace(/\D/g, '').slice(0, 11);
+      if (n.length > 10) return n.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+      if (n.length > 6) return n.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+      return n;
+    }
+
+    async function iniciarClientes(userId, plano) {
+      usuarioIdPerfil = userId;
+      const profissional = plano === 'profissional';
+      document.getElementById('clientes-upsell').hidden = profissional;
+      document.getElementById('clientes-pro').hidden = !profissional;
+      if (!profissional) return;
+
+      const { data: pref } = await sb.from('preferencias').select('nome_empresa').eq('user_id', userId).maybeSingle();
+      if (pref && pref.nome_empresa) document.getElementById('desc-nome-empresa').textContent = pref.nome_empresa + ' · aparece no topo dos relatórios';
+      await carregarClientes();
+    }
+
+    async function carregarClientes() {
+      const [clientes, docs] = await Promise.all([
+        sb.from('clientes').select('*').order('nome'),
+        sb.from('documentos').select('cliente_id').not('cliente_id', 'is', null),
+      ]);
+      clientesCarregados = clientes.data || [];
+      const contagem = {};
+      (docs.data || []).forEach(function (d) { contagem[d.cliente_id] = (contagem[d.cliente_id] || 0) + 1; });
+
+      document.getElementById('lista-clientes').innerHTML = clientesCarregados.map(function (c) {
+        const qtd = contagem[c.id] || 0;
+        const partes = [];
+        if (c.documento) partes.push(formatarDocumento(c.documento));
+        partes.push(qtd === 0 ? 'Nenhum documento' : qtd === 1 ? '1 documento' : qtd + ' documentos');
+        if (c.avisar_email && c.email) partes.push('recebe avisos por e-mail');
+        return `
+          <div class="opcao-linha">
+            <span class="opcao-icone">${icone('briefcase', 17)}</span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo">${escaparHtml(c.nome)}</div>
+              <div class="opcao-descricao">${escaparHtml(partes.join(' · '))}</div>
+            </div>
+            <button type="button" class="pessoa-acao" data-acao="editar" data-id="${c.id}" aria-label="Editar">${icone('edit', 16)}</button>
+            <button type="button" class="pessoa-acao pessoa-acao-excluir" data-acao="excluir" data-id="${c.id}" data-qtd="${qtd}" aria-label="Excluir">${icone('trash', 16)}</button>
+          </div>`;
+      }).join('');
+
+      const total = clientesCarregados.length;
+      const btnNovo = document.getElementById('btn-novo-cliente');
+      document.getElementById('desc-novo-cliente').textContent = total >= LIMITE_CLIENTES
+        ? 'Limite de ' + LIMITE_CLIENTES + ' clientes atingido'
+        : total + ' de ' + LIMITE_CLIENTES + ' clientes';
+      btnNovo.disabled = total >= LIMITE_CLIENTES;
+    }
+
+    function abrirModalCliente(cliente) {
+      clienteEditandoId = cliente ? cliente.id : null;
+      document.getElementById('modal-cliente-titulo').textContent = cliente ? 'Editar cliente' : 'Novo cliente';
+      document.getElementById('cliente-nome').value = cliente ? cliente.nome : '';
+      document.getElementById('cliente-documento').value = cliente && cliente.documento ? formatarDocumento(cliente.documento) : '';
+      document.getElementById('cliente-email').value = cliente && cliente.email ? cliente.email : '';
+      document.getElementById('cliente-telefone').value = cliente && cliente.telefone ? formatarTelefone(cliente.telefone) : '';
+      document.getElementById('cliente-avisar').checked = !!(cliente && cliente.avisar_email);
+      document.getElementById('cliente-erro').hidden = true;
+      document.getElementById('cliente-salvar').disabled = false;
+      document.getElementById('modal-cliente').hidden = false;
+      setTimeout(function () { document.getElementById('cliente-nome').focus(); }, 50);
+    }
+
+    function fecharModalCliente() {
+      document.getElementById('modal-cliente').hidden = true;
+    }
+
+    document.getElementById('cliente-documento').addEventListener('input', function () { this.value = formatarDocumento(this.value); });
+    document.getElementById('cliente-telefone').addEventListener('input', function () { this.value = formatarTelefone(this.value); });
+    document.getElementById('cliente-cancelar').addEventListener('click', fecharModalCliente);
+    document.getElementById('modal-cliente').addEventListener('click', function (e) { if (e.target === this) fecharModalCliente(); });
+    document.getElementById('btn-novo-cliente').addEventListener('click', function () { abrirModalCliente(null); });
+
+    document.getElementById('form-cliente').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const erroEl = document.getElementById('cliente-erro');
+      const nome = document.getElementById('cliente-nome').value.trim();
+      const documento = document.getElementById('cliente-documento').value.replace(/\D/g, '');
+      const email = document.getElementById('cliente-email').value.trim();
+      const telefone = document.getElementById('cliente-telefone').value.replace(/\D/g, '');
+      const avisar = document.getElementById('cliente-avisar').checked;
+
+      erroEl.hidden = true;
+      if (!nome) { erroEl.textContent = 'Digite o nome do cliente.'; erroEl.hidden = false; return; }
+      if (documento && documento.length !== 11 && documento.length !== 14) { erroEl.textContent = 'CPF deve ter 11 números e CNPJ, 14.'; erroEl.hidden = false; return; }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { erroEl.textContent = 'E-mail inválido.'; erroEl.hidden = false; return; }
+      if (avisar && !email) { erroEl.textContent = 'Para avisar por e-mail, preencha o e-mail do cliente.'; erroEl.hidden = false; return; }
+
+      const dados = { nome: nome, documento: documento || null, email: email || null, telefone: telefone || null, avisar_email: avisar };
+      const botao = document.getElementById('cliente-salvar');
+      botao.disabled = true;
+
+      const resultado = clienteEditandoId
+        ? await sb.from('clientes').update(dados).eq('id', clienteEditandoId)
+        : await sb.from('clientes').insert([Object.assign({ user_id: usuarioIdPerfil }, dados)]);
+
+      botao.disabled = false;
+      if (resultado.error) {
+        erroEl.textContent = resultado.error.message || 'Não foi possível salvar agora. Tente de novo.';
+        erroEl.hidden = false;
+        return;
+      }
+      fecharModalCliente();
+      carregarClientes();
+    });
+
+    document.getElementById('lista-clientes').addEventListener('click', async function (e) {
+      const btn = e.target.closest('.pessoa-acao');
+      if (!btn) return;
+      const cliente = clientesCarregados.find(function (c) { return c.id === btn.dataset.id; });
+      if (!cliente) return;
+      if (btn.dataset.acao === 'editar') { abrirModalCliente(cliente); return; }
+      const qtd = Number(btn.dataset.qtd || 0);
+      const aviso = qtd > 0
+        ? 'Excluir ' + cliente.nome + '? Os ' + qtd + ' documento(s) dele continuam salvos, só ficam sem cliente.'
+        : 'Excluir ' + cliente.nome + '?';
+      if (!confirm(aviso)) return;
+      const { error } = await sb.from('clientes').delete().eq('id', cliente.id);
+      if (error) { alert('Não foi possível excluir agora. Tente de novo.'); return; }
+      carregarClientes();
+    });
+
+    document.getElementById('btn-nome-empresa').addEventListener('click', async function () {
+      const { data: pref } = await sb.from('preferencias').select('nome_empresa').eq('user_id', usuarioIdPerfil).maybeSingle();
+      const atual = pref && pref.nome_empresa ? pref.nome_empresa : '';
+      const novo = prompt('Nome da sua empresa (aparece no topo dos relatórios):', atual);
+      if (novo === null) return;
+      const valor = novo.trim().slice(0, 80) || null;
+      const { error } = await sb.from('preferencias').upsert(
+        { user_id: usuarioIdPerfil, nome_empresa: valor, atualizado_em: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      );
+      if (error) { alert('Não foi possível salvar agora. Tente de novo.'); return; }
+      document.getElementById('desc-nome-empresa').textContent = valor
+        ? valor + ' · aparece no topo dos relatórios'
+        : 'Aparece no topo dos relatórios. Toque para definir.';
+    });
+
     /* ---------- sessão ---------- */
 
     sb.auth.getSession().then(function (resultado) {
@@ -1061,6 +1300,13 @@
 
       iniciarEmailLembretes(resultado.data.session.user.id);
       carregarPessoas();
+      planoEmVigor().then(function (plano) {
+        iniciarClientes(resultado.data.session.user.id, plano);
+        if (plano !== 'familia' && plano !== 'profissional') {
+          document.querySelector('#pessoas-vazio .opcao-descricao').innerHTML =
+            'Organizar documentos de outras pessoas é um recurso dos planos <a href="planos.html" style="color: var(--marca);">Família e Profissional</a>.';
+        }
+      });
 
       sb.from('perfis').select('plano, plano_valido_ate').maybeSingle().then(function (r) {
         const p = r.data;
