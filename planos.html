@@ -314,7 +314,7 @@
   .modal-botao:hover { background: var(--marca-hover); }
   .modal-botao:disabled { opacity: 0.6; cursor: wait; }
   .modal-botao.secundario { background: none; color: var(--texto-muted); font-weight: 500; margin-top: 8px; }
-  .modal-msg { color: var(--status-vermelho); font-size: 12.5px; margin: 0 0 12px; }
+  .modal-msg, .modal-card p.modal-msg { color: var(--status-vermelho); font-size: 12.5px; margin: 0 0 12px; }
   .pix-qr { display: block; width: 210px; height: 210px; margin: 4px auto 14px; background: #fff; border-radius: 12px; padding: 8px; box-sizing: border-box; object-fit: contain; }
   .pix-codigo { width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--borda); color: var(--texto); border-radius: 10px; padding: 10px 12px; font-size: 12px; font-family: ui-monospace, monospace; resize: none; height: 64px; margin-bottom: 10px; word-break: break-all; }
   .pix-status { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 12.5px; color: var(--texto-muted); margin: 12px 0 4px; }
@@ -322,6 +322,13 @@
   .pix-ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--status-amarelo, #D9930D); animation: pix-pulsar 1.4s ease-in-out infinite; }
   @keyframes pix-pulsar { 50% { opacity: 0.3; } }
   .plano-pagar { margin-top: 10px; }
+  .escolha-metodo { display: grid; gap: 10px; margin: 6px 0 4px; }
+  .escolha-metodo button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--borda); background: var(--bg); color: var(--texto); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; text-align: left; }
+  .escolha-metodo button:hover { border-color: var(--marca); }
+  .escolha-metodo button span.sub { display: block; font-size: 12px; font-weight: 400; color: var(--texto-muted); margin-top: 2px; }
+  .escolha-metodo .icone-metodo { width: 36px; height: 36px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: rgba(91,110,245,0.14); color: var(--marca); flex-shrink: 0; }
+  .cartao-linha { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .modal-card p.cartao-seguro { font-size: 11.5px; margin: 0 0 12px; display: flex; gap: 6px; align-items: flex-start; }
   .modal-card p.pix-aviso-recebedor { font-size: 11.5px; margin: 0 0 12px; text-align: center; }
 
   /* ---------- correção mobile: nada pode ser mais largo que a tela ---------- */
@@ -397,14 +404,14 @@
         <input type="text" id="modal-cpf" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00">
         <label for="modal-telefone">Celular com DDD</label>
         <input type="tel" id="modal-telefone" inputmode="numeric" autocomplete="tel-national" placeholder="(51) 99999-8888">
-        <p style="font-size: 11.5px; margin-top: -4px;">Esses dados são exigidos pelo banco pra gerar o Pix.</p>
+        <p style="font-size: 11.5px; margin-top: -4px;">Esses dados são exigidos pela processadora pra gerar a cobrança.</p>
         <p class="modal-msg" id="modal-msg" hidden></p>
         <button type="button" class="modal-botao" id="modal-confirmar">Começar meus 30 dias grátis</button>
         <button type="button" class="modal-botao secundario" id="modal-fechar">Agora não</button>
       </div>
       <div id="modal-conteudo-ok" hidden>
         <h2>Premium ativado!</h2>
-        <p>Seu teste grátis vale até <strong id="modal-ok-data"></strong>. Perto dessa data a gente te avisa por e-mail pra pagar o Pix do mês aqui no app.</p>
+        <p>Seu teste grátis vale até <strong id="modal-ok-data"></strong>. Perto dessa data a gente te avisa por e-mail pra pagar o mês aqui no app, com Pix ou cartão.</p>
         <button type="button" class="modal-botao secundario" id="modal-ok-fechar">Fechar</button>
       </div>
       <div id="modal-conteudo-pix" hidden>
@@ -418,6 +425,39 @@
         <div class="pix-status" id="pix-status"><span class="pix-ponto"></span><span id="pix-status-texto">Aguardando pagamento...</span></div>
         <button type="button" class="modal-botao secundario" id="pix-ja-paguei">Já paguei</button>
         <button type="button" class="modal-botao secundario" id="pix-fechar">Fechar</button>
+      </div>
+      <div id="modal-conteudo-escolha" hidden>
+        <h2>Como você quer pagar?</h2>
+        <p>Mensalidade do Premium: <strong>R$ 9,90</strong>. Sem cobrança automática: você paga um mês de cada vez.</p>
+        <div class="escolha-metodo">
+          <button type="button" id="escolher-pix"><span class="icone-metodo" id="icone-metodo-pix"></span><span>Pix<span class="sub">Aprovação na hora, pelo app do banco</span></span></button>
+          <button type="button" id="escolher-cartao"><span class="icone-metodo" id="icone-metodo-cartao"></span><span>Cartão de crédito<span class="sub">Visa, Mastercard, Elo e outros</span></span></button>
+        </div>
+        <button type="button" class="modal-botao secundario" id="escolha-fechar">Fechar</button>
+      </div>
+      <div id="modal-conteudo-cartao" hidden>
+        <h2>Pagar com cartão</h2>
+        <p>Mensalidade do Premium: <strong>R$ 9,90</strong>, à vista.</p>
+        <form id="form-cartao" autocomplete="on" novalidate>
+          <label for="cartao-numero">Número do cartão</label>
+          <input type="text" id="cartao-numero" name="cc-number" inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000" maxlength="23">
+          <label for="cartao-titular">Nome impresso no cartão</label>
+          <input type="text" id="cartao-titular" name="cc-name" autocomplete="cc-name" placeholder="COMO ESTÁ NO CARTÃO" maxlength="60" style="text-transform: uppercase;">
+          <div class="cartao-linha">
+            <div>
+              <label for="cartao-validade">Validade</label>
+              <input type="text" id="cartao-validade" name="cc-exp" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/AA" maxlength="5">
+            </div>
+            <div>
+              <label for="cartao-cvv">CVV</label>
+              <input type="password" id="cartao-cvv" name="cc-csc" inputmode="numeric" autocomplete="cc-csc" placeholder="123" maxlength="4">
+            </div>
+          </div>
+          <p class="cartao-seguro"><span id="icone-cartao-seguro"></span><span>Os dados do cartão vão direto pra processadora de pagamento e não ficam salvos no DocTrack.</span></p>
+          <p class="modal-msg" id="cartao-msg" hidden></p>
+          <button type="submit" class="modal-botao" id="cartao-pagar">Pagar R$ 9,90</button>
+        </form>
+        <button type="button" class="modal-botao secundario" id="cartao-voltar">Voltar</button>
       </div>
       <div id="modal-conteudo-pago" hidden>
         <h2>Pagamento confirmado!</h2>
@@ -462,6 +502,8 @@
       briefcase: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
       check: '<polyline points="20 6 9 17 4 12"/>',
       creditCard: '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
+      zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+      lock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
     };
 
     function icone(nome, tamanho, corTraco) {
@@ -545,10 +587,10 @@
             ? `<div class="plano-trial">Ativo até ${validoAteTxt}</div>
                <button type="button" class="plano-botao atual" disabled>Seu plano atual</button>
                ${perfil.assinatura_ativa
-                 ? `<button type="button" class="plano-botao principal plano-pagar" id="btn-pagar">Pagar próximo mês com Pix</button>
+                 ? `<button type="button" class="plano-botao principal plano-pagar" id="btn-pagar">Pagar próximo mês</button>
                     <button type="button" class="plano-cancelar" id="btn-cancelar">Cancelar assinatura</button>`
                  : `<p class="plano-cancelado">Assinatura cancelada — o Premium vale até a data acima.</p>
-                    <button type="button" class="plano-botao principal plano-pagar" id="btn-pagar">Reativar e pagar com Pix</button>`}`
+                    <button type="button" class="plano-botao principal plano-pagar" id="btn-pagar">Reativar e pagar</button>`}`
             : perfilBruto && perfilBruto.teste_usado
               ? `<div class="plano-trial">Pague com Pix, sem fidelidade</div>
                  <button type="button" class="plano-botao principal" id="btn-assinar">Assinar por R$ 9,90/mês</button>`
@@ -588,10 +630,10 @@
       if (btnPremium) btnPremium.addEventListener('click', function () { abrirModalAssinatura(false); });
 
       const btnAssinar = document.getElementById('btn-assinar');
-      if (btnAssinar) btnAssinar.addEventListener('click', function () { pagarComPix(); });
+      if (btnAssinar) btnAssinar.addEventListener('click', function () { escolherPagamento(); });
 
       const btnPagar = document.getElementById('btn-pagar');
-      if (btnPagar) btnPagar.addEventListener('click', function () { pagarComPix(); });
+      if (btnPagar) btnPagar.addEventListener('click', function () { escolherPagamento(); });
 
       const btnCancelar = document.getElementById('btn-cancelar');
       if (btnCancelar) btnCancelar.addEventListener('click', cancelarAssinatura);
@@ -641,11 +683,11 @@
     let modoPagamento = false; // false = começar teste grátis; true = preencher dados e ir pro Pix
 
     function textoBotaoForm() {
-      return modoPagamento ? 'Continuar para o Pix' : 'Começar meus 30 dias grátis';
+      return modoPagamento ? 'Continuar para o pagamento' : 'Começar meus 30 dias grátis';
     }
 
     function mostrarConteudo(qual) {
-      ['form', 'ok', 'pix', 'pago'].forEach(function (nome) {
+      ['form', 'ok', 'escolha', 'pix', 'cartao', 'pago'].forEach(function (nome) {
         document.getElementById('modal-conteudo-' + nome).hidden = nome !== qual;
       });
       modalEl.hidden = false;
@@ -659,8 +701,8 @@
       document.getElementById('modal-form-titulo').hidden = !modoPagamento;
       document.getElementById('modal-form-titulo-teste').hidden = modoPagamento;
       document.getElementById('modal-form-texto').textContent = modoPagamento
-        ? 'R$ 9,90 por mês, pago com Pix direto no app. Não tem cobrança automática: é só não pagar pra parar.'
-        : 'Sem cobrar nada agora. Depois dos 30 dias, você paga R$ 9,90 por mês com Pix, direto no app. Não tem cobrança automática: é só não pagar pra parar.';
+        ? 'R$ 9,90 por mês, pago com Pix ou cartão direto no app. Não tem cobrança automática: é só não pagar pra parar.'
+        : 'Sem cobrar nada agora. Depois dos 30 dias, você paga R$ 9,90 por mês com Pix ou cartão, direto no app. Não tem cobrança automática: é só não pagar pra parar.';
       if (perfilAtual) {
         if (perfilAtual.cobranca_nome) document.getElementById('modal-nome').value = perfilAtual.cobranca_nome;
         if (perfilAtual.cobranca_cpf) { const c = document.getElementById('modal-cpf'); c.value = perfilAtual.cobranca_cpf; c.dispatchEvent(new Event('input')); }
@@ -671,6 +713,8 @@
 
     function fecharModalAssinatura() {
       pararVerificacao();
+      const f = document.getElementById('form-cartao');
+      if (f) f.reset();
       modalEl.hidden = true;
     }
 
@@ -715,7 +759,7 @@
         if (r.status === 'PAID') { mostrarPago(r.validoAte); return; }
         if (['EXPIRED', 'EXPIRADO', 'FAILED', 'REFUSED', 'CANCELED', 'CANCELLED'].includes(r.status)) {
           pararVerificacao();
-          statusTxt.textContent = 'Esse Pix expirou. Feche e gere outro.';
+          statusTxt.textContent = 'Esse pagamento não foi concluído. Feche e tente de novo.';
           return;
         }
         if (manual) statusTxt.textContent = 'Ainda não recebemos. Se você já pagou, espere alguns segundos.';
@@ -725,8 +769,22 @@
       if (Date.now() - inicioVerificacao > 10 * 60 * 1000) pararVerificacao();
     }
 
+    function temDadosCobranca() {
+      return !!(perfilAtual && perfilAtual.cobranca_cpf && perfilAtual.cobranca_telefone && perfilAtual.cobranca_nome);
+    }
+
+    // primeiro passo de qualquer pagamento: dados de cobrança -> escolher Pix ou cartão
+    function escolherPagamento() {
+      if (!temDadosCobranca()) {
+        abrirModalAssinatura(true);
+        return;
+      }
+      pararVerificacao();
+      mostrarConteudo('escolha');
+    }
+
     async function pagarComPix() {
-      if (!perfilAtual || !perfilAtual.cobranca_cpf || !perfilAtual.cobranca_telefone) {
+      if (!temDadosCobranca()) {
         abrirModalAssinatura(true);
         return;
       }
@@ -755,6 +813,137 @@
         document.getElementById('pix-status-texto').textContent = e.message;
       }
     }
+
+    /* ----- Cartão de crédito ----- */
+
+    const formCartao = document.getElementById('form-cartao');
+    const cartaoMsgEl = document.getElementById('cartao-msg');
+    const cartaoBtnEl = document.getElementById('cartao-pagar');
+    let pagandoCartao = false;
+
+    function limparFormCartao() {
+      // apaga os dados do cartão da tela (não ficam guardados em lugar nenhum)
+      formCartao.reset();
+      cartaoMsgEl.hidden = true;
+    }
+
+    function abrirCartao() {
+      limparFormCartao();
+      cartaoBtnEl.disabled = false;
+      cartaoBtnEl.textContent = 'Pagar R$ 9,90';
+      mostrarConteudo('cartao');
+      setTimeout(function () { document.getElementById('cartao-numero').focus(); }, 50);
+    }
+
+    function erroCartao(texto) {
+      cartaoMsgEl.textContent = texto;
+      cartaoMsgEl.hidden = false;
+    }
+
+    function luhnOk(n) {
+      if (!/^\d{13,19}$/.test(n)) return false;
+      let soma = 0, dobrar = false;
+      for (let i = n.length - 1; i >= 0; i--) {
+        let d = Number(n[i]);
+        if (dobrar) { d *= 2; if (d > 9) d -= 9; }
+        soma += d; dobrar = !dobrar;
+      }
+      return soma % 10 === 0;
+    }
+
+    document.getElementById('cartao-numero').addEventListener('input', function () {
+      const n = this.value.replace(/\D/g, '').slice(0, 19);
+      this.value = n.replace(/(\d{4})(?=\d)/g, '$1 ');
+    });
+    document.getElementById('cartao-validade').addEventListener('input', function () {
+      const n = this.value.replace(/\D/g, '').slice(0, 4);
+      this.value = n.length > 2 ? n.slice(0, 2) + '/' + n.slice(2) : n;
+    });
+    document.getElementById('cartao-cvv').addEventListener('input', function () {
+      this.value = this.value.replace(/\D/g, '').slice(0, 4);
+    });
+
+    formCartao.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      if (pagandoCartao) return; // evita cobrar duas vezes com clique duplo
+      cartaoMsgEl.hidden = true;
+
+      const numero = document.getElementById('cartao-numero').value.replace(/\D/g, '');
+      const titular = document.getElementById('cartao-titular').value.trim();
+      const validade = document.getElementById('cartao-validade').value.replace(/\D/g, '');
+      const cvv = document.getElementById('cartao-cvv').value.replace(/\D/g, '');
+      const mes = Number(validade.slice(0, 2));
+      const ano = 2000 + Number(validade.slice(2, 4));
+      const agora = new Date();
+
+      if (!luhnOk(numero)) return erroCartao('Número do cartão inválido. Confira os dígitos.');
+      if (titular.length < 3) return erroCartao('Digite o nome como está impresso no cartão.');
+      if (validade.length !== 4 || mes < 1 || mes > 12) return erroCartao('Validade inválida. Use MM/AA.');
+      if (ano < agora.getFullYear() || (ano === agora.getFullYear() && mes < agora.getMonth() + 1)) return erroCartao('Esse cartão está vencido.');
+      if (cvv.length < 3) return erroCartao('Código de segurança (CVV) inválido.');
+
+      pagandoCartao = true;
+      cartaoBtnEl.disabled = true;
+      cartaoBtnEl.textContent = 'Processando pagamento...';
+
+      let dados = {};
+      let resp = null;
+      try {
+        resp = await fetch('/api/cartao', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (await tokenDeLogin()) },
+          body: JSON.stringify({ numero: numero, titular: titular, mes: mes, ano: ano, cvv: cvv }),
+        });
+        dados = await resp.json().catch(function () { return {}; });
+      } catch (erroRede) {
+        dados = { erro: 'Sem conexão. Confira sua internet. Se a cobrança aparecer no cartão, o Premium é liberado sozinho.', verificar: true };
+      }
+
+      // a partir daqui os dados do cartão saem da tela
+      limparFormCartao();
+      pagandoCartao = false;
+      cartaoBtnEl.disabled = false;
+      cartaoBtnEl.textContent = 'Pagar R$ 9,90';
+
+      if (resp && resp.ok && dados.status === 'PAID') {
+        mostrarPago(dados.validoAte);
+        return;
+      }
+      if (resp && resp.ok && dados.status === 'PENDING_3DS' && dados.redirecionar) {
+        window.location.href = dados.redirecionar; // banco pede confirmação; volta pra esta tela depois
+        return;
+      }
+      if ((resp && resp.ok) || dados.verificar) {
+        // processando, ou sem resposta clara: verifica sozinho por alguns minutos
+        mostrarConteudo('pix');
+        document.getElementById('pix-qr').hidden = true;
+        document.getElementById('pix-codigo').hidden = true;
+        document.getElementById('pix-copiar').hidden = true;
+        document.getElementById('pix-checkout').hidden = true;
+        document.querySelector('.pix-aviso-recebedor').hidden = true;
+        document.getElementById('pix-status-texto').textContent = dados.verificar && dados.erro
+          ? dados.erro
+          : 'Confirmando o pagamento no cartão...';
+        pararVerificacao();
+        inicioVerificacao = Date.now();
+        timerVerificacao = setInterval(function () { verificarPix(false); }, 5000);
+        return;
+      }
+      if (dados.precisaDados) { abrirModalAssinatura(true); return; }
+      erroCartao(dados.erro || 'Não foi possível pagar agora. Tente de novo ou pague com Pix.');
+    });
+
+    document.getElementById('escolher-pix').addEventListener('click', function () {
+      ['pix-qr', 'pix-codigo', 'pix-copiar'].forEach(function (id) { document.getElementById(id).hidden = false; });
+      document.querySelector('.pix-aviso-recebedor').hidden = false;
+      pagarComPix();
+    });
+    document.getElementById('escolher-cartao').addEventListener('click', abrirCartao);
+    document.getElementById('cartao-voltar').addEventListener('click', function () { limparFormCartao(); mostrarConteudo('escolha'); });
+    document.getElementById('escolha-fechar').addEventListener('click', fecharModalAssinatura);
+    document.getElementById('icone-metodo-pix').innerHTML = icone('zap', 18);
+    document.getElementById('icone-metodo-cartao').innerHTML = icone('creditCard', 18);
+    document.getElementById('icone-cartao-seguro').innerHTML = icone('lock', 13);
 
     document.getElementById('pix-copiar').addEventListener('click', async function () {
       const codigo = document.getElementById('pix-codigo');
@@ -808,7 +997,7 @@
 
         if (dados.precisaPagar) {
           await carregarPlano();
-          await pagarComPix();
+          escolherPagamento();
           return;
         }
         document.getElementById('modal-ok-data').textContent = new Date(dados.validoAte + 'T00:00:00').toLocaleDateString('pt-BR');
@@ -851,6 +1040,17 @@
       usoDocumentos = count || 0;
       renderComparacao();
       await carregarPlano();
+
+      if (new URLSearchParams(window.location.search).get('cartao') === 'retorno') {
+        history.replaceState(null, '', 'planos.html');
+        mostrarConteudo('pix');
+        ['pix-qr', 'pix-codigo', 'pix-copiar', 'pix-checkout'].forEach(function (id) { document.getElementById(id).hidden = true; });
+        document.querySelector('.pix-aviso-recebedor').hidden = true;
+        document.getElementById('pix-status-texto').textContent = 'Confirmando o pagamento no cartão...';
+        inicioVerificacao = Date.now();
+        verificarPix(false);
+        timerVerificacao = setInterval(function () { verificarPix(false); }, 5000);
+      }
     });
       /* ---------- instalar app (pwa) ---------- */
 

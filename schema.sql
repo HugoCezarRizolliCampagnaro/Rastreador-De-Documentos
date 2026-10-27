@@ -308,3 +308,5 @@ alter table public.preferencias enable row level security;
 -- pagamentos: cada Pix gerado (external_id único, status PENDING/PAID/...). Só o servidor grava;
 --             o usuário só lê os próprios (RLS).
 -- avisos_assinatura: e-mails de "mensalidade vencendo" já enviados (5, 1 e 0 dias antes).
+-- pagamentos ganhou: metodo ('pix' | 'cartao'), erro_mensagem, cartao_final (só os 4 últimos dígitos).
+-- Nenhum outro dado de cartão é gravado.

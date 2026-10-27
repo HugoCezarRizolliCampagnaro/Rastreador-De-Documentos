@@ -132,8 +132,8 @@ function emailMensalidade(a: AvisoMensalidade) {
     ? `Seu teste grátis do DocTrack termina ${quando}`
     : `Sua mensalidade do DocTrack vence ${quando}`
   const intro = a.em_teste
-    ? `Seu teste do Premium vai até ${a.valido_br}. Pra continuar com documentos ilimitados e todos os recursos, pague o Pix de R$ 9,90 direto no app.`
-    : `Seu Premium vale até ${a.valido_br}. Pra continuar, pague o Pix do próximo mês (R$ 9,90) direto no app. Leva menos de um minuto.`
+    ? `Seu teste do Premium vai até ${a.valido_br}. Pra continuar com documentos ilimitados e todos os recursos, pague R$ 9,90 com Pix ou cartão direto no app.`
+    : `Seu Premium vale até ${a.valido_br}. Pra continuar, pague o próximo mês (R$ 9,90) com Pix ou cartão direto no app. Leva menos de um minuto.`
   const link = APP_URL + 'planos.html'
   const html = `
   <div style="background:#f4f5fb;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;">
@@ -141,11 +141,11 @@ function emailMensalidade(a: AvisoMensalidade) {
       <p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;font-weight:bold;color:#3D4FE0;">DOCTRACK</p>
       <h1 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:#14162b;">${esc(assunto)}</h1>
       <p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:#4a4d68;">${esc(intro)}</p>
-      <a href="${link}" style="display:inline-block;background:#3D4FE0;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 28px;border-radius:12px;">Pagar com Pix</a>
+      <a href="${link}" style="display:inline-block;background:#3D4FE0;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 28px;border-radius:12px;">Pagar agora</a>
       <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#7b7e96;">Não tem cobrança automática. Se não pagar, sua conta volta pro plano Grátis e nenhum documento é apagado.</p>
     </div>
   </div>`
-  const texto = `${assunto}\n\n${intro}\n\nPagar com Pix: ${link}`
+  const texto = `${assunto}\n\n${intro}\n\nPagar agora: ${link}`
   return { assunto, html, texto }
 }
 
