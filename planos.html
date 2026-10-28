@@ -479,6 +479,7 @@
     </div>
   </div>
 
+  <script src="dialogos.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
@@ -1043,7 +1044,7 @@
     });
 
     async function cancelarAssinatura() {
-      if (!confirm('Cancelar a assinatura? Você continua com o Premium até o fim do período já pago, e a gente para de pedir o Pix dos próximos meses.')) return;
+      if (!await Dialogo.confirmar('Cancelar a assinatura?\n\nVocê continua com o Premium até o fim do período já pago, e a gente para de pedir o Pix dos próximos meses.', { ok: 'Cancelar assinatura', cancelar: 'Manter', perigo: true })) return;
       try {
         const resp = await fetch('/api/cancelar-assinatura', {
           method: 'POST',
@@ -1053,7 +1054,7 @@
         if (!resp.ok) throw new Error(dados.erro);
         await carregarPlano();
       } catch (erro) {
-        alert(erro.message || 'Não foi possível cancelar agora.');
+        await Dialogo.avisar(erro.message || 'Não foi possível cancelar agora.');
       }
     }
 

@@ -387,6 +387,7 @@
       <button type="button" class="banner-instalar-fechar" id="btn-fechar-banner">Agora não</button>
     </div>
   </div>
+  <script src="dialogos.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
@@ -677,50 +678,50 @@
       const id = btn.dataset.id;
       const nomeAtual = btn.dataset.nome;
       if (btn.dataset.acao === 'cargo') {
-        const novo = prompt('Cargo, setor ou parentesco de ' + nomeAtual + ' (ex.: Recepção, Enfermagem, Filho).\nDeixe vazio pra tirar.', btn.dataset.cargo || '');
+        const novo = await Dialogo.pedir('Cargo, setor ou parentesco. Deixe vazio pra tirar.', btn.dataset.cargo || '', { titulo: 'Cargo / setor de ' + nomeAtual, placeholder: 'Ex.: Recepção, Enfermagem, Filho' });
         if (novo === null) return;
         const cargo = novo.trim().replace(/\s+/g, ' ').slice(0, 60);
         const { error } = await sb.from('pessoas').update({ cargo: cargo || null }).eq('id', id);
-        if (error) { alert('Não foi possível salvar agora. Tente de novo.'); return; }
+        if (error) { await Dialogo.avisar('Não foi possível salvar agora. Tente de novo.'); return; }
       } else if (btn.dataset.acao === 'email') {
         const limite = LIMITE_PESSOAS[planoAtual] === undefined ? 0 : LIMITE_PESSOAS[planoAtual];
         if (limite === 0) {
-          if (confirm('O aviso por e-mail pra outras pessoas é dos planos Família e Profissional.\n\nQuer ver os planos?')) window.location.href = 'planos.html';
+          if (await Dialogo.confirmar('O aviso por e-mail pra outras pessoas é dos planos Família e Profissional.', { titulo: 'Recurso dos planos pagos', ok: 'Ver planos', cancelar: 'Agora não' })) window.location.href = 'planos.html';
           return;
         }
         const atual = btn.dataset.email || '';
-        const novo = prompt('E-mail de ' + nomeAtual + ' pra receber o aviso de vencimento dos documentos dele(a).\nDeixe vazio pra parar de avisar.', atual);
+        const novo = await Dialogo.pedir('Essa pessoa recebe o aviso de vencimento dos documentos dela. Deixe vazio pra parar de avisar.', atual, { titulo: 'E-mail de ' + nomeAtual, tipo: 'email', placeholder: 'nome@exemplo.com' });
         if (novo === null) return;
         const email = novo.trim().toLowerCase();
-        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('Esse e-mail não parece válido. Confira e tente de novo.'); return; }
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { await Dialogo.avisar('Esse e-mail não parece válido. Confira e tente de novo.'); return; }
         const { error } = await sb.from('pessoas').update({ email: email || null, avisar_email: !!email }).eq('id', id);
-        if (error) { alert('Não foi possível salvar agora. Tente de novo.'); return; }
-        if (email) alert(nomeAtual + ' vai receber o aviso no e-mail ' + email + ', nos mesmos dias que você.');
+        if (error) { await Dialogo.avisar('Não foi possível salvar agora. Tente de novo.'); return; }
+        if (email) await Dialogo.avisar(nomeAtual + ' vai receber o aviso no e-mail ' + email + ', nos mesmos dias que você.', { titulo: 'Aviso por e-mail ligado' });
       } else if (btn.dataset.acao === 'renomear') {
-        const novo = prompt('Novo nome para ' + nomeAtual + ':', nomeAtual);
+        const novo = await Dialogo.pedir('Renomear ' + nomeAtual, nomeAtual);
         if (!novo || !novo.trim() || novo.trim() === nomeAtual) return;
         const { error } = await sb.from('pessoas').update({ nome: novo.trim().slice(0, 80) }).eq('id', id);
-        if (error) { alert('Não foi possível renomear agora. Tente de novo.'); return; }
+        if (error) { await Dialogo.avisar('Não foi possível renomear agora. Tente de novo.'); return; }
       } else {
         const qtd = Number(btn.dataset.qtd || 0);
         const aviso = qtd > 0
-          ? 'Excluir ' + nomeAtual + '? ' + (qtd === 1 ? 'O documento dessa pessoa continua salvo' : 'Os ' + qtd + ' documentos dessa pessoa continuam salvos') + ', só passam a aparecer como seus.'
+          ? 'Excluir ' + nomeAtual + '?\n\n' + (qtd === 1 ? 'O documento dessa pessoa continua salvo' : 'Os ' + qtd + ' documentos dessa pessoa continuam salvos') + ', só passam a aparecer como seus.'
           : 'Excluir ' + nomeAtual + '?';
-        if (!confirm(aviso)) return;
+        if (!await Dialogo.confirmar(aviso, { ok: 'Excluir', perigo: true })) return;
         const { error } = await sb.from('pessoas').delete().eq('id', id);
-        if (error) { alert('Não foi possível excluir agora. Tente de novo.'); return; }
+        if (error) { await Dialogo.avisar('Não foi possível excluir agora. Tente de novo.'); return; }
       }
       carregar();
     });
 
     document.getElementById('btn-adicionar').addEventListener('click', async function () {
-      const nome = prompt('Nome da pessoa:');
+      const nome = await Dialogo.pedir('Nova pessoa', '', { placeholder: 'Nome da pessoa', ok: 'Adicionar' });
       if (!nome || !nome.trim()) return;
       const { error } = await sb.from('pessoas').insert([{ user_id: usuarioAtual.id, nome: nome.trim().slice(0, 80) }]);
       if (error) {
         const msg = error.message || 'Não foi possível adicionar agora.';
-        if (/plano/i.test(msg)) { if (confirm(msg + '\n\nQuer ver os planos?')) window.location.href = 'planos.html'; }
-        else alert('Não foi possível adicionar agora. Tente de novo.');
+        if (/plano/i.test(msg)) { if (await Dialogo.confirmar(msg, { ok: 'Ver planos', cancelar: 'Agora não' })) window.location.href = 'planos.html'; }
+        else await Dialogo.avisar('Não foi possível adicionar agora. Tente de novo.');
         return;
       }
       carregar();

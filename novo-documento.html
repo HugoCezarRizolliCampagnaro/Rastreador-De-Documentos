@@ -653,6 +653,7 @@
       <button type="button" class="banner-instalar-fechar" id="btn-fechar-banner">Agora não</button>
     </div>
   </div>
+  <script src="dialogos.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
@@ -997,7 +998,7 @@
 
     document.getElementById('pessoa').addEventListener('change', async function () {
       if (this.value !== '__novo__') return;
-      const nome = prompt('Nome da pessoa:');
+      const nome = await Dialogo.pedir('Nova pessoa', '', { placeholder: 'Nome da pessoa', ok: 'Adicionar' });
       if (nome && nome.trim()) {
         const { data, error } = await sb.from('pessoas').insert([{ user_id: usuarioAtual.id, nome: nome.trim() }]).select().single();
         if (!error && data) {
@@ -1005,8 +1006,8 @@
         } else {
           this.value = '';
           const msg = (error && error.message) || 'Não foi possível adicionar agora.';
-          if (/plano/i.test(msg) && confirm(msg + '\n\nQuer ver os planos?')) window.location.href = 'planos.html';
-          else if (!/plano/i.test(msg)) alert(msg);
+          if (/plano/i.test(msg) && await Dialogo.confirmar(msg, { ok: 'Ver planos', cancelar: 'Agora não' })) window.location.href = 'planos.html';
+          else if (!/plano/i.test(msg)) await Dialogo.avisar(msg);
         }
       } else {
         this.value = '';
@@ -1037,12 +1038,12 @@
 
     document.getElementById('cliente-id').addEventListener('change', async function () {
       if (this.value !== '__novo__') return;
-      const nome = prompt('Nome do cliente (dá pra completar CNPJ e e-mail depois em Minha conta):');
+      const nome = await Dialogo.pedir('Dá pra completar CNPJ e e-mail depois em Minha conta.', '', { titulo: 'Novo cliente', placeholder: 'Nome do cliente', ok: 'Adicionar' });
       if (!nome || !nome.trim()) { this.value = ''; return; }
       const { data, error } = await sb.from('clientes').insert([{ user_id: usuarioAtual.id, nome: nome.trim().slice(0, 120) }]).select('id').single();
       if (error || !data) {
         this.value = '';
-        alert((error && error.message) || 'Não foi possível cadastrar o cliente agora.');
+        await Dialogo.avisar((error && error.message) || 'Não foi possível cadastrar o cliente agora.');
         return;
       }
       await carregarClientesDoc(data.id);
@@ -1085,9 +1086,9 @@
       select.value = selecionarValor || 'trabalho';
     }
 
-    document.getElementById('categoria').addEventListener('change', function () {
+    document.getElementById('categoria').addEventListener('change', async function () {
       if (this.value !== '__novo__') return;
-      const nome = prompt('Nome da nova categoria:');
+      const nome = await Dialogo.pedir('Nova categoria', '', { placeholder: 'Ex.: Veículo da empresa', ok: 'Criar' });
       if (nome && nome.trim()) {
         const valor = slugificarCategoria(nome);
         if (!valor) { this.value = 'trabalho'; return; }
@@ -1318,7 +1319,7 @@
       const { error } = await sb.from('documentos').delete().eq('id', idEdicao);
 
       if (error) {
-        alert('Não foi possível excluir: ' + error.message);
+        await Dialogo.avisar('Não foi possível excluir: ' + error.message);
         btnExcluir.disabled = false;
         return;
       }
@@ -1331,7 +1332,7 @@
 
       const { data: original, error: erroLeitura } = await sb.from('documentos').select('*').eq('id', idEdicao).single();
       if (erroLeitura || !original) {
-        alert('Não foi possível duplicar: ' + (erroLeitura ? erroLeitura.message : 'documento não encontrado'));
+        await Dialogo.avisar('Não foi possível duplicar: ' + (erroLeitura ? erroLeitura.message : 'documento não encontrado'));
         btnDuplicar.disabled = false;
         return;
       }
@@ -1343,7 +1344,7 @@
 
       const { data: novo, error: erroInsercao } = await sb.from('documentos').insert([copia]).select().single();
       if (erroInsercao || !novo) {
-        alert('Não foi possível duplicar: ' + (erroInsercao ? erroInsercao.message : ''));
+        await Dialogo.avisar('Não foi possível duplicar: ' + (erroInsercao ? erroInsercao.message : ''));
         btnDuplicar.disabled = false;
         return;
       }

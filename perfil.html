@@ -694,6 +694,7 @@
     </div>
   </div>
 
+  <script src="dialogos.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
@@ -998,9 +999,9 @@
       }
       const iOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
       if (iOS) {
-        alert('No Safari, toque no ícone de compartilhar e escolha "Adicionar à Tela de Início".');
+        await Dialogo.avisar('No Safari, toque no ícone de compartilhar e escolha "Adicionar à Tela de Início".');
       } else {
-        alert('Seu navegador ainda não liberou a instalação automática. Procure por "Instalar app" no menu do navegador, ou recarregue a página e tente de novo.');
+        await Dialogo.avisar('Seu navegador ainda não liberou a instalação automática. Procure por "Instalar app" no menu do navegador, ou recarregue a página e tente de novo.');
       }
     });
 
@@ -1014,7 +1015,7 @@
       const { data } = await sb.from('documentos').select('*');
 
       if (!data || data.length === 0) {
-        alert('Nenhum documento pra exportar ainda.');
+        await Dialogo.avisar('Nenhum documento pra exportar ainda.');
         textoEl.textContent = textoOriginal;
         return;
       }
@@ -1113,18 +1114,18 @@
       const id = btn.dataset.id;
       const nomeAtual = btn.dataset.nome;
       if (btn.dataset.acao === 'renomear') {
-        const novo = prompt('Novo nome para ' + nomeAtual + ':', nomeAtual);
+        const novo = await Dialogo.pedir('Renomear ' + nomeAtual, nomeAtual);
         if (!novo || !novo.trim() || novo.trim() === nomeAtual) return;
         const { error } = await sb.from('pessoas').update({ nome: novo.trim() }).eq('id', id);
-        if (error) { alert('Não foi possível renomear agora. Tente de novo.'); return; }
+        if (error) { await Dialogo.avisar('Não foi possível renomear agora. Tente de novo.'); return; }
       } else {
         const qtd = Number(btn.dataset.qtd || 0);
         const aviso = qtd > 0
-          ? 'Excluir ' + nomeAtual + '? Os ' + qtd + ' documento(s) dessa pessoa continuam salvos, só ficam sem pessoa.'
+          ? 'Excluir ' + nomeAtual + '?\n\nOs ' + qtd + ' documento(s) dessa pessoa continuam salvos, só ficam sem pessoa.'
           : 'Excluir ' + nomeAtual + '?';
-        if (!confirm(aviso)) return;
+        if (!await Dialogo.confirmar(aviso, { ok: 'Excluir', perigo: true })) return;
         const { error } = await sb.from('pessoas').delete().eq('id', id);
-        if (error) { alert('Não foi possível excluir agora. Tente de novo.'); return; }
+        if (error) { await Dialogo.avisar('Não foi possível excluir agora. Tente de novo.'); return; }
       }
       carregarPessoas();
     });
@@ -1274,25 +1275,25 @@
       if (btn.dataset.acao === 'editar') { abrirModalCliente(cliente); return; }
       const qtd = Number(btn.dataset.qtd || 0);
       const aviso = qtd > 0
-        ? 'Excluir ' + cliente.nome + '? Os ' + qtd + ' documento(s) dele continuam salvos, só ficam sem cliente.'
+        ? 'Excluir ' + cliente.nome + '?\n\nOs ' + qtd + ' documento(s) dele continuam salvos, só ficam sem cliente.'
         : 'Excluir ' + cliente.nome + '?';
-      if (!confirm(aviso)) return;
+      if (!await Dialogo.confirmar(aviso, { ok: 'Excluir', perigo: true })) return;
       const { error } = await sb.from('clientes').delete().eq('id', cliente.id);
-      if (error) { alert('Não foi possível excluir agora. Tente de novo.'); return; }
+      if (error) { await Dialogo.avisar('Não foi possível excluir agora. Tente de novo.'); return; }
       carregarClientes();
     });
 
     document.getElementById('btn-nome-empresa').addEventListener('click', async function () {
       const { data: pref } = await sb.from('preferencias').select('nome_empresa').eq('user_id', usuarioIdPerfil).maybeSingle();
       const atual = pref && pref.nome_empresa ? pref.nome_empresa : '';
-      const novo = prompt('Nome da sua empresa (aparece no topo dos relatórios):', atual);
+      const novo = await Dialogo.pedir('Aparece no topo dos relatórios.', atual, { titulo: 'Nome da sua empresa', placeholder: 'Ex.: Clínica Vida' });
       if (novo === null) return;
       const valor = novo.trim().slice(0, 80) || null;
       const { error } = await sb.from('preferencias').upsert(
         { user_id: usuarioIdPerfil, nome_empresa: valor, atualizado_em: new Date().toISOString() },
         { onConflict: 'user_id' }
       );
-      if (error) { alert('Não foi possível salvar agora. Tente de novo.'); return; }
+      if (error) { await Dialogo.avisar('Não foi possível salvar agora. Tente de novo.'); return; }
       document.getElementById('desc-nome-empresa').textContent = valor
         ? valor + ' · aparece no topo dos relatórios'
         : 'Aparece no topo dos relatórios. Toque para definir.';
@@ -1312,11 +1313,11 @@
     }
 
     document.getElementById('btn-nome-usuario').addEventListener('click', async function () {
-      const novo = prompt('Como quer ser chamado?', nomeUsuarioAtual);
+      const novo = await Dialogo.pedir('Como quer ser chamado?', nomeUsuarioAtual, { placeholder: 'Ex.: Hugo' });
       if (novo === null) return;
       const valor = novo.trim().replace(/\s+/g, ' ').slice(0, 60);
       const { error } = await sb.auth.updateUser({ data: { full_name: valor || null } });
-      if (error) { alert('Não foi possível salvar agora. Tente de novo.'); return; }
+      if (error) { await Dialogo.avisar('Não foi possível salvar agora. Tente de novo.'); return; }
       mostrarNomeUsuario(valor);
     });
 

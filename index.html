@@ -838,6 +838,7 @@
     </div>
   </div>
 
+  <script src="dialogos.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
@@ -1064,21 +1065,21 @@
     async function duplicarRapido(id) {
       document.querySelectorAll('.doc-menu').forEach(function (m) { m.hidden = true; });
       const { data: original, error } = await sb.from('documentos').select('*').eq('id', id).single();
-      if (error || !original) { alert('Não foi possível duplicar.'); return; }
+      if (error || !original) { await Dialogo.avisar('Não foi possível duplicar.'); return; }
       const copia = Object.assign({}, original);
       delete copia.id;
       delete copia.criado_em;
       copia.nome = original.nome + ' (cópia)';
       const { error: erroInsercao } = await sb.from('documentos').insert([copia]);
-      if (erroInsercao) { alert('Não foi possível duplicar: ' + erroInsercao.message); return; }
+      if (erroInsercao) { await Dialogo.avisar('Não foi possível duplicar: ' + erroInsercao.message); return; }
       carregar();
     }
 
     async function excluirRapido(id) {
       document.querySelectorAll('.doc-menu').forEach(function (m) { m.hidden = true; });
-      if (!confirm('Excluir este documento? Essa ação não pode ser desfeita.')) return;
+      if (!await Dialogo.confirmar('Excluir este documento?\n\nEssa ação não pode ser desfeita.', { ok: 'Excluir', perigo: true })) return;
       const { error } = await sb.from('documentos').delete().eq('id', id);
-      if (error) { alert('Não foi possível excluir: ' + error.message); return; }
+      if (error) { await Dialogo.avisar('Não foi possível excluir: ' + error.message); return; }
       carregar();
     }
 

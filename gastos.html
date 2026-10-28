@@ -725,6 +725,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js"></script>
+  <script src="dialogos.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
@@ -1098,7 +1099,7 @@
 
       listaEl.querySelectorAll('.gasto-excluir').forEach(function (btn) {
         btn.addEventListener('click', async function () {
-          if (!confirm('Excluir esse gasto?')) return;
+          if (!await Dialogo.confirmar('Excluir esse gasto?', { ok: 'Excluir', perigo: true })) return;
           await sb.from('gastos').delete().eq('id', btn.dataset.id);
           todosGastos = todosGastos.filter(function (g) { return g.id !== btn.dataset.id; });
           renderTudo();
