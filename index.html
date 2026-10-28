@@ -309,6 +309,9 @@
     white-space: nowrap;
   }
 
+  /* atalho de Gastos: só no celular (no computador já está na sidebar) */
+  @media (min-width: 960px) { .atalho-gastos { display: none; } }
+
   /* ---------- estatísticas ---------- */
 
   .stats-linha {
@@ -786,6 +789,7 @@
               <span class="notif-ponto" id="notif-ponto" hidden></span>
             </button>
             <a href="relatorio.html" class="botao-relatorio"><span id="icone-relatorio"></span> Relatório</a>
+            <a href="gastos.html" class="botao-relatorio atalho-gastos"><span id="icone-gastos"></span> Gastos</a>
           </div>
         </div>
 
@@ -862,6 +866,7 @@
     document.getElementById('botao-menu').innerHTML = icone('menu', 18);
     document.getElementById('icone-notif').innerHTML = icone('bell', 17);
     document.getElementById('icone-relatorio').innerHTML = icone('fileText', 15);
+    document.getElementById('icone-gastos').innerHTML = icone('dollarSign', 15);
     document.getElementById('icone-busca').innerHTML = icone('search', 17);
     document.getElementById('sidebar-perfil-seta').innerHTML = icone('chevronRight', 16);
     document.getElementById('fab-adicionar').innerHTML = icone('plus', 26, '#FFFFFF');
@@ -1339,5 +1344,6 @@
     atualizarOpcaoInstalarPerfil();
   </script>
 
+  <script src="barra-inferior.js"></script>
 </body>
 </html>
