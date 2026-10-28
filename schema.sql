@@ -318,3 +318,11 @@ alter table public.preferencias enable row level security;
 --           trigger limitar_clientes; RLS só do dono.
 -- documentos.cliente_id: vínculo com o cliente (on delete set null). O texto "cliente" continua.
 -- preferencias.nome_empresa: aparece no topo do relatório e assina o aviso enviado ao cliente.
+
+-- ---------- pessoas: aviso por e-mail (Família e Profissional) ----------
+-- pessoas.email e pessoas.avisar_email: a pessoa do documento também recebe o lembrete
+-- (enviar-lembretes manda em nome da empresa ou de quem cadastrou; responder vai pro dono da conta).
+alter table public.pessoas add column if not exists email text;
+alter table public.pessoas add column if not exists avisar_email boolean not null default false;
+alter table public.pessoas drop constraint if exists pessoas_email_check;
+alter table public.pessoas add constraint pessoas_email_check check (email is null or char_length(email) <= 200);

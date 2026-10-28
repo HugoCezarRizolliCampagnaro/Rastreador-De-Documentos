@@ -3,6 +3,7 @@
 // aviso (coluna avisos_dias de cada documento), manda 1 email por usuário pelo
 // Gmail (SMTP porta 465) e registra em lembretes_enviados pra não repetir.
 // Plano Profissional: também avisa o cliente (se marcado), assinando com o nome da empresa.
+// Planos Família e Profissional: também avisa a pessoa do documento (se tiver e-mail marcado).
 // Também avisa a mensalidade/teste vencendo (5, 1 e 0 dias antes).
 //
 // Modos (campo "modo" no corpo JSON):
@@ -37,6 +38,10 @@ type Lembrete = {
   cliente_nome: string | null
   avisar_cliente: boolean
   nome_empresa: string | null
+  // aviso pra pessoa do documento (planos Família e Profissional)
+  pessoa_email: string | null
+  avisar_pessoa: boolean
+  dono_nome: string | null
 }
 
 // Documentos que vencem hoje ou no futuro, cuja faixa atual de aviso
@@ -57,7 +62,10 @@ const CANDIDATOS = `
     cl.email as cliente_email,
     cl.nome as cliente_nome,
     (cl.avisar_email and cl.email is not null and public.plano_ativo(doc.user_id) = 'profissional') as avisar_cliente,
-    pr.nome_empresa
+    pr.nome_empresa,
+    p.email as pessoa_email,
+    (coalesce(p.avisar_email, false) and p.email is not null and public.plano_ativo(doc.user_id) in ('familia', 'profissional')) as avisar_pessoa,
+    nullif(trim(u.raw_user_meta_data->>'full_name'), '') as dono_nome
   from public.documentos doc
   cross join (select (now() at time zone 'America/Sao_Paulo')::date as d) h
   cross join lateral (
@@ -67,14 +75,16 @@ const CANDIDATOS = `
     where a >= (doc.data_vencimento - h.d)
   ) f
   join auth.users u on u.id = doc.user_id
-  left join public.pessoas p on p.id = doc.pessoa_id
+  -- só pessoa do próprio dono do documento
+  left join public.pessoas p on p.id = doc.pessoa_id and p.user_id = doc.user_id
   left join public.preferencias pr on pr.user_id = doc.user_id
   -- só cliente do próprio dono do documento (nunca o cliente de outra conta)
   left join public.clientes cl on cl.id = doc.cliente_id and cl.user_id = doc.user_id
   where doc.data_vencimento >= h.d - 7
     and f.faixa is not null
     and (coalesce(pr.email_lembretes, true)
-         or (cl.avisar_email and cl.email is not null and public.plano_ativo(doc.user_id) = 'profissional'))
+         or (cl.avisar_email and cl.email is not null and public.plano_ativo(doc.user_id) = 'profissional')
+         or (coalesce(p.avisar_email, false) and p.email is not null and public.plano_ativo(doc.user_id) in ('familia', 'profissional')))
     and u.email is not null
     and u.email_confirmed_at is not null
     and not exists (
@@ -320,6 +330,46 @@ function montarEmailCliente(itens: Lembrete[], remetenteNome: string) {
   return { assunto, html, texto }
 }
 
+// E-mail que vai pra PESSOA do documento (ex.: funcionário, filho), em nome de quem cadastrou
+function montarEmailPessoa(itens: Lembrete[], remetenteNome: string) {
+  const ordenados = [...itens].sort((a, b) => a.dias - b.dias)
+  const unico = ordenados.length === 1
+  const primeiro = ordenados[0]
+  const assunto = unico
+    ? `Seu documento ${primeiro.nome} ${textoDias(primeiro.dias)}`
+    : `${ordenados.length} documentos seus precisam de atenção`
+  const saudacao = primeiro.pessoa ? `Olá, ${primeiro.pessoa}!` : 'Olá!'
+  const intro = `${remetenteNome} cadastrou ${unico ? 'este documento seu' : 'estes documentos seus'} no DocTrack e pediu pra te avisar do vencimento.`
+  const cartoes = ordenados
+    .map((l) => `
+      <div style="border:1px solid #e6e8f2;border-left:4px solid ${cor(l.dias)};border-radius:12px;padding:14px 16px;margin:0 0 12px;">
+        <p style="margin:0;font-size:15px;font-weight:bold;color:#14162b;">${esc(l.nome)}</p>
+        ${l.tipo ? `<p style="margin:4px 0 0;font-size:13px;color:#7b7e96;">${esc(l.tipo)}</p>` : ''}
+        <p style="margin:8px 0 0;font-size:14px;font-weight:bold;color:${cor(l.dias)};">${maiuscula(textoDias(l.dias))} · ${l.vencimento_br}</p>
+      </div>`)
+    .join('')
+  const html = `
+  <div style="background:#f4f5fb;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;">
+    <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px;">
+      <p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;font-weight:bold;color:#3D4FE0;">DOCTRACK</p>
+      <h1 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:#14162b;">${esc(saudacao)}</h1>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:#4a4d68;">${esc(intro)}</p>
+      ${cartoes}
+      <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#7b7e96;">Dúvidas ou não quer mais receber? É só responder este e-mail que a mensagem vai para ${esc(remetenteNome)}.</p>
+    </div>
+  </div>`
+  const texto = [
+    saudacao,
+    '',
+    intro,
+    '',
+    ...ordenados.map((l) => `- ${l.nome}: ${textoDias(l.dias)}, em ${l.vencimento_br}`),
+    '',
+    `Dúvidas ou não quer mais receber? Responda este e-mail que a mensagem vai para ${remetenteNome}.`,
+  ].join('\n')
+  return { assunto, html, texto }
+}
+
 function criarTransporte(senha: string) {
   return nodemailer.createTransport({
     host: 'smtp.gmail.com',
@@ -382,8 +432,8 @@ Deno.serve(async (req) => {
       return x.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
     }
     const exemplo: Lembrete[] = [
-      { id: '1', user_id: '0', email: REMETENTE, nome: 'ASO — Exemplo', tipo: 'ASO', cliente: 'Empresa Exemplo', pessoa: 'João', vencimento: '', vencimento_br: em(7), dias: 7, faixa: 7, cliente_email: null, cliente_nome: null, avisar_cliente: false, nome_empresa: null },
-      { id: '2', user_id: '0', email: REMETENTE, nome: 'Alvará de funcionamento', tipo: 'Alvará', cliente: null, pessoa: null, vencimento: '', vencimento_br: em(30), dias: 30, faixa: 30, cliente_email: null, cliente_nome: null, avisar_cliente: false, nome_empresa: null },
+      { id: '1', user_id: '0', email: REMETENTE, nome: 'ASO — Exemplo', tipo: 'ASO', cliente: 'Empresa Exemplo', pessoa: 'João', vencimento: '', vencimento_br: em(7), dias: 7, faixa: 7, cliente_email: null, cliente_nome: null, avisar_cliente: false, nome_empresa: null, pessoa_email: null, avisar_pessoa: false, dono_nome: null },
+      { id: '2', user_id: '0', email: REMETENTE, nome: 'Alvará de funcionamento', tipo: 'Alvará', cliente: null, pessoa: null, vencimento: '', vencimento_br: em(30), dias: 30, faixa: 30, cliente_email: null, cliente_nome: null, avisar_cliente: false, nome_empresa: null, pessoa_email: null, avisar_pessoa: false, dono_nome: null },
     ]
     const { assunto, html, texto } = montarEmail(exemplo)
     try {
@@ -426,6 +476,7 @@ Deno.serve(async (req) => {
   let emails = 0
   let falhas = 0
   let clientes = 0
+  let pessoas = 0
   for (const itens of porUsuario.values()) {
     // 1) aviso pro cliente (Profissional): agrupado por e-mail do cliente; falha aqui não trava o resto
     const porCliente = new Map<string, Lembrete[]>()
@@ -455,6 +506,37 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 1b) aviso pra pessoa do documento (Família/Profissional): agrupado por e-mail da pessoa.
+    //     Quem já recebeu o mesmo documento como cliente (mesmo e-mail) não recebe de novo.
+    const porPessoa = new Map<string, Lembrete[]>()
+    for (const l of itens) {
+      if (!l.avisar_pessoa || !l.pessoa_email) continue
+      const emailPessoa = l.pessoa_email.trim().toLowerCase()
+      if (l.avisar_cliente && (l.cliente_email || '').trim().toLowerCase() === emailPessoa && avisadosCliente.has(l.id)) continue
+      if (emailPessoa === (itens[0].email || '').toLowerCase()) continue // é o próprio dono: já recebe o dele
+      const lista = porPessoa.get(emailPessoa) ?? []
+      lista.push(l)
+      porPessoa.set(emailPessoa, lista)
+    }
+    const remetentePessoa = (itens[0].nome_empresa || '').trim() || (itens[0].dono_nome || '').trim() || itens[0].email
+    for (const [emailPessoa, docsPessoa] of porPessoa) {
+      const m = montarEmailPessoa(docsPessoa, remetentePessoa)
+      try {
+        await transporte.sendMail({
+          from: `"${remetentePessoa.replace(/["\r\n]/g, '')} via DocTrack" <${REMETENTE}>`,
+          to: emailPessoa,
+          replyTo: itens[0].email,
+          subject: m.assunto,
+          html: m.html,
+          text: m.texto,
+        })
+        pessoas += 1
+        docsPessoa.forEach((l) => avisadosCliente.add(l.id))
+      } catch (e) {
+        console.error('falha ao avisar pessoa', e instanceof Error ? e.message : e)
+      }
+    }
+
     // 2) aviso pro dono da conta (se ele não desligou os e-mails)
     const doDono = itens.filter((l) => (l as Lembrete & { avisar_dono: boolean }).avisar_dono)
     if (doDono.length === 0) continue
@@ -478,6 +560,6 @@ Deno.serve(async (req) => {
     }
   }
 
-  console.log('lembretes', { emails, falhas, clientes, lembretes: reservados.length, mensalidades })
-  return resposta({ modo, emails, falhas, clientes, lembretes: reservados.length, mensalidades })
+  console.log('lembretes', { emails, falhas, clientes, pessoas, lembretes: reservados.length, mensalidades })
+  return resposta({ modo, emails, falhas, clientes, pessoas, lembretes: reservados.length, mensalidades })
 })

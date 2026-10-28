@@ -385,6 +385,7 @@
       plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
       moreHorizontal: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
       edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+      mail: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
       trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
       checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
       clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
@@ -500,7 +501,7 @@
 
     async function carregar() {
       const [pessoasRes, docsRes] = await Promise.all([
-        sb.from('pessoas').select('id, nome').order('nome'),
+        sb.from('pessoas').select('id, nome, email, avisar_email').order('nome'),
         sb.from('documentos').select('id, nome, data_vencimento, pessoa_id'),
       ]);
       pessoasCarregadas = pessoasRes.data || [];
@@ -512,7 +513,9 @@
       const linhas = pessoasCarregadas.map(function (p) {
         const r = resumir(docs.filter(function (d) { return d.pessoa_id === p.id; }));
         const qtd = docs.filter(function (d) { return d.pessoa_id === p.id; }).length;
-        return Object.assign({ id: p.id, nome: p.nome, eu: false, qtd: qtd }, r);
+        const emailAviso = p.avisar_email && p.email ? p.email : '';
+        if (emailAviso) r.detalhe += ' · aviso por e-mail';
+        return Object.assign({ id: p.id, nome: p.nome, eu: false, qtd: qtd, email: emailAviso }, r);
       });
       // quem tem problema aparece primeiro; empate, ordem alfabética
       linhas.sort(function (a, b) { return a.peso - b.peso || a.nome.localeCompare(b.nome, 'pt-BR'); });
@@ -554,6 +557,7 @@
           <div class="pessoa-menu" id="menu-${l.id}" hidden>
             <a href="novo-documento.html${l.eu ? '' : '?pessoa=' + encodeURIComponent(l.id)}">${icone('plus', 14)} Novo documento</a>
             ${l.eu ? '' : `
+            <button type="button" data-acao="email" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}" data-email="${escapeHtml(l.email || '')}">${icone('mail', 14)} ${l.email ? 'E-mail de aviso' : 'Avisar por e-mail'}</button>
             <button type="button" data-acao="renomear" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}">${icone('edit', 14)} Renomear</button>
             <button type="button" class="perigo" data-acao="excluir" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}" data-qtd="${l.qtd}">${icone('trash', 14)} Excluir</button>`}
           </div>
@@ -617,7 +621,21 @@
       fecharMenus();
       const id = btn.dataset.id;
       const nomeAtual = btn.dataset.nome;
-      if (btn.dataset.acao === 'renomear') {
+      if (btn.dataset.acao === 'email') {
+        const limite = LIMITE_PESSOAS[planoAtual] === undefined ? 0 : LIMITE_PESSOAS[planoAtual];
+        if (limite === 0) {
+          if (confirm('O aviso por e-mail pra outras pessoas é dos planos Família e Profissional.\n\nQuer ver os planos?')) window.location.href = 'planos.html';
+          return;
+        }
+        const atual = btn.dataset.email || '';
+        const novo = prompt('E-mail de ' + nomeAtual + ' pra receber o aviso de vencimento dos documentos dele(a).\nDeixe vazio pra parar de avisar.', atual);
+        if (novo === null) return;
+        const email = novo.trim().toLowerCase();
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('Esse e-mail não parece válido. Confira e tente de novo.'); return; }
+        const { error } = await sb.from('pessoas').update({ email: email || null, avisar_email: !!email }).eq('id', id);
+        if (error) { alert('Não foi possível salvar agora. Tente de novo.'); return; }
+        if (email) alert(nomeAtual + ' vai receber o aviso no e-mail ' + email + ', nos mesmos dias que você.');
+      } else if (btn.dataset.acao === 'renomear') {
         const novo = prompt('Novo nome para ' + nomeAtual + ':', nomeAtual);
         if (!novo || !novo.trim() || novo.trim() === nomeAtual) return;
         const { error } = await sb.from('pessoas').update({ nome: novo.trim().slice(0, 80) }).eq('id', id);
