@@ -326,3 +326,8 @@ alter table public.pessoas add column if not exists email text;
 alter table public.pessoas add column if not exists avisar_email boolean not null default false;
 alter table public.pessoas drop constraint if exists pessoas_email_check;
 alter table public.pessoas add constraint pessoas_email_check check (email is null or char_length(email) <= 200);
+
+-- ---------- pessoas: cargo / setor / parentesco ----------
+alter table public.pessoas add column if not exists cargo text;
+alter table public.pessoas drop constraint if exists pessoas_cargo_check;
+alter table public.pessoas add constraint pessoas_cargo_check check (cargo is null or char_length(cargo) <= 60);

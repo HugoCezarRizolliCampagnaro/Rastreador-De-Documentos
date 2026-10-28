@@ -200,7 +200,9 @@
   .pessoa-avatar.eu { background: var(--marca); color: #FFFFFF; }
 
   .pessoa-info { flex: 1; min-width: 0; }
-  .pessoa-nome { font-size: 14.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pessoa-nome { font-size: 14.5px; font-weight: 600; display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .pessoa-nome > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pessoa-email-icone { color: var(--marca); flex-shrink: 0; display: flex; }
   .pessoa-detalhe { font-size: 12px; color: var(--texto-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   .status-badge {
@@ -359,7 +361,7 @@
         <div class="resumo-pessoas" id="resumo-pessoas"></div>
         <div class="busca-pessoas" id="busca-pessoas-wrap" hidden>
           <span id="icone-busca-pessoas"></span>
-          <input type="search" id="busca-pessoas" placeholder="Buscar pessoa..." aria-label="Buscar pessoa" autocomplete="off">
+          <input type="search" id="busca-pessoas" placeholder="Buscar por nome ou cargo..." aria-label="Buscar pessoa" autocomplete="off">
         </div>
         <div class="lista-pessoas" id="lista-pessoas"><p class="carregando">Carregando...</p></div>
         <p class="limite-texto" id="limite-texto" hidden></p>
@@ -402,6 +404,7 @@
       plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
       moreHorizontal: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
       edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+      briefcase: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
       mail: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
       trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
       checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
@@ -476,6 +479,7 @@
     let planoAtual = 'gratis';
     let pessoasCarregadas = [];
     let avisoEmailDisponivel = true;
+    let cargoDisponivel = true;
 
     async function planoEmVigor() {
       const { data } = await sb.from('perfis').select('plano, plano_valido_ate').maybeSingle();
@@ -522,10 +526,13 @@
 
     async function carregar() {
       let [pessoasRes, docsRes] = await Promise.all([
-        sb.from('pessoas').select('id, nome, email, avisar_email').order('nome'),
+        sb.from('pessoas').select('id, nome, email, avisar_email, cargo').order('nome'),
         sb.from('documentos').select('id, nome, data_vencimento, pessoa_id'),
       ]);
       // se o banco ainda não tem os campos de e-mail, carrega sem eles e esconde a opção
+      // se o banco ainda não tem algum campo novo, tenta sem ele e esconde a opção correspondente
+      cargoDisponivel = !pessoasRes.error;
+      if (pessoasRes.error) pessoasRes = await sb.from('pessoas').select('id, nome, email, avisar_email').order('nome');
       avisoEmailDisponivel = !pessoasRes.error;
       if (pessoasRes.error) pessoasRes = await sb.from('pessoas').select('id, nome').order('nome');
       pessoasCarregadas = pessoasRes.data || [];
@@ -538,8 +545,9 @@
         const r = resumir(docs.filter(function (d) { return d.pessoa_id === p.id; }));
         const qtd = docs.filter(function (d) { return d.pessoa_id === p.id; }).length;
         const emailAviso = p.avisar_email && p.email ? p.email : '';
-        if (emailAviso) r.detalhe += ' · aviso por e-mail';
-        return Object.assign({ id: p.id, nome: p.nome, eu: false, qtd: qtd, email: emailAviso }, r);
+        const cargo = String(p.cargo || '').trim();
+        if (cargo) r.detalhe = cargo + ' · ' + r.detalhe;
+        return Object.assign({ id: p.id, nome: p.nome, eu: false, qtd: qtd, email: emailAviso, cargo: cargo }, r);
       });
       // quem tem problema aparece primeiro; empate, ordem alfabética
       linhas.sort(function (a, b) { return a.peso - b.peso || a.nome.localeCompare(b.nome, 'pt-BR'); });
@@ -573,7 +581,7 @@
 
     function filtrarEDesenhar() {
       const termo = semAcento(document.getElementById('busca-pessoas').value.trim());
-      const lista = termo ? todasPessoas.filter(function (l) { return semAcento(l.nome).includes(termo); }) : todasPessoas;
+      const lista = termo ? todasPessoas.filter(function (l) { return semAcento(l.nome + ' ' + (l.cargo || '')).includes(termo); }) : todasPessoas;
       if (lista.length === 0) {
         document.getElementById('lista-pessoas').innerHTML = '<p class="sem-resultado">Nenhuma pessoa encontrada.</p>';
         return;
@@ -591,8 +599,8 @@
           <a class="pessoa-card" href="index.html?pessoa=${encodeURIComponent(l.id)}">
             <span class="pessoa-avatar${l.eu ? ' eu' : ''}">${inicial}</span>
             <div class="pessoa-info">
-              <div class="pessoa-nome">${escapeHtml(l.nome)}</div>
-              <div class="pessoa-detalhe">${l.detalhe}</div>
+              <div class="pessoa-nome"><span>${escapeHtml(l.nome)}</span>${l.email ? `<span class="pessoa-email-icone" title="Recebe aviso por e-mail" aria-label="Recebe aviso por e-mail">${icone('mail', 13)}</span>` : ''}</div>
+              <div class="pessoa-detalhe">${escapeHtml(l.detalhe)}</div>
               ${l.proximoTxt ? `<div class="pessoa-detalhe pessoa-urgente ${l.classe}">${l.icon ? icone(l.icon, 12) : ''}<span>${escapeHtml(l.proximoTxt)}</span></div>` : ''}
             </div>
             <span class="status-badge ${l.classe}">${l.icon ? icone(l.icon, 12) : ''} ${l.selo}</span>
@@ -604,6 +612,7 @@
             <a href="relatorio.html?pessoa=${encodeURIComponent(l.id)}">${icone('fileText', 14)} Relatório</a>
             ${l.eu ? '' : `
             <button type="button" ${avisoEmailDisponivel ? '' : 'hidden '}data-acao="email" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}" data-email="${escapeHtml(l.email || '')}">${icone('mail', 14)} ${l.email ? 'E-mail de aviso' : 'Avisar por e-mail'}</button>
+            <button type="button" ${cargoDisponivel ? '' : 'hidden '}data-acao="cargo" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}" data-cargo="${escapeHtml(l.cargo || '')}">${icone('briefcase', 14)} ${l.cargo ? 'Cargo / setor' : 'Definir cargo / setor'}</button>
             <button type="button" data-acao="renomear" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}">${icone('edit', 14)} Renomear</button>
             <button type="button" class="perigo" data-acao="excluir" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}" data-qtd="${l.qtd}">${icone('trash', 14)} Excluir</button>`}
           </div>
@@ -667,7 +676,13 @@
       fecharMenus();
       const id = btn.dataset.id;
       const nomeAtual = btn.dataset.nome;
-      if (btn.dataset.acao === 'email') {
+      if (btn.dataset.acao === 'cargo') {
+        const novo = prompt('Cargo, setor ou parentesco de ' + nomeAtual + ' (ex.: Recepção, Enfermagem, Filho).\nDeixe vazio pra tirar.', btn.dataset.cargo || '');
+        if (novo === null) return;
+        const cargo = novo.trim().replace(/\s+/g, ' ').slice(0, 60);
+        const { error } = await sb.from('pessoas').update({ cargo: cargo || null }).eq('id', id);
+        if (error) { alert('Não foi possível salvar agora. Tente de novo.'); return; }
+      } else if (btn.dataset.acao === 'email') {
         const limite = LIMITE_PESSOAS[planoAtual] === undefined ? 0 : LIMITE_PESSOAS[planoAtual];
         if (limite === 0) {
           if (confirm('O aviso por e-mail pra outras pessoas é dos planos Família e Profissional.\n\nQuer ver os planos?')) window.location.href = 'planos.html';
