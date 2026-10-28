@@ -487,14 +487,17 @@
       }
       document.getElementById('vazio').hidden = true;
 
-      let verdes = 0, amarelos = 0, vermelhos = 0;
+      let verdes = 0, amarelos = 0, vermelhos = 0, vencidos = 0;
       documentos.forEach(function (doc) {
-        const status = statusPorDias(diasRestantes(doc.data_vencimento));
+        const dias = diasRestantes(doc.data_vencimento);
+        const status = statusPorDias(dias);
         if (status === 'verde') verdes++;
         else if (status === 'amarelo') amarelos++;
         else vermelhos++;
+        if (dias < 0) vencidos++;
       });
-      const score = Math.round((verdes + amarelos) / documentos.length * 100);
+      // mesma regra do Início: conformidade = documentos que ainda não venceram ÷ total
+      const score = Math.round((documentos.length - vencidos) / documentos.length * 100);
 
       document.getElementById('stats-relatorio').innerHTML = `
         <div class="stat-card">

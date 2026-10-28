@@ -1164,18 +1164,29 @@
       requestAnimationFrame(passo);
     }
 
+    // documentos da pessoa/cliente escolhidos nos filtros (os números do topo acompanham esse filtro)
+    function documentosDoFiltroDeQuem() {
+      let docs = documentosCarregados;
+      if (filtroPessoa === '__eu__') docs = docs.filter(function (doc) { return !doc.pessoa_id; });
+      else if (filtroPessoa) docs = docs.filter(function (doc) { return doc.pessoa_id === filtroPessoa; });
+      if (filtroCliente) docs = docs.filter(function (doc) { return doc.cliente_id === filtroCliente; });
+      return docs;
+    }
+
     function renderStats() {
       const notifPonto = document.getElementById('notif-ponto');
+      // o pontinho do sino vale pra todos os documentos, com ou sem filtro
+      notifPonto.hidden = !documentosCarregados.some(function (doc) { return statusPorDias(diasRestantes(doc.data_vencimento)) === 'vermelho'; });
 
-      if (documentosCarregados.length === 0) {
+      const docsStats = documentosDoFiltroDeQuem();
+      if (docsStats.length === 0) {
         statsEl.innerHTML = '';
-        notifPonto.hidden = true;
         return;
       }
 
       let verdes = 0, amarelos = 0, vermelhos = 0, vencidos = 0;
 
-      documentosCarregados.forEach(function (doc) {
+      docsStats.forEach(function (doc) {
         const dias = diasRestantes(doc.data_vencimento);
         const status = statusPorDias(dias);
         if (status === 'verde') verdes++;
@@ -1184,9 +1195,8 @@
         if (dias < 0) vencidos++;
       });
 
-      notifPonto.hidden = vermelhos === 0;
-
-      const total = documentosCarregados.length;
+      // conformidade = documentos que ainda não venceram (dentro da validade) ÷ total
+      const total = docsStats.length;
       const score = Math.round(((total - vencidos) / total) * 100);
       const raio = 34;
       const circunferencia = 2 * Math.PI * raio;
@@ -1217,7 +1227,7 @@
           <div>
             <div class="score-label">Score de conformidade</div>
             <div class="score-numero-grande" id="score-numero">0%</div>
-            <div class="score-sub">dos seus documentos em dia</div>
+            <div class="score-sub">dos documentos dentro da validade</div>
           </div>
         </div>
       `;
@@ -1283,11 +1293,13 @@
     document.getElementById('filtro-pessoa').addEventListener('change', function () {
       filtroPessoa = this.value;
       this.classList.toggle('ativo', !!filtroPessoa);
+      renderStats();
       renderLista();
     });
     document.getElementById('filtro-cliente').addEventListener('change', function () {
       filtroCliente = this.value;
       this.classList.toggle('ativo', !!filtroCliente);
+      renderStats();
       renderLista();
     });
 
