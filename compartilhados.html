@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<!-- Compartilhados comigo — documentos que outra conta compartilhou com você (convite) -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="description" content="DocTrack — organize seus documentos, controle vencimentos e receba lembretes.">
+<meta property="og:title" content="DocTrack">
+<meta property="og:description" content="Organize seus documentos, controle vencimentos e nunca mais perca um prazo.">
+<meta property="og:image" content="https://rastreador-de-documentos.vercel.app/icons/icon-512.png">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<meta name="theme-color" content="#0B0E14">
+<title>Compartilhados — DocTrack</title>
+<script>
+  if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+  if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --marca: #3D4FE0; --marca-hover: #2E3FC0;
+    --bg: #F7F8FA; --superficie: #FFFFFF;
+    --texto: #14161A; --texto-muted: #6B7280; --borda: #E3E5E9;
+    --status-verde: #1F9D55; --status-amarelo: #F5A623; --status-vermelho: #E5484D;
+  }
+
+  html.escuro {
+    --bg: #0B0E14; --superficie: #141821;
+    --texto: #F1F2F4; --texto-muted: #8A93A3; --borda: #232833;
+    --marca: #5B6EF5; --marca-hover: #4457E0;
+    --status-verde: #22C55E; --status-amarelo: #F5A623; --status-vermelho: #F2555C;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    overflow-x: hidden;
+    max-width: 100vw;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg); color: var(--texto);
+    -webkit-font-smoothing: antialiased;
+    animation: entrada 0.3s ease;
+  }
+
+  @keyframes entrada { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  svg.icone { display: block; flex-shrink: 0; }
+
+  .glow-fundo {
+    position: fixed; top: -180px; left: 15%;
+    width: 560px; height: 560px;
+    background: radial-gradient(circle, rgba(91, 110, 245, 0.35), transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  html:not(.escuro) .glow-fundo { display: none; }
+
+  .app-shell { display: flex; min-height: 100vh; position: relative; z-index: 1; }
+
+  .sidebar {
+    position: fixed; top: 0; left: 0; height: 100vh; width: 250px;
+    display: flex; flex-direction: column;
+    padding: 22px 14px;
+    background: var(--superficie);
+    border-right: 1px solid var(--borda);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 40;
+  }
+
+  .sidebar.aberta { transform: translateX(0); }
+  .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 35; display: none; }
+  .sidebar-backdrop.ativo { display: block; }
+
+  @media (min-width: 960px) {
+    .sidebar { position: sticky; transform: none; }
+    .sidebar-backdrop { display: none !important; }
+    .botao-menu { display: none; }
+    .conteudo-principal { flex: 1; min-width: 0; }
+    .cabecalho, .conteudo { max-width: 860px; padding-left: 32px; padding-right: 32px; }
+  }
+
+  .sidebar-marca { display: flex; align-items: center; gap: 10px; padding: 6px 10px 22px; }
+  .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sidebar-titulo { font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+  .sidebar-subtitulo { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  .sidebar-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; color: var(--texto-muted); text-decoration: none; font-size: 14px; font-weight: 500; }
+  .sidebar-item:hover { background: var(--bg); }
+  .sidebar-perfil { display: flex; align-items: center; gap: 10px; padding: 12px 10px 4px; border-top: 1px solid var(--borda); margin-top: 10px; text-decoration: none; color: var(--texto); }
+  .sidebar-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+  .sidebar-perfil-nome { font-size: 12.5px; font-weight: 600; word-break: break-all; }
+  .sidebar-perfil-sub { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-perfil-seta { margin-left: auto; color: var(--texto-muted); flex-shrink: 0; }
+
+
+  .sidebar-item.ativo { background: rgba(91, 110, 245, 0.14); color: var(--marca); font-weight: 600; }
+
+  .cabecalho { max-width: 760px; margin: 0 auto; padding: 24px 20px 4px; }
+  .topo-pagina { display: flex; flex-wrap: wrap; row-gap: 12px; align-items: flex-start; justify-content: space-between; gap: 14px; }
+  .topo-esquerda { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+  .botao-menu { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--borda); background: var(--superficie); color: var(--texto); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+  .pagina-icone { width: 46px; height: 46px; border-radius: 12px; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .cabecalho h1 { font-size: 24px; font-weight: 700; margin: 0 0 4px; }
+  .pagina-sub { font-size: 13px; color: var(--texto-muted); margin: 0; }
+
+  .btn-adicionar {
+    display: flex; align-items: center; gap: 7px;
+    padding: 10px 16px;
+    font-family: inherit; font-size: 13.5px; font-weight: 600;
+    color: #FFFFFF; background: var(--marca);
+    border: none; border-radius: 9px;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .btn-adicionar:hover { background: var(--marca-hover); }
+  .btn-adicionar[hidden] { display: none; }
+
+  .conteudo { max-width: 760px; margin: 0 auto; padding: 20px 20px 60px; }
+
+  @media (min-width: 960px) {
+    .cabecalho, .conteudo { max-width: 760px; padding-left: 32px; padding-right: 32px; }
+  }
+
+
+  .carregando { text-align: center; color: var(--texto-muted); font-size: 14px; padding: 40px 20px; }
+
+  /* ---------- compartilhados ---------- */
+  .grupo { margin-bottom: 26px; animation: subir 0.3s ease both; }
+  @keyframes subir { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .grupo-topo { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .grupo-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; flex-shrink: 0; background: rgba(91, 110, 245, 0.16); color: var(--marca); }
+  .grupo-info { flex: 1; min-width: 0; }
+  .grupo-nome { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .grupo-sub { font-size: 12.5px; color: var(--texto-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .grupo-perm { display: inline-block; margin-top: 5px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(91, 110, 245, 0.14); color: var(--marca); }
+  .grupo-menu-wrap { position: relative; flex-shrink: 0; }
+  .icone-btn { width: 36px; height: 36px; border: 1px solid var(--borda); border-radius: 10px; background: var(--superficie); color: var(--texto-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .grupo-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; min-width: 200px; overflow: hidden; background: var(--superficie); border: 1px solid var(--borda); border-radius: 10px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); }
+  .grupo-menu[hidden] { display: none; }
+  .grupo-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 11px 14px; background: none; border: none; text-align: left; font-family: inherit; font-size: 13px; color: var(--texto); cursor: pointer; }
+  .grupo-menu button:hover { background: var(--bg); }
+  .grupo-menu .perigo { color: var(--status-vermelho); }
+
+  .btn-novo-doc { display: flex; align-items: center; gap: 6px; padding: 8px 12px; font-family: inherit; font-size: 13px; font-weight: 600; color: #FFFFFF; background: var(--marca); border: none; border-radius: 9px; cursor: pointer; flex-shrink: 0; }
+  .btn-novo-doc:hover { background: var(--marca-hover); }
+
+  .lista-docs { display: flex; flex-direction: column; gap: 10px; }
+  .doc-card { background: var(--superficie); border: 1px solid var(--borda); border-radius: 12px; padding: 12px 14px; }
+  .doc-linha { display: flex; align-items: center; gap: 12px; }
+  .doc-icone { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: rgba(91, 110, 245, 0.14); color: var(--marca); }
+  .doc-info { flex: 1; min-width: 0; }
+  .doc-nome { font-size: 14.5px; font-weight: 600; display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .doc-nome > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .doc-nome .icone { color: var(--texto-muted); }
+  .doc-meta { font-size: 12px; color: var(--texto-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .doc-prazo { font-size: 12.5px; margin-top: 3px; display: flex; align-items: center; gap: 5px; color: var(--texto-muted); }
+  .doc-prazo b { font-weight: 600; }
+  .doc-prazo b.vermelho { color: var(--status-vermelho); }
+  .doc-prazo b.amarelo { color: var(--status-amarelo); }
+  .doc-prazo b.verde { color: var(--status-verde); }
+  .doc-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--borda); }
+  .doc-acoes:empty { display: none; }
+  .btn-mini { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--texto); background: var(--bg); border: 1px solid var(--borda); border-radius: 9px; cursor: pointer; }
+  .btn-mini:hover { border-color: var(--marca); color: var(--marca); }
+  .btn-mini.principal { background: var(--marca); border-color: var(--marca); color: #FFFFFF; }
+  .btn-mini.principal:hover { background: var(--marca-hover); color: #FFFFFF; }
+  .sem-docs { font-size: 13.5px; color: var(--texto-muted); padding: 16px; text-align: center; background: var(--superficie); border: 1px dashed var(--borda); border-radius: 12px; }
+
+  .vazio { text-align: center; padding: 48px 20px; }
+  .vazio-icone { width: 56px; height: 56px; border-radius: 16px; background: rgba(91, 110, 245, 0.14); color: var(--marca); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+  .vazio h2 { font-size: 17px; margin: 0 0 6px; }
+  .vazio p { font-size: 13.5px; color: var(--texto-muted); margin: 0 auto; max-width: 340px; line-height: 1.55; }
+
+  /* folha (formulário por cima da tela) */
+  .folha-fundo { position: fixed; inset: 0; z-index: 950; background: rgba(5, 8, 15, 0.62); display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .folha-fundo[hidden] { display: none; }
+  .folha { width: 100%; max-width: 440px; max-height: calc(100dvh - 40px); overflow-y: auto; background: var(--superficie); border: 1px solid var(--borda); border-radius: 16px; padding: 22px 20px 18px; box-shadow: 0 20px 50px rgba(0,0,0,.45); }
+  .folha h2 { font-size: 17px; margin: 0 0 4px; }
+  .folha-sub { font-size: 13px; color: var(--texto-muted); margin: 0 0 16px; line-height: 1.5; }
+  .campo { margin-bottom: 14px; }
+  .campo label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .campo-dica { font-size: 11.5px; color: var(--texto-muted); margin-top: 5px; line-height: 1.45; }
+  .campo input, .campo select, .campo textarea { width: 100%; padding: 11px 13px; font: inherit; font-size: 15px; color: var(--texto); background: var(--bg); border: 1.5px solid var(--borda); border-radius: 10px; outline: none; }
+  .campo textarea { min-height: 70px; resize: vertical; }
+  .campo input:focus, .campo select:focus, .campo textarea:focus { border-color: var(--marca); }
+  .campo input[type="file"] { font-size: 13px; padding: 9px; }
+  .duas-colunas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  .duas-colunas > .campo, .campo input, .campo select { min-width: 0; max-width: 100%; }
+  .campo input[type="date"] { -webkit-appearance: none; appearance: none; min-height: 46px; }
+  .folha-botoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  .folha-botoes button { font: inherit; font-size: 14px; font-weight: 600; padding: 10px 18px; border-radius: 10px; cursor: pointer; border: 1px solid var(--borda); background: transparent; color: var(--texto); }
+  .folha-botoes .ok { background: var(--marca); border-color: var(--marca); color: #FFFFFF; }
+  .folha-botoes .ok:disabled { opacity: 0.7; cursor: default; }
+  .folha-erro { font-size: 13px; color: var(--status-vermelho); margin: 4px 0 0; }
+  .folha-erro[hidden] { display: none; }
+  @media (max-width: 480px) {
+    .folha-botoes { flex-direction: column-reverse; }
+    .folha-botoes button { width: 100%; padding: 12px; }
+    .btn-novo-doc { width: 36px; height: 36px; padding: 0; justify-content: center; }
+    .btn-novo-doc .txt-novo { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  }
+
+  .aviso-rapido { position: fixed; left: 50%; bottom: 24px; z-index: 960; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; width: calc(100% - 32px); max-width: 420px; padding: 14px 16px; border-radius: 12px; background: #1E2330; color: #F1F2F4; border: 1px solid #2E3546; box-shadow: 0 12px 32px rgba(0,0,0,.45); font-size: 14px; transition: transform .2s ease, opacity .2s ease; }
+  .aviso-rapido.visivel { transform: translate(-50%, 0); opacity: 1; }
+  @media (max-width: 959px) { .aviso-rapido { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); } }
+
+  /* ---------- correção mobile: nada pode ser mais largo que a tela ---------- */
+  .app-shell { overflow-x: clip; max-width: 100%; }
+  .conteudo-principal { min-width: 0; max-width: 100%; }
+  .glow-fundo { max-width: 85vw; }
+  a.sidebar-marca { text-decoration: none; color: inherit; border-radius: 10px; }
+  a.sidebar-marca:hover .sidebar-titulo { color: var(--marca); }
+</style>
+</head>
+<body>
+
+  <div class="glow-fundo"></div>
+  <div class="app-shell">
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+    <aside class="sidebar" id="sidebar">
+      <a href="index.html" class="sidebar-marca" aria-label="DocTrack — voltar pro Início">
+        <img class="sidebar-logo" src="icons/icon-192.png" alt="DocTrack" style="object-fit: cover;">
+        <div>
+          <div class="sidebar-titulo">DocTrack</div>
+          <div class="sidebar-subtitulo">Rastreador de Documentos</div>
+        </div>
+      </a>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+      <a href="perfil.html" class="sidebar-perfil">
+        <span class="sidebar-avatar" id="sidebar-avatar">?</span>
+        <div>
+          <div class="sidebar-perfil-nome" id="sidebar-email">Carregando...</div>
+          <div class="sidebar-perfil-sub">Minha conta</div>
+        </div>
+        <span class="sidebar-perfil-seta" id="sidebar-perfil-seta"></span>
+      </a>
+    </aside>
+
+    <div class="conteudo-principal">
+      <div class="cabecalho">
+        <div class="topo-pagina">
+          <div class="topo-esquerda">
+            <button type="button" class="botao-menu" id="botao-menu" aria-label="Abrir menu"></button>
+            <div class="pagina-icone" id="pagina-icone"></div>
+            <div>
+              <h1>Compartilhados comigo</h1>
+              <p class="pagina-sub" id="subtitulo">Documentos que compartilharam com você.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="conteudo">
+        <div id="lista-grupos"><p class="carregando">Carregando...</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- atualizar (renovou) -->
+  <div class="folha-fundo" id="folha-atualizar" hidden>
+    <form class="folha" id="form-atualizar" novalidate>
+      <h2 id="atualizar-titulo">Atualizar documento</h2>
+      <p class="folha-sub">Renovou? Coloque a nova data de vencimento e, se tiver, anexe o documento novo.</p>
+      <div class="campo">
+        <label for="atualizar-data">Nova data de vencimento</label>
+        <input type="date" id="atualizar-data" required>
+        <p class="campo-dica" id="atualizar-dica"></p>
+      </div>
+      <div class="campo">
+        <label for="atualizar-arquivo">Documento novo (opcional)</label>
+        <input type="file" id="atualizar-arquivo" accept="application/pdf,image/*">
+        <p class="campo-dica">Foto ou PDF. Substitui o arquivo anterior.</p>
+      </div>
+      <p class="folha-erro" id="atualizar-erro" hidden></p>
+      <div class="folha-botoes">
+        <button type="button" data-fechar>Cancelar</button>
+        <button type="submit" class="ok" id="atualizar-ok">Salvar</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- cadastrar / editar (gerente) -->
+  <div class="folha-fundo" id="folha-doc" hidden>
+    <form class="folha" id="form-doc" novalidate>
+      <h2 id="doc-titulo">Novo documento</h2>
+      <p class="folha-sub" id="doc-sub"></p>
+      <div class="campo">
+        <label for="doc-nome">Nome do documento</label>
+        <input type="text" id="doc-nome" maxlength="120" placeholder="Ex.: CNH, ASO, Exame anual" autocomplete="off">
+      </div>
+      <div class="duas-colunas">
+        <div class="campo">
+          <label for="doc-tipo">Tipo</label>
+          <select id="doc-tipo">
+            <option value="">Selecione</option>
+            <option value="aso">ASO</option>
+            <option value="nr">NR</option>
+            <option value="alvara">Alvará</option>
+            <option value="contrato">Contrato</option>
+            <option value="certificacao">Certificação</option>
+            <option value="conta">Conta / boleto</option>
+            <option value="imposto">Imposto / taxa</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label for="doc-repeticao">Repete</label>
+          <select id="doc-repeticao">
+            <option value="">Não repete</option>
+            <option value="mensal">Todo mês</option>
+            <option value="trimestral">A cada 3 meses</option>
+            <option value="semestral">A cada 6 meses</option>
+            <option value="anual">Todo ano</option>
+          </select>
+        </div>
+      </div>
+      <div class="duas-colunas">
+        <div class="campo">
+          <label for="doc-vencimento">Vencimento</label>
+          <input type="date" id="doc-vencimento">
+        </div>
+        <div class="campo">
+          <label for="doc-emissao">Emissão</label>
+          <input type="date" id="doc-emissao">
+        </div>
+      </div>
+      <div class="campo">
+        <label for="doc-numero">Número (opcional)</label>
+        <input type="text" id="doc-numero" maxlength="80" autocomplete="off">
+      </div>
+      <div class="campo">
+        <label for="doc-obs">Observações (opcional)</label>
+        <textarea id="doc-obs" maxlength="2000"></textarea>
+      </div>
+      <div class="campo">
+        <label for="doc-arquivo" id="doc-arquivo-label">Arquivo (opcional)</label>
+        <input type="file" id="doc-arquivo" accept="application/pdf,image/*">
+        <p class="campo-dica" id="doc-arquivo-dica">Foto ou PDF do documento.</p>
+      </div>
+      <p class="folha-erro" id="doc-erro" hidden></p>
+      <div class="folha-botoes">
+        <button type="button" data-fechar>Cancelar</button>
+        <button type="submit" class="ok" id="doc-ok">Salvar</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="aviso-rapido" id="aviso-rapido" role="status"></div>
+
+  <script src="dialogos.js"></script>
+  <script src="recorrencia.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_brDnSPSCu4ry9QTe-pYwag_zRqB6hkL';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const CORPOS_ICONE = {
+      home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+      users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+      dollarSign: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+      calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+      messageCircle: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+      share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>',
+      menu: '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',
+      chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+      plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+      moreHorizontal: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+      edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+      fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+      paperclip: '<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+      eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+      refresh: '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+      logOut: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+      clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    };
+
+    function icone(nome, tamanho, corTraco) {
+      const tam = tamanho || 18;
+      const cor = corTraco || 'currentColor';
+      return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
+    }
+
+    document.getElementById('botao-menu').innerHTML = icone('menu', 18);
+    document.getElementById('pagina-icone').innerHTML = icone('share', 22, '#FFFFFF');
+    document.getElementById('sidebar-perfil-seta').innerHTML = icone('chevronRight', 16);
+
+    document.getElementById('sidebar-nav').innerHTML = [
+      { href: 'index.html', nome: 'home', label: 'Início' },
+      { href: 'compartilhados.html', nome: 'share', label: 'Compartilhados', ativo: true },
+      { href: 'pessoas.html', nome: 'users', label: 'Pessoas' },
+      { href: 'gastos.html', nome: 'dollarSign', label: 'Gastos' },
+      { href: 'calendario.html', nome: 'calendar', label: 'Calendário' },
+      { href: 'assistente.html', nome: 'messageCircle', label: 'Assistente' },
+    ].map(function (item) {
+      return `<a href="${item.href}" class="sidebar-item${item.ativo ? ' ativo' : ''}">${icone(item.nome, 18)}${item.label}</a>`;
+    }).join('');
+
+    const sidebarEl = document.getElementById('sidebar');
+    const backdropEl = document.getElementById('sidebar-backdrop');
+    document.getElementById('botao-menu').addEventListener('click', function () { sidebarEl.classList.add('aberta'); backdropEl.classList.add('ativo'); });
+    backdropEl.addEventListener('click', function () { sidebarEl.classList.remove('aberta'); backdropEl.classList.remove('ativo'); });
+
+    /* ---------- utilidades ---------- */
+
+    function escapeHtml(texto) { const div = document.createElement('div'); div.textContent = texto == null ? '' : String(texto); return div.innerHTML; }
+    function diasRestantes(dataStr) { const hoje = new Date(); hoje.setHours(0, 0, 0, 0); return Math.round((new Date(dataStr + 'T00:00:00') - hoje) / 86400000); }
+    function statusPorDias(d) { return d < 7 ? 'vermelho' : d < 30 ? 'amarelo' : 'verde'; }
+    function textoDias(d) {
+      if (d < 0) return 'venceu há ' + Math.abs(d) + (Math.abs(d) === 1 ? ' dia' : ' dias');
+      if (d === 0) return 'vence hoje';
+      return 'vence em ' + d + (d === 1 ? ' dia' : ' dias');
+    }
+    function dataBR(iso) { return iso ? new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR') : ''; }
+    const TIPOS = { aso: 'ASO', nr: 'NR', alvara: 'Alvará', contrato: 'Contrato', certificacao: 'Certificação', conta: 'Conta / boleto', imposto: 'Imposto / taxa', outro: 'Outro' };
+    const PERMISSAO_TXT = { ver: 'Só ver', atualizar: 'Ver e atualizar', gerenciar: 'Gerente: cadastra e edita' };
+
+    function avisoRapido(texto) {
+      const el = document.getElementById('aviso-rapido');
+      el.textContent = '✓  ' + texto;
+      el.classList.add('visivel');
+      clearTimeout(el._t);
+      el._t = setTimeout(function () { el.classList.remove('visivel'); }, 3500);
+    }
+
+    /* ---------- carregar e desenhar ---------- */
+
+    let usuarioAtual = null;
+    let pessoas = [];
+    let docs = [];
+
+    async function carregar() {
+      const [pRes, dRes] = await Promise.all([
+        sb.rpc('pessoas_compartilhadas'),
+        sb.rpc('documentos_compartilhados'),
+      ]);
+      if (pRes.error || dRes.error) {
+        document.getElementById('lista-grupos').innerHTML = '<p class="sem-docs">Não foi possível carregar agora. Confira sua internet e tente de novo.</p>';
+        return;
+      }
+      pessoas = pRes.data || [];
+      docs = dRes.data || [];
+      desenhar();
+    }
+
+    function desenhar() {
+      const lista = document.getElementById('lista-grupos');
+      if (pessoas.length === 0) {
+        lista.innerHTML = `
+          <div class="vazio">
+            <div class="vazio-icone">${icone('share', 26)}</div>
+            <h2>Nada compartilhado com você</h2>
+            <p>Quando alguém te convidar pelo DocTrack, os seus documentos aparecem aqui. É só abrir o link do convite.</p>
+          </div>`;
+        return;
+      }
+      lista.innerHTML = pessoas.map(function (p, i) {
+        const meus = docs.filter(function (d) { return d.pessoa_id === p.pessoa_id; });
+        const gerente = p.permissao === 'gerenciar';
+        const pode = p.permissao === 'atualizar' || gerente;
+        const cards = meus.length ? meus.map(function (d) {
+          const dias = diasRestantes(d.data_vencimento);
+          const st = statusPorDias(dias);
+          const tipo = TIPOS[d.tipo] || d.tipo || '';
+          const rep = d.repeticao && Recorrencia.ROTULOS[d.repeticao];
+          const meta = [tipo, rep].filter(Boolean).join(' · ');
+          const acoes = [
+            pode ? `<button type="button" class="btn-mini principal" data-acao="atualizar" data-id="${d.id}">${icone('refresh', 14)} Renovei</button>` : '',
+            d.arquivo_path ? `<button type="button" class="btn-mini" data-acao="arquivo" data-id="${d.id}">${icone('eye', 14)} Ver arquivo</button>` : '',
+          ].join('');
+          return `
+            <div class="doc-card">
+              <div class="doc-linha">
+                <span class="doc-icone">${icone('fileText', 18)}</span>
+                <div class="doc-info">
+                  <div class="doc-nome"><span>${escapeHtml(d.nome)}</span>${d.arquivo_path ? icone('paperclip', 12) : ''}</div>
+                  ${meta ? `<div class="doc-meta">${escapeHtml(meta)}</div>` : ''}
+                  <div class="doc-prazo">${icone('calendar', 12)}<span>${dataBR(d.data_vencimento)} · <b class="${st}">${textoDias(dias)}</b></span></div>
+                </div>
+                ${gerente ? `<button type="button" class="icone-btn" data-acao="editar" data-id="${d.id}" aria-label="Editar ${escapeHtml(d.nome)}" title="Editar">${icone('edit', 15)}</button>` : ''}
+              </div>
+              <div class="doc-acoes">${acoes}</div>
+            </div>`;
+        }).join('') : `<p class="sem-docs">Nenhum documento cadastrado ainda.${gerente ? ' Toque em "Novo" pra cadastrar o primeiro.' : ''}</p>`;
+
+        return `
+          <section class="grupo" style="animation-delay: ${Math.min(i * 0.05, 0.3)}s;">
+            <div class="grupo-topo">
+              <span class="grupo-avatar">${escapeHtml((p.pessoa_nome || '?').trim().charAt(0).toUpperCase())}</span>
+              <div class="grupo-info">
+                <div class="grupo-nome">${escapeHtml(p.pessoa_nome)}</div>
+                <div class="grupo-sub">De ${escapeHtml(p.dono_nome || '')}</div>
+                <div class="grupo-perm">${PERMISSAO_TXT[p.permissao] || ''}</div>
+              </div>
+              ${gerente ? `<button type="button" class="btn-novo-doc" data-acao="novo" data-pessoa="${p.pessoa_id}">${icone('plus', 15, '#FFFFFF')}<span class="txt-novo">Novo documento</span></button>` : ''}
+              <div class="grupo-menu-wrap">
+                <button type="button" class="icone-btn" data-acao="menu" data-pessoa="${p.pessoa_id}" aria-label="Opções">${icone('moreHorizontal', 16)}</button>
+                <div class="grupo-menu" id="menu-${p.pessoa_id}" hidden>
+                  <button type="button" class="perigo" data-acao="sair" data-pessoa="${p.pessoa_id}">${icone('logOut', 14)} Sair deste compartilhamento</button>
+                </div>
+              </div>
+            </div>
+            <div class="lista-docs">${cards}</div>
+          </section>`;
+      }).join('');
+    }
+
+    function fecharMenus() { document.querySelectorAll('.grupo-menu').forEach(function (m) { m.hidden = true; }); }
+    document.addEventListener('click', function (e) { if (!e.target.closest('.grupo-menu-wrap')) fecharMenus(); });
+
+    document.getElementById('lista-grupos').addEventListener('click', async function (e) {
+      const btn = e.target.closest('[data-acao]');
+      if (!btn) return;
+      const acao = btn.dataset.acao;
+      if (acao === 'menu') {
+        const m = document.getElementById('menu-' + btn.dataset.pessoa);
+        const abrir = m.hidden;
+        fecharMenus();
+        m.hidden = !abrir;
+        return;
+      }
+      fecharMenus();
+      const doc = docs.find(function (d) { return d.id === btn.dataset.id; });
+      if (acao === 'arquivo' && doc) abrirArquivo(doc);
+      else if (acao === 'atualizar' && doc) abrirAtualizar(doc);
+      else if (acao === 'editar' && doc) abrirFormDoc(doc.pessoa_id, doc);
+      else if (acao === 'novo') abrirFormDoc(btn.dataset.pessoa, null);
+      else if (acao === 'sair') sair(btn.dataset.pessoa);
+    });
+
+    async function abrirArquivo(doc) {
+      const janela = window.open('', '_blank'); // abre já no toque, senão o navegador bloqueia
+      const { data, error } = await sb.storage.from('documentos-arquivos').createSignedUrl(doc.arquivo_path, 3600);
+      if (error || !data) {
+        if (janela) janela.close();
+        await Dialogo.avisar('Não foi possível abrir o arquivo agora. Tente de novo.');
+        return;
+      }
+      if (janela) janela.location.href = data.signedUrl; else window.location.href = data.signedUrl;
+    }
+
+    async function sair(pessoaId) {
+      const p = pessoas.find(function (x) { return x.pessoa_id === pessoaId; });
+      if (!p) return;
+      if (!await Dialogo.confirmar('Sair do compartilhamento?\n\nOs documentos de ' + p.pessoa_nome + ' somem da sua conta. Nada é apagado, e ' + (p.dono_nome || 'quem te convidou') + ' pode te convidar de novo.', { ok: 'Sair', perigo: true })) return;
+      const { error } = await sb.rpc('sair_compartilhamento', { p_pessoa: pessoaId });
+      if (error) { await Dialogo.avisar('Não foi possível sair agora. Tente de novo.'); return; }
+      carregar();
+    }
+
+    /* ---------- enviar arquivo (fica na pasta de quem compartilhou) ---------- */
+
+    async function enviarArquivo(donoId, arquivo) {
+      if (arquivo.size > 20 * 1024 * 1024) throw new Error('O arquivo passa de 20 MB. Escolha um menor.');
+      const caminho = `${donoId}/compartilhado/${usuarioAtual.id}/${Date.now()}-${arquivo.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
+      const { error } = await sb.storage.from('documentos-arquivos').upload(caminho, arquivo);
+      if (error) throw new Error('Não foi possível enviar o arquivo. Tente de novo.');
+      return { path: caminho, nome: arquivo.name };
+    }
+
+    /* ---------- folhas ---------- */
+
+    function abrirFolha(id) { document.getElementById(id).hidden = false; }
+    function fecharFolha(id) { document.getElementById(id).hidden = true; }
+    document.querySelectorAll('.folha-fundo').forEach(function (f) {
+      f.addEventListener('click', function (e) { if (e.target === f || e.target.closest('[data-fechar]')) fecharFolha(f.id); });
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') document.querySelectorAll('.folha-fundo:not([hidden])').forEach(function (f) { fecharFolha(f.id); });
+    });
+
+    function mostrarErro(id, texto) { const el = document.getElementById(id); el.textContent = texto; el.hidden = !texto; }
+
+    // Renovei: data nova (+ arquivo novo)
+    let docAtualizando = null;
+    function abrirAtualizar(doc) {
+      docAtualizando = doc;
+      document.getElementById('atualizar-titulo').textContent = 'Atualizar ' + doc.nome;
+      const sugestao = doc.repeticao ? Recorrencia.proximaData(doc.data_vencimento, doc.repeticao) : '';
+      document.getElementById('atualizar-data').value = sugestao || '';
+      document.getElementById('atualizar-dica').textContent = 'Vencimento atual: ' + dataBR(doc.data_vencimento) + (sugestao ? '. Já sugerimos o próximo.' : '.');
+      document.getElementById('atualizar-arquivo').value = '';
+      mostrarErro('atualizar-erro', '');
+      const ok = document.getElementById('atualizar-ok');
+      ok.disabled = false; ok.textContent = 'Salvar';
+      abrirFolha('folha-atualizar');
+      setTimeout(function () { document.getElementById('atualizar-data').focus(); }, 50);
+    }
+
+    document.getElementById('form-atualizar').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const doc = docAtualizando;
+      if (!doc) return;
+      const data = document.getElementById('atualizar-data').value;
+      const arquivo = document.getElementById('atualizar-arquivo').files[0];
+      if (!data) { mostrarErro('atualizar-erro', 'Coloque a nova data de vencimento.'); return; }
+      if (data === doc.data_vencimento && !arquivo) { mostrarErro('atualizar-erro', 'A data é a mesma de antes. Mude a data ou anexe o arquivo novo.'); return; }
+      const ok = document.getElementById('atualizar-ok');
+      ok.disabled = true; ok.textContent = 'Salvando...';
+      try {
+        const env = arquivo ? await enviarArquivo(doc.dono_id, arquivo) : null;
+        const { error } = await sb.rpc('atualizar_documento_compartilhado', {
+          p_id: doc.id, p_data_vencimento: data,
+          p_arquivo_path: env ? env.path : null, p_arquivo_nome: env ? env.nome : null,
+        });
+        if (error) throw new Error(/permiss/i.test(error.message || '') ? error.message : 'Não foi possível salvar agora. Tente de novo.');
+      } catch (err) {
+        ok.disabled = false; ok.textContent = 'Salvar';
+        mostrarErro('atualizar-erro', err.message);
+        return;
+      }
+      fecharFolha('folha-atualizar');
+      avisoRapido('Atualizado! Novo vencimento: ' + dataBR(data));
+      carregar();
+    });
+
+    // Gerente: novo / editar
+    let formDoc = null; // { pessoaId, doc }
+    function abrirFormDoc(pessoaId, doc) {
+      const p = pessoas.find(function (x) { return x.pessoa_id === pessoaId; });
+      if (!p) return;
+      formDoc = { pessoaId: pessoaId, doc: doc, donoId: p.dono_id };
+      document.getElementById('doc-titulo').textContent = doc ? 'Editar documento' : 'Novo documento';
+      document.getElementById('doc-sub').textContent = 'Documento de ' + p.pessoa_nome + '. ' + (p.dono_nome || 'Quem te convidou') + ' também vê e recebe os avisos.';
+      document.getElementById('doc-nome').value = doc ? doc.nome : '';
+      document.getElementById('doc-tipo').value = doc && TIPOS[doc.tipo] ? doc.tipo : '';
+      document.getElementById('doc-repeticao').value = doc && doc.repeticao ? doc.repeticao : '';
+      document.getElementById('doc-vencimento').value = doc ? doc.data_vencimento || '' : '';
+      document.getElementById('doc-emissao').value = doc ? doc.data_emissao || '' : '';
+      document.getElementById('doc-numero').value = doc ? doc.numero_documento || '' : '';
+      document.getElementById('doc-obs').value = doc ? doc.observacoes || '' : '';
+      document.getElementById('doc-arquivo').value = '';
+      document.getElementById('doc-arquivo-dica').textContent = doc && doc.arquivo_path ? 'Já tem um arquivo (' + (doc.arquivo_nome || 'anexo') + '). Escolher outro substitui.' : 'Foto ou PDF do documento.';
+      mostrarErro('doc-erro', '');
+      const ok = document.getElementById('doc-ok');
+      ok.disabled = false; ok.textContent = doc ? 'Salvar alterações' : 'Cadastrar';
+      abrirFolha('folha-doc');
+      setTimeout(function () { document.getElementById('doc-nome').focus(); }, 50);
+    }
+
+    document.getElementById('form-doc').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      if (!formDoc) return;
+      const nome = document.getElementById('doc-nome').value.trim();
+      const venc = document.getElementById('doc-vencimento').value;
+      if (!nome) { mostrarErro('doc-erro', 'Coloque o nome do documento.'); return; }
+      if (!venc) { mostrarErro('doc-erro', 'Coloque a data de vencimento.'); return; }
+      const ok = document.getElementById('doc-ok');
+      const textoOk = ok.textContent;
+      ok.disabled = true; ok.textContent = 'Salvando...';
+      const arquivo = document.getElementById('doc-arquivo').files[0];
+      try {
+        const env = arquivo ? await enviarArquivo(formDoc.donoId, arquivo) : null;
+        const dados = {
+          nome: nome,
+          tipo: document.getElementById('doc-tipo').value,
+          repeticao: document.getElementById('doc-repeticao').value,
+          data_vencimento: venc,
+          data_emissao: document.getElementById('doc-emissao').value,
+          numero_documento: document.getElementById('doc-numero').value.trim(),
+          observacoes: document.getElementById('doc-obs').value.trim(),
+        };
+        if (formDoc.doc) dados.categoria = formDoc.doc.categoria;
+        if (env) { dados.arquivo_path = env.path; dados.arquivo_nome = env.nome; }
+        const { error } = await sb.rpc('salvar_documento_compartilhado', {
+          p_id: formDoc.doc ? formDoc.doc.id : null, p_pessoa: formDoc.pessoaId, p_dados: dados,
+        });
+        if (error) throw new Error(/permiss|informe/i.test(error.message || '') ? error.message : 'Não foi possível salvar agora. Tente de novo.');
+      } catch (err) {
+        ok.disabled = false; ok.textContent = textoOk;
+        mostrarErro('doc-erro', err.message);
+        return;
+      }
+      const editando = !!formDoc.doc;
+      fecharFolha('folha-doc');
+      avisoRapido(editando ? 'Alterações salvas!' : 'Documento cadastrado!');
+      carregar();
+    });
+
+    /* ---------- sessão ---------- */
+
+    sb.auth.getSession().then(function (resultado) {
+      if (!resultado.data.session) { window.location.href = 'login.html'; return; }
+      usuarioAtual = resultado.data.session.user;
+      document.getElementById('sidebar-email').textContent = usuarioAtual.email;
+      document.getElementById('sidebar-avatar').textContent = usuarioAtual.email.charAt(0).toUpperCase();
+      carregar();
+    });
+  </script>
+
+  <script src="barra-inferior.js"></script>
+</body>
+</html>

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<!-- Convite — a pessoa abre o link que recebeu, entra (ou cria conta) e aceita -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="description" content="Você recebeu um convite pra acompanhar seus documentos no DocTrack.">
+<meta property="og:title" content="Convite pro DocTrack">
+<meta property="og:description" content="Acompanhe seus documentos e receba os avisos antes de vencer.">
+<meta property="og:image" content="https://rastreador-de-documentos.vercel.app/icons/icon-512.png">
+<meta property="og:type" content="website">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<meta name="theme-color" content="#0B0E14">
+<title>Convite — DocTrack</title>
+<script>
+  if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+  if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --marca: #3D4FE0; --marca-hover: #2E3FC0;
+    --bg: #F7F8FA; --superficie: #FFFFFF;
+    --texto: #14161A; --texto-muted: #6B7280; --borda: #E3E5E9;
+    --status-verde: #1F9D55; --status-vermelho: #E5484D;
+  }
+  html.escuro {
+    --bg: #0B0E14; --superficie: #141821;
+    --texto: #F1F2F4; --texto-muted: #8A93A3; --borda: #232833;
+    --marca: #5B6EF5; --marca-hover: #4457E0;
+    --status-verde: #22C55E; --status-vermelho: #F2555C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; min-height: 100dvh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px 0;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg); color: var(--texto);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  svg.icone { display: block; flex-shrink: 0; }
+  .glow-fundo {
+    position: fixed; top: -180px; left: 50%; transform: translateX(-50%);
+    width: 640px; max-width: 100vw; height: 640px;
+    background: radial-gradient(circle, rgba(91, 110, 245, 0.35), transparent 70%);
+    filter: blur(60px); pointer-events: none; z-index: 0;
+  }
+  html:not(.escuro) .glow-fundo { display: none; }
+
+  .cartao {
+    position: relative; z-index: 1;
+    width: calc(100% - 32px); max-width: 410px;
+    background: var(--superficie); border: 1px solid var(--borda); border-radius: 20px;
+    padding: 30px 26px 26px;
+    animation: entrada 0.3s ease;
+  }
+  @keyframes entrada { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .topo { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 20px; }
+  .logo-img { width: 60px; height: 60px; border-radius: 16px; object-fit: cover; margin-bottom: 12px; }
+  .nome-marca { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: var(--texto-muted); margin-bottom: 14px; text-transform: uppercase; }
+  h1 { font-size: 21px; font-weight: 700; margin: 0 0 8px; line-height: 1.3; }
+  .subtitulo { font-size: 14px; color: var(--texto-muted); margin: 0; line-height: 1.55; }
+  .subtitulo strong { color: var(--texto); }
+
+  .lista { list-style: none; padding: 14px 16px; margin: 0 0 20px; background: var(--bg); border: 1px solid var(--borda); border-radius: 12px; }
+  .lista li { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; line-height: 1.45; padding: 5px 0; }
+  .lista li .icone { color: var(--status-verde); margin-top: 1px; }
+  .lista li.nao .icone { color: var(--texto-muted); }
+  .lista li.nao { color: var(--texto-muted); }
+
+  .btn-principal {
+    width: 100%; padding: 13px; display: block; text-align: center; text-decoration: none;
+    font-family: inherit; font-size: 15px; font-weight: 700;
+    color: #FFFFFF; background: var(--marca);
+    border: none; border-radius: 10px; cursor: pointer;
+  }
+  .btn-principal:hover { background: var(--marca-hover); }
+  .btn-principal:disabled { opacity: 0.7; cursor: default; }
+  .btn-secundario {
+    width: 100%; padding: 12px; margin-top: 10px; display: block; text-align: center; text-decoration: none;
+    font-family: inherit; font-size: 14px; font-weight: 600;
+    color: var(--texto); background: none;
+    border: 1.5px solid var(--borda); border-radius: 10px; cursor: pointer;
+  }
+  .btn-secundario:hover { border-color: var(--marca); color: var(--marca); }
+
+  .conta-atual { text-align: center; font-size: 12.5px; color: var(--texto-muted); margin-top: 14px; line-height: 1.5; word-break: break-all; }
+  .link-botao { background: none; border: none; padding: 0; font: inherit; font-weight: 600; color: var(--marca); cursor: pointer; }
+  .link-botao:hover { text-decoration: underline; }
+
+  .selo { width: 54px; height: 54px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+  .selo.ok { background: rgba(34, 197, 94, 0.14); color: var(--status-verde); }
+  .selo.erro { background: rgba(242, 85, 92, 0.14); color: var(--status-vermelho); }
+
+  .mensagem { margin-top: 14px; font-size: 13px; line-height: 1.5; color: var(--status-vermelho); display: flex; gap: 6px; align-items: flex-start; }
+  [hidden] { display: none !important; }
+  .carregando { text-align: center; color: var(--texto-muted); font-size: 14px; padding: 20px 0; }
+</style>
+</head>
+<body>
+  <div class="glow-fundo"></div>
+
+  <main class="cartao">
+    <p class="carregando" id="vista-carregando">Abrindo convite...</p>
+
+    <!-- convite válido -->
+    <section id="vista-convite" hidden>
+      <div class="topo">
+        <img class="logo-img" src="icons/icon-192.png" alt="DocTrack">
+        <div class="nome-marca">DocTrack</div>
+        <h1 id="convite-titulo">Você recebeu um convite</h1>
+        <p class="subtitulo" id="convite-sub"></p>
+      </div>
+      <ul class="lista" id="convite-lista"></ul>
+
+      <div id="acoes-sem-conta" hidden>
+        <a class="btn-principal" href="login.html#criar">Criar minha conta grátis</a>
+        <a class="btn-secundario" href="login.html">Já tenho conta</a>
+        <p class="conta-atual">Depois de entrar, você volta pra cá e aceita o convite.</p>
+      </div>
+
+      <div id="acoes-com-conta" hidden>
+        <button type="button" class="btn-principal" id="btn-aceitar">Aceitar convite</button>
+        <p class="conta-atual">Entrando como <strong id="email-atual"></strong>.<br>Não é você? <button type="button" class="link-botao" id="btn-trocar">Entrar com outra conta</button></p>
+      </div>
+
+      <p class="mensagem" id="mensagem" role="status" hidden></p>
+    </section>
+
+    <!-- aceito -->
+    <section id="vista-ok" hidden>
+      <div class="topo">
+        <div class="selo ok" id="selo-ok"></div>
+        <h1>Pronto!</h1>
+        <p class="subtitulo" id="ok-sub"></p>
+      </div>
+      <a class="btn-principal" href="compartilhados.html">Ver meus documentos</a>
+    </section>
+
+    <!-- erro -->
+    <section id="vista-erro" hidden>
+      <div class="topo">
+        <div class="selo erro" id="selo-erro"></div>
+        <h1 id="erro-titulo">Convite não encontrado</h1>
+        <p class="subtitulo" id="erro-sub">Esse link não funciona mais. Ele pode já ter sido usado ou ter expirado. Peça um link novo pra quem te convidou.</p>
+      </div>
+      <a class="btn-secundario" href="index.html">Ir pro DocTrack</a>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_brDnSPSCu4ry9QTe-pYwag_zRqB6hkL';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const CORPOS_ICONE = {
+      check: '<polyline points="20 6 9 17 4 12"/>',
+      x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+      checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+      alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+      linkOff: '<path d="M9 17H7A5 5 0 0 1 7 7"/><path d="M15 7h2a5 5 0 0 1 4 8"/><line x1="8" y1="12" x2="12" y2="12"/><line x1="2" y1="2" x2="22" y2="22"/>',
+    };
+    function icone(nome, tamanho) {
+      return `<svg class="icone" width="${tamanho || 18}" height="${tamanho || 18}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
+    }
+    function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; }
+    const $ = function (id) { return document.getElementById(id); };
+
+    $('selo-ok').innerHTML = icone('checkCircle', 26);
+    $('selo-erro').innerHTML = icone('linkOff', 26);
+
+    const CHAVE = 'convite-pendente';
+    const token = new URLSearchParams(location.search).get('t') || '';
+
+    function mostrar(vista) {
+      ['vista-carregando', 'vista-convite', 'vista-ok', 'vista-erro'].forEach(function (id) { $(id).hidden = id !== vista; });
+    }
+
+    function erro(titulo, texto) {
+      try { localStorage.removeItem(CHAVE); } catch (e) {}
+      if (titulo) $('erro-titulo').textContent = titulo;
+      if (texto) $('erro-sub').textContent = texto;
+      mostrar('vista-erro');
+    }
+
+    function listaPermissao(permissao) {
+      const itens = [
+        { ok: true, texto: 'Ver seus documentos e abrir os arquivos' },
+        { ok: true, texto: 'Receber o aviso por e-mail antes de vencer' },
+        { ok: permissao !== 'ver', texto: 'Atualizar a data e anexar o arquivo novo quando renovar' },
+      ];
+      if (permissao === 'gerenciar') itens.push({ ok: true, texto: 'Cadastrar e editar seus documentos' });
+      return itens.map(function (i) {
+        return `<li class="${i.ok ? '' : 'nao'}">${icone(i.ok ? 'check' : 'x', 16)}<span>${escapeHtml(i.texto)}</span></li>`;
+      }).join('');
+    }
+
+    async function iniciar() {
+      if (token.length < 32) { erro(); return; }
+      const { data, error } = await sb.rpc('ver_convite', { p_token: token });
+      const c = data && data[0];
+      if (error) { erro('Não deu pra abrir o convite', 'Confira sua internet e tente de novo.'); return; }
+      if (!c) { erro(); return; }
+      if (!c.valido) { erro('Convite expirado', 'Esse link não vale mais. Peça um link novo pra ' + (c.dono_nome || 'quem te convidou') + '.'); return; }
+
+      const dono = c.dono_nome || 'Alguém';
+      $('convite-titulo').textContent = 'Olá, ' + c.pessoa_nome + '!';
+      $('convite-sub').innerHTML = '<strong>' + escapeHtml(dono) + '</strong> te convidou pra acompanhar os seus documentos no DocTrack. Com o convite, você pode:';
+      $('convite-lista').innerHTML = listaPermissao(c.permissao);
+
+      const sessao = (await sb.auth.getSession()).data.session;
+      if (sessao) {
+        $('email-atual').textContent = sessao.user.email;
+        $('acoes-com-conta').hidden = false;
+      } else {
+        // guarda o convite: depois de entrar ou criar conta, o Início traz a pessoa de volta pra cá
+        try { localStorage.setItem(CHAVE, token); } catch (e) {}
+        $('acoes-sem-conta').hidden = false;
+      }
+      mostrar('vista-convite');
+    }
+
+    $('btn-aceitar').addEventListener('click', async function () {
+      const btn = this;
+      btn.disabled = true;
+      btn.textContent = 'Aceitando...';
+      $('mensagem').hidden = true;
+      const { data, error } = await sb.rpc('aceitar_convite', { p_token: token });
+      if (error) {
+        btn.disabled = false;
+        btn.textContent = 'Aceitar convite';
+        const msg = String(error.message || '');
+        $('mensagem').innerHTML = icone('alertTriangle', 15) + '<span></span>';
+        $('mensagem').querySelector('span').textContent = /convite|plano|link|conta/i.test(msg) ? msg : 'Não foi possível aceitar agora. Tente de novo.';
+        $('mensagem').hidden = false;
+        return;
+      }
+      try { localStorage.removeItem(CHAVE); } catch (e) {}
+      const r = data && data[0];
+      $('ok-sub').textContent = 'Agora os documentos de ' + (r ? r.pessoa_nome : 'você') + ' aparecem na sua conta, em "Compartilhados comigo".';
+      mostrar('vista-ok');
+    });
+
+    $('btn-trocar').addEventListener('click', async function () {
+      try { localStorage.setItem(CHAVE, token); } catch (e) {}
+      await sb.auth.signOut();
+      window.location.href = 'login.html';
+    });
+
+    iniciar();
+  </script>
+</body>
+</html>

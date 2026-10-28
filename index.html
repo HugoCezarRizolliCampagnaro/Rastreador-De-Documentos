@@ -618,6 +618,16 @@
 
   /* ---------- aviso "Documento excluído · Desfazer" ---------- */
 
+  .faixa-compartilhados { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding: 12px 14px; background: var(--superficie); border: 1px solid var(--borda); border-left: 3px solid var(--marca); border-radius: 12px; text-decoration: none; color: inherit; }
+  .faixa-compartilhados[hidden] { display: none; }
+  .faixa-compartilhados:hover { border-color: var(--marca); }
+  .faixa-compartilhados-icone { width: 36px; height: 36px; border-radius: 10px; background: rgba(91, 110, 245, 0.14); color: var(--marca); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .faixa-compartilhados-textos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .faixa-compartilhados-textos strong { font-size: 14px; }
+  .faixa-compartilhados-textos span { font-size: 12.5px; color: var(--texto-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .faixa-compartilhados-textos span.alerta { color: var(--status-amarelo); font-weight: 600; }
+  .faixa-compartilhados-seta { color: var(--texto-muted); }
+
   .aviso-desfazer {
     position: fixed; left: 50%; bottom: 24px; z-index: 900;
     transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
@@ -854,6 +864,11 @@
       </div>
 
       <div class="conteudo">
+        <a href="compartilhados.html" class="faixa-compartilhados" id="faixa-compartilhados" hidden>
+          <span class="faixa-compartilhados-icone"><svg class="icone" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></span>
+          <span class="faixa-compartilhados-textos"><strong>Compartilhados com você</strong><span id="faixa-compartilhados-sub"></span></span>
+          <svg class="icone faixa-compartilhados-seta" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
         <div class="busca-wrap">
           <span id="icone-busca"></span>
           <input type="search" class="busca" id="busca" placeholder="Buscar por nome ou cliente...">
@@ -1013,16 +1028,44 @@
         return;
       }
 
+      // abriu um convite antes de entrar: volta pra ele pra aceitar
+      let convitePendente = '';
+      try { convitePendente = localStorage.getItem('convite-pendente') || ''; } catch (e) {}
+      if (convitePendente) {
+        try { localStorage.removeItem('convite-pendente'); } catch (e) {}
+        window.location.replace('convite.html?t=' + encodeURIComponent(convitePendente));
+        return;
+      }
+
       const email = resultado.data.session.user.email;
       document.getElementById('sidebar-email').textContent = email;
       document.getElementById('sidebar-avatar').textContent = email.charAt(0).toUpperCase();
 
       carregar();
+      carregarCompartilhados();
 
       if (localStorage.getItem('onboarding-visto') !== 'true') {
         document.getElementById('onboarding').hidden = false;
       }
     });
+
+    // faixa "Compartilhados com você" (só aparece pra quem aceitou um convite)
+    async function carregarCompartilhados() {
+      try {
+        const [p, d] = await Promise.all([sb.rpc('pessoas_compartilhadas'), sb.rpc('documentos_compartilhados')]);
+        if (p.error || !p.data || !p.data.length) return;
+        const nomes = Array.from(new Set(p.data.map(function (x) { return x.pessoa_nome; })));
+        const atencao = (d.data || []).filter(function (doc) { return diasRestantes(doc.data_vencimento) < 30; }).length;
+        const sub = document.getElementById('faixa-compartilhados-sub');
+        if (atencao) {
+          sub.textContent = atencao === 1 ? '1 precisa de atenção' : atencao + ' precisam de atenção';
+          sub.classList.add('alerta');
+        } else {
+          sub.textContent = 'Documentos de ' + nomes.join(', ');
+        }
+        document.getElementById('faixa-compartilhados').hidden = false;
+      } catch (e) {}
+    }
 
     document.getElementById('onboarding-fechar').addEventListener('click', function () {
       localStorage.setItem('onboarding-visto', 'true');

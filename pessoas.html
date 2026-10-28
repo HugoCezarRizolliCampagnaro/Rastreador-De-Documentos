@@ -168,6 +168,7 @@
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
   }
   .pessoa-menu[hidden] { display: none; }
+  .pessoa-menu.pra-cima { top: auto; bottom: calc(100% + 6px); }
   .pessoa-menu a, .pessoa-menu button {
     display: flex; align-items: center; gap: 8px; width: 100%;
     padding: 11px 14px; background: none; border: none; text-align: left;
@@ -203,6 +204,8 @@
   .pessoa-nome { font-size: 14.5px; font-weight: 600; display: flex; align-items: center; gap: 6px; min-width: 0; }
   .pessoa-nome > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pessoa-email-icone { color: var(--marca); flex-shrink: 0; display: flex; }
+  .pessoa-app-icone { color: var(--texto-muted); flex-shrink: 0; display: flex; }
+  .pessoa-app-icone.ativo { color: var(--status-verde); }
   .pessoa-detalhe { font-size: 12px; color: var(--texto-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   .status-badge {
@@ -431,6 +434,8 @@
       alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
       fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
       search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+      userCheck: '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/>',
+      send: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
       star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
     };
 
@@ -500,6 +505,7 @@
     let ultimosDocs = [];
     let avisoEmailDisponivel = true;
     let cargoDisponivel = true;
+    let conviteDisponivel = true;
 
     async function planoEmVigor() {
       const { data } = await sb.from('perfis').select('plano, plano_valido_ate').maybeSingle();
@@ -546,11 +552,12 @@
 
     async function carregar() {
       let [pessoasRes, docsRes] = await Promise.all([
-        sb.from('pessoas').select('id, nome, email, avisar_email, cargo').order('nome'),
+        sb.from('pessoas').select('id, nome, email, avisar_email, cargo, permissao, convidado_user_id, convite_token, convite_criado_em').order('nome'),
         sb.from('documentos').select('id, nome, data_vencimento, pessoa_id'),
       ]);
-      // se o banco ainda não tem os campos de e-mail, carrega sem eles e esconde a opção
       // se o banco ainda não tem algum campo novo, tenta sem ele e esconde a opção correspondente
+      conviteDisponivel = !pessoasRes.error;
+      if (pessoasRes.error) pessoasRes = await sb.from('pessoas').select('id, nome, email, avisar_email, cargo').order('nome');
       cargoDisponivel = !pessoasRes.error;
       if (pessoasRes.error) pessoasRes = await sb.from('pessoas').select('id, nome, email, avisar_email').order('nome');
       avisoEmailDisponivel = !pessoasRes.error;
@@ -576,7 +583,7 @@
         const emailAviso = p.avisar_email && p.email ? p.email : '';
         const cargo = String(p.cargo || '').trim();
         if (cargo) r.detalhe = cargo + ' · ' + r.detalhe;
-        return Object.assign({ id: p.id, nome: p.nome, eu: false, qtd: qtd, email: emailAviso, cargo: cargo }, r);
+        return Object.assign({ id: p.id, nome: p.nome, eu: false, qtd: qtd, email: emailAviso, cargo: cargo, acesso: situacaoAcesso(p) }, r);
       });
       // quem tem problema aparece primeiro; empate, ordem alfabética
       linhas.sort(function (a, b) { return a.peso - b.peso || a.nome.localeCompare(b.nome, 'pt-BR'); });
@@ -592,6 +599,147 @@
       desenharResumo(todas);
       filtrarEDesenhar();
       atualizarPlano();
+    }
+
+    /* ---------- acesso ao app (convite) ---------- */
+
+    const VALIDADE_CONVITE_DIAS = 14;
+    const PERMISSOES = {
+      ver: { curto: 'Só ver', longo: 'vê os documentos e os arquivos' },
+      atualizar: { curto: 'Ver e atualizar', longo: 'vê os documentos e atualiza a data e o arquivo quando renova' },
+      gerenciar: { curto: 'Gerente', longo: 'vê, cadastra e edita os documentos' },
+    };
+
+    // 'ativo' (já entrou), 'pendente' (convite enviado e válido) ou '' (nada)
+    function situacaoAcesso(p) {
+      if (!conviteDisponivel) return { estado: '' };
+      const base = { permissao: p.permissao || 'atualizar', token: p.convite_token || '' };
+      if (p.convidado_user_id) return Object.assign(base, { estado: 'ativo' });
+      if (p.convite_token && p.convite_criado_em && (Date.now() - new Date(p.convite_criado_em).getTime()) < VALIDADE_CONVITE_DIAS * 86400000) {
+        return Object.assign(base, { estado: 'pendente' });
+      }
+      return Object.assign(base, { estado: '' });
+    }
+
+    function seloAcesso(a) {
+      if (!a || !a.estado) return '';
+      if (a.estado === 'ativo') return `<span class="pessoa-app-icone ativo" title="Usa o app (${PERMISSOES[a.permissao].curto})" aria-label="Usa o app">${icone('userCheck', 13)}</span>`;
+      return `<span class="pessoa-app-icone" title="Convite enviado, esperando a pessoa entrar" aria-label="Convite enviado">${icone('send', 12)}</span>`;
+    }
+
+    function linkConvite(token) {
+      return window.location.origin + '/convite.html?t=' + encodeURIComponent(token);
+    }
+
+    function primeiroNomeDono() {
+      const n = String((usuarioAtual.user_metadata || {}).full_name || '').trim().split(/\s+/)[0];
+      return n || '';
+    }
+
+    async function escolherPermissao(nome, atual) {
+      const texto = 'O que ' + nome + ' vai poder fazer no app?\n\n' +
+        'Só ver: ' + PERMISSOES.ver.longo + '.\n' +
+        'Ver e atualizar: ' + PERMISSOES.atualizar.longo + '.\n' +
+        'Gerente: ' + PERMISSOES.gerenciar.longo + '.\n\n' +
+        'Excluir documentos fica só com você.';
+      return Dialogo.escolher(texto, ['ver', 'atualizar', 'gerenciar'].map(function (k) {
+        return { valor: k, texto: PERMISSOES[k].curto + (k === atual ? ' (atual)' : ''), principal: k === (atual || 'atualizar') };
+      }));
+    }
+
+    async function copiarTexto(texto) {
+      try { await navigator.clipboard.writeText(texto); return true; } catch (e) { return false; }
+    }
+
+    async function enviarConvite(nome, email, token) {
+      const link = linkConvite(token);
+      const dono = primeiroNomeDono();
+      const mensagem = 'Oi, ' + nome + '! ' + (dono ? dono + ' te convidou' : 'Você foi convidado(a)') +
+        ' pro DocTrack, pra acompanhar os seus documentos e receber os avisos de vencimento. Abra o link pra entrar: ' + link;
+      const opcoes = [
+        { valor: 'whatsapp', texto: 'Enviar pelo WhatsApp', principal: true },
+        { valor: 'email', texto: 'Enviar por e-mail' },
+        { valor: 'copiar', texto: 'Copiar link' },
+      ];
+      const v = await Dialogo.escolher('Convite pronto\n\nEnvie o link pra ' + nome + '. Ele vale por ' + VALIDADE_CONVITE_DIAS + ' dias e só funciona uma vez.', opcoes);
+      if (v === 'whatsapp') {
+        window.open('https://wa.me/?text=' + encodeURIComponent(mensagem), '_blank');
+      } else if (v === 'email') {
+        window.location.href = 'mailto:' + encodeURIComponent(email || '') + '?subject=' + encodeURIComponent('Convite pro DocTrack') + '&body=' + encodeURIComponent(mensagem);
+      } else if (v === 'copiar') {
+        if (await copiarTexto(link)) await Dialogo.avisar('Link copiado. É só colar na conversa com ' + nome + '.', { titulo: 'Copiado!' });
+        else await Dialogo.pedir('Copie o link abaixo e envie pra ' + nome + '.', link, { titulo: 'Link do convite', ok: 'Pronto' });
+      }
+    }
+
+    async function gerarEEnviar(id, nome, email, permissao) {
+      const { data, error } = await sb.rpc('criar_convite', { p_pessoa: id, p_permissao: permissao });
+      if (error || !data) {
+        const msg = error && error.message || '';
+        await Dialogo.avisar(/plano/i.test(msg) ? msg : 'Não foi possível criar o convite agora. Tente de novo.');
+        return;
+      }
+      await carregar();
+      await enviarConvite(nome, email, data);
+    }
+
+    async function gerenciarAcesso(id, nome) {
+      const limite = LIMITE_PESSOAS[planoAtual] === undefined ? 0 : LIMITE_PESSOAS[planoAtual];
+      if (limite === 0) {
+        if (await Dialogo.confirmar('Dar acesso ao app pra outras pessoas é dos planos Família e Profissional.', { titulo: 'Recurso dos planos pagos', ok: 'Ver planos', cancelar: 'Agora não' })) window.location.href = 'planos.html';
+        return;
+      }
+      const p = pessoasCarregadas.find(function (x) { return x.id === id; });
+      if (!p) return;
+      const a = situacaoAcesso(p);
+      const email = p.email || '';
+
+      if (!a.estado) {
+        const perm = await escolherPermissao(nome, '');
+        if (!perm) return;
+        await gerarEEnviar(id, nome, email, perm);
+        return;
+      }
+
+      if (a.estado === 'pendente') {
+        const v = await Dialogo.escolher('Convite enviado\n\n' + nome + ' ainda não abriu o link. Acesso: ' + PERMISSOES[a.permissao].curto + '.', [
+          { valor: 'reenviar', texto: 'Enviar o link de novo', principal: true },
+          { valor: 'permissao', texto: 'Mudar o que pode fazer' },
+          { valor: 'cancelar', texto: 'Cancelar convite', perigo: true },
+        ], { cancelar: 'Fechar' });
+        if (v === 'reenviar') await enviarConvite(nome, email, a.token);
+        else if (v === 'permissao') {
+          const perm = await escolherPermissao(nome, a.permissao);
+          if (!perm || perm === a.permissao) return;
+          const r = await sb.from('pessoas').update({ permissao: perm }).eq('id', id);
+          if (r.error) await Dialogo.avisar('Não foi possível salvar agora. Tente de novo.');
+          carregar();
+        } else if (v === 'cancelar') {
+          const r = await sb.from('pessoas').update({ convite_token: null }).eq('id', id);
+          if (r.error) await Dialogo.avisar('Não foi possível cancelar agora. Tente de novo.');
+          carregar();
+        }
+        return;
+      }
+
+      // já usa o app
+      const v = await Dialogo.escolher(nome + ' usa o app\n\nAcesso: ' + PERMISSOES[a.permissao].curto + ' (' + PERMISSOES[a.permissao].longo + ').', [
+        { valor: 'permissao', texto: 'Mudar o que pode fazer', principal: true },
+        { valor: 'remover', texto: 'Remover acesso', perigo: true },
+      ], { cancelar: 'Fechar' });
+      if (v === 'permissao') {
+        const perm = await escolherPermissao(nome, a.permissao);
+        if (!perm || perm === a.permissao) return;
+        const r = await sb.from('pessoas').update({ permissao: perm }).eq('id', id);
+        if (r.error) { await Dialogo.avisar('Não foi possível salvar agora. Tente de novo.'); return; }
+        await Dialogo.avisar('Agora ' + nome + ' ' + PERMISSOES[perm].longo + '.', { titulo: 'Acesso atualizado' });
+        carregar();
+      } else if (v === 'remover') {
+        if (!await Dialogo.confirmar('Remover o acesso de ' + nome + '?\n\n' + nome + ' deixa de ver os documentos no app. Nada é apagado e você pode convidar de novo depois.', { ok: 'Remover acesso', perigo: true })) return;
+        const r = await sb.from('pessoas').update({ convidado_user_id: null, convite_token: null }).eq('id', id);
+        if (r.error) { await Dialogo.avisar('Não foi possível remover agora. Tente de novo.'); return; }
+        carregar();
+      }
     }
 
     function desenharResumo(todas) {
@@ -628,7 +776,7 @@
           <a class="pessoa-card" href="index.html?pessoa=${encodeURIComponent(l.id)}">
             <span class="pessoa-avatar${l.eu ? ' eu' : ''}">${inicial}</span>
             <div class="pessoa-info">
-              <div class="pessoa-nome"><span>${escapeHtml(l.nome)}</span>${l.email ? `<span class="pessoa-email-icone" title="Recebe aviso por e-mail" aria-label="Recebe aviso por e-mail">${icone('mail', 13)}</span>` : ''}</div>
+              <div class="pessoa-nome"><span>${escapeHtml(l.nome)}</span>${l.email ? `<span class="pessoa-email-icone" title="Recebe aviso por e-mail" aria-label="Recebe aviso por e-mail">${icone('mail', 13)}</span>` : ''}${seloAcesso(l.acesso)}</div>
               <div class="pessoa-detalhe">${escapeHtml(l.detalhe)}</div>
               ${l.proximoTxt ? `<div class="pessoa-detalhe pessoa-urgente ${l.classe}">${l.icon ? icone(l.icon, 12) : ''}<span>${escapeHtml(l.proximoTxt)}</span></div>` : ''}
             </div>
@@ -640,6 +788,7 @@
             <a href="novo-documento.html${l.eu ? '' : '?pessoa=' + encodeURIComponent(l.id)}">${icone('plus', 14)} Novo documento</a>
             <a href="relatorio.html?pessoa=${encodeURIComponent(l.id)}">${icone('fileText', 14)} Relatório</a>
             ${l.eu ? '' : `
+            <button type="button" ${conviteDisponivel ? '' : 'hidden '}data-acao="acesso" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}">${icone(l.acesso && l.acesso.estado ? 'userCheck' : 'send', 14)} ${l.acesso && l.acesso.estado ? 'Acesso ao app' : 'Convidar pro app'}</button>
             <button type="button" ${avisoEmailDisponivel ? '' : 'hidden '}data-acao="email" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}" data-email="${escapeHtml(l.email || '')}">${icone('mail', 14)} ${l.email ? 'E-mail de aviso' : 'Avisar por e-mail'}</button>
             <button type="button" ${cargoDisponivel ? '' : 'hidden '}data-acao="cargo" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}" data-cargo="${escapeHtml(l.cargo || '')}">${icone('briefcase', 14)} ${l.cargo ? 'Cargo / setor' : 'Definir cargo / setor'}</button>
             <button type="button" data-acao="renomear" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}">${icone('edit', 14)} Renomear</button>
@@ -698,6 +847,13 @@
         fecharMenus(btnMenu.dataset.menu);
         menu.hidden = !menu.hidden;
         menu.parentElement.classList.toggle('menu-aberto', !menu.hidden);
+        // perto do fim da tela (ou da barra de baixo), o menu abre pra cima
+        menu.classList.remove('pra-cima');
+        if (!menu.hidden) {
+          const barra = document.querySelector('.barra-inferior');
+          const limite = window.innerHeight - (barra && barra.offsetHeight ? barra.offsetHeight : 0) - 8;
+          if (menu.getBoundingClientRect().bottom > limite && menu.parentElement.getBoundingClientRect().top > menu.offsetHeight + 8) menu.classList.add('pra-cima');
+        }
         return;
       }
       const btn = e.target.closest('.pessoa-menu button[data-acao]');
@@ -705,6 +861,10 @@
       fecharMenus();
       const id = btn.dataset.id;
       const nomeAtual = btn.dataset.nome;
+      if (btn.dataset.acao === 'acesso') {
+        await gerenciarAcesso(id, nomeAtual);
+        return;
+      }
       if (btn.dataset.acao === 'cargo') {
         const novo = await Dialogo.pedir('Cargo, setor ou parentesco. Deixe vazio pra tirar.', btn.dataset.cargo || '', { titulo: 'Cargo / setor de ' + nomeAtual, placeholder: 'Ex.: Recepção, Enfermagem, Filho' });
         if (novo === null) return;
