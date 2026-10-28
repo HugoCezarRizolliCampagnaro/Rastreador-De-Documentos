@@ -605,6 +605,14 @@
 
         <p class="secao-titulo-grupo">Suporte</p>
         <div class="opcao-card">
+          <a href="index.html?tour=1" class="opcao-linha">
+            <span class="opcao-icone" id="icone-tour"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo">Ver tour do app</div>
+              <div class="opcao-descricao">Um passo a passo rápido mostrando cada parte do Início</div>
+            </div>
+            <span class="opcao-seta" id="seta-tour"></span>
+          </a>
           <a href="mailto:doctrack.suporte@gmail.com" class="opcao-linha">
             <span class="opcao-icone" id="icone-suporte"></span>
             <div class="opcao-texto">
@@ -1048,6 +1056,8 @@
     document.getElementById('icone-email-lembretes').innerHTML = icone('mail', 17);
     document.getElementById('icone-pessoas').innerHTML = icone('users', 17);
     document.getElementById('seta-pessoas').innerHTML = icone('chevronRight', 16);
+    document.getElementById('icone-tour').innerHTML = '<svg class="icone" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>';
+    document.getElementById('seta-tour').innerHTML = icone('chevronRight', 16);
 
     async function iniciarEmailLembretes(userId) {
       const toggle = document.getElementById('toggle-email-lembretes');

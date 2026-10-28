@@ -699,7 +699,10 @@
 
   .onboarding-lista li { display: flex; align-items: center; gap: 10px; }
 
-  #onboarding-fechar {
+  .onboarding-lista li { align-items: flex-start; line-height: 1.45; margin-bottom: 10px; }
+  .onboarding-lista li .icone { margin-top: 2px; color: var(--marca); }
+
+  #onboarding-tour, #onboarding-fechar {
     width: 100%;
     padding: 13px;
     font-family: inherit;
@@ -711,6 +714,8 @@
     border-radius: 8px;
     cursor: pointer;
   }
+
+  #onboarding-fechar.onboarding-pular { margin-top: 8px; background: transparent; color: var(--texto-muted); font-weight: 500; }
 
   /* ---------- instalar app (pwa) ---------- */
 
@@ -792,10 +797,11 @@
 
   <div id="onboarding" class="onboarding-overlay" hidden>
     <div class="onboarding-card">
-      <h2>Bem-vindo! 👋</h2>
-      <p>O DocTrack te ajuda a nunca mais perder um prazo.</p>
+      <h2>Bem-vindo ao DocTrack! 👋</h2>
+      <p>Nunca mais perca o prazo de um documento.</p>
       <ul class="onboarding-lista" id="onboarding-lista"></ul>
-      <button id="onboarding-fechar">Entendi, vamos lá!</button>
+      <button id="onboarding-tour">Fazer tour rápido (1 minuto)</button>
+      <button id="onboarding-fechar" class="onboarding-pular">Pular</button>
     </div>
   </div>
 
@@ -878,6 +884,7 @@
 
   <script src="dialogos.js"></script>
   <script src="recorrencia.js"></script>
+  <script src="tour.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
@@ -937,10 +944,10 @@
     }).join('');
 
     document.getElementById('onboarding-lista').innerHTML = [
-      { nome: 'fileText', texto: 'Cadastre documentos com data de vencimento' },
-      { nome: 'bell', texto: 'Configure quando quer ser avisado' },
-      { nome: 'checkCircle', texto: 'Siga o checklist de renovação de cada um' },
-      { nome: 'dollarSign', texto: 'Acompanhe os gastos relacionados' },
+      { nome: 'fileText', texto: 'Cadastre seus documentos (dá até pra tirar foto que o app preenche)' },
+      { nome: 'bell', texto: 'Receba aviso por e-mail antes de vencer' },
+      { nome: 'users', texto: 'Controle os documentos da família ou da equipe' },
+      { nome: 'checkCircle', texto: 'Gere relatório pra fiscalização em 1 toque' },
     ].map(function (item) {
       return `<li>${icone(item.nome, 17)} ${item.texto}</li>`;
     }).join('');
@@ -1020,6 +1027,12 @@
     document.getElementById('onboarding-fechar').addEventListener('click', function () {
       localStorage.setItem('onboarding-visto', 'true');
       document.getElementById('onboarding').hidden = true;
+    });
+
+    document.getElementById('onboarding-tour').addEventListener('click', function () {
+      localStorage.setItem('onboarding-visto', 'true');
+      document.getElementById('onboarding').hidden = true;
+      Tour.iniciar();
     });
 
     function escapeHtml(texto) {
@@ -1395,6 +1408,12 @@
 
       // veio da tela do documento com "Excluir": faz a exclusão aqui, com "Desfazer"
       const params = new URLSearchParams(window.location.search);
+      if (params.get('tour') === '1') {
+        params.delete('tour');
+        const restoTour = params.toString();
+        history.replaceState(null, '', window.location.pathname + (restoTour ? '?' + restoTour : ''));
+        setTimeout(function () { Tour.iniciar(); }, 400);
+      }
       const idExcluir = params.get('excluir');
       if (idExcluir) {
         params.delete('excluir');
