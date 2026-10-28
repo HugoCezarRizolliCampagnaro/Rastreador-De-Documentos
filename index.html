@@ -518,6 +518,13 @@
     gap: 5px;
   }
 
+  /* se não couber numa linha, a data desce inteira pra linha de baixo em vez de ser cortada.
+     O "·" fica antes de cada parte; na parte que começa a linha ele cai fora da área visível. */
+  .doc-detalhe-textos { flex: 1; min-width: 0; overflow: hidden; white-space: normal; }
+  .doc-detalhe-linha { display: flex; flex-wrap: wrap; row-gap: 2px; margin-left: -12px; }
+  .doc-detalhe-parte { white-space: nowrap; position: relative; padding-left: 12px; }
+  .doc-detalhe-parte::before { content: '·'; position: absolute; left: 4px; }
+
   .status-badge {
     display: inline-flex;
     align-items: center;
@@ -1122,7 +1129,7 @@
               <div class="doc-info">
                 <div class="doc-nome">${escapeHtml(doc.nome)}${doc.arquivo_path ? icone('paperclip', 12) : ''}</div>
                 <div class="doc-meta">${catLabel} · ${escapeHtml(tipoLabel)}</div>
-                <div class="doc-detalhe">${icone('calendar', 12)} ${textoDias(dias)} · ${dataFormatada}</div>
+                <div class="doc-detalhe">${icone('calendar', 12)}<span class="doc-detalhe-textos"><span class="doc-detalhe-linha"><span class="doc-detalhe-parte">${textoDias(dias)}</span><span class="doc-detalhe-parte">${dataFormatada}</span></span></span></div>
               </div>
               <span class="status-badge ${status}">${icone(statusIconeNome, 12)} ${statusTexto}</span>
             </a>
