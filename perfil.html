@@ -472,6 +472,18 @@
           <a href="planos.html" class="btn-ver-planos">Ver planos</a>
         </div>
 
+        <p class="secao-titulo-grupo">Seu nome</p>
+        <div class="opcao-card">
+          <button type="button" class="opcao-linha" id="btn-nome-usuario">
+            <span class="opcao-icone" id="icone-nome-usuario"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo">Como quer ser chamado</div>
+              <div class="opcao-descricao" id="desc-nome-usuario">Aparece na saudação do app. Toque para definir.</div>
+            </div>
+            <span class="opcao-seta" id="seta-nome-usuario"></span>
+          </button>
+        </div>
+
         <p class="secao-titulo-grupo">Aparência</p>
         <div class="opcao-card">
           <div class="opcao-linha">
@@ -1285,6 +1297,28 @@
         : 'Aparece no topo dos relatórios. Toque para definir.';
     });
 
+    /* ---------- nome do usuário ("Como quer ser chamado") ---------- */
+
+    document.getElementById('icone-nome-usuario').innerHTML = icone('user', 17);
+    document.getElementById('seta-nome-usuario').innerHTML = icone('chevronRight', 16);
+    let nomeUsuarioAtual = '';
+
+    function mostrarNomeUsuario(nome) {
+      nomeUsuarioAtual = nome || '';
+      document.getElementById('desc-nome-usuario').textContent = nomeUsuarioAtual
+        ? nomeUsuarioAtual + ' · aparece na saudação do app'
+        : 'Aparece na saudação do app. Toque para definir.';
+    }
+
+    document.getElementById('btn-nome-usuario').addEventListener('click', async function () {
+      const novo = prompt('Como quer ser chamado?', nomeUsuarioAtual);
+      if (novo === null) return;
+      const valor = novo.trim().replace(/\s+/g, ' ').slice(0, 60);
+      const { error } = await sb.auth.updateUser({ data: { full_name: valor || null } });
+      if (error) { alert('Não foi possível salvar agora. Tente de novo.'); return; }
+      mostrarNomeUsuario(valor);
+    });
+
     /* ---------- sessão ---------- */
 
     sb.auth.getSession().then(function (resultado) {
@@ -1293,6 +1327,8 @@
         return;
       }
       const email = resultado.data.session.user.email;
+      const metaUsuario = resultado.data.session.user.user_metadata || {};
+      mostrarNomeUsuario(String(metaUsuario.full_name || metaUsuario.name || '').trim());
       document.getElementById('conta-email').textContent = email;
       document.getElementById('conta-avatar').textContent = email.charAt(0).toUpperCase();
       document.getElementById('sidebar-email').textContent = email;
