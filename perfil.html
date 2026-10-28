@@ -410,8 +410,6 @@
   .modal-cliente-salvar:disabled { opacity: 0.6; cursor: wait; }
 
   /* pessoas */
-  #lista-pessoas .opcao-linha { cursor: default; }
-  #lista-pessoas .opcao-linha:last-child { border-bottom: none; }
   #pessoas-vazio[hidden] { display: none; }
   .pessoa-acao {
     flex-shrink: 0;
@@ -534,14 +532,14 @@
 
         <p class="secao-titulo-grupo">Pessoas</p>
         <div class="opcao-card" id="card-pessoas">
-          <div class="opcao-linha" id="pessoas-vazio">
+          <a href="pessoas.html" class="opcao-linha" id="pessoas-vazio">
             <span class="opcao-icone" id="icone-pessoas"></span>
             <div class="opcao-texto">
-              <div class="opcao-titulo">Nenhuma pessoa cadastrada</div>
-              <div class="opcao-descricao">Adicione pessoas ao cadastrar um documento para organizar por família ou equipe.</div>
+              <div class="opcao-titulo">Gerenciar pessoas</div>
+              <div class="opcao-descricao" id="pessoas-desc">Família ou equipe: veja a situação dos documentos de cada um.</div>
             </div>
-          </div>
-          <div id="lista-pessoas"></div>
+            <span class="opcao-seta" id="seta-pessoas"></span>
+          </a>
         </div>
 
         <p class="secao-titulo-grupo">Clientes</p>
@@ -1047,6 +1045,7 @@
 
     document.getElementById('icone-email-lembretes').innerHTML = icone('mail', 17);
     document.getElementById('icone-pessoas').innerHTML = icone('users', 17);
+    document.getElementById('seta-pessoas').innerHTML = icone('chevronRight', 16);
 
     async function iniciarEmailLembretes(userId) {
       const toggle = document.getElementById('toggle-email-lembretes');
@@ -1082,53 +1081,11 @@
       });
     }
 
+    // a gestão de pessoas fica na tela Pessoas; aqui só mostra quantas tem
     async function carregarPessoas() {
-      const lista = document.getElementById('lista-pessoas');
-      const vazio = document.getElementById('pessoas-vazio');
-      const [pessoas, docs] = await Promise.all([
-        sb.from('pessoas').select('id, nome').order('nome'),
-        sb.from('documentos').select('pessoa_id').not('pessoa_id', 'is', null),
-      ]);
-      const contagem = {};
-      (docs.data || []).forEach(function (d) { contagem[d.pessoa_id] = (contagem[d.pessoa_id] || 0) + 1; });
-      const itens = pessoas.data || [];
-      vazio.hidden = itens.length > 0;
-      lista.innerHTML = itens.map(function (p) {
-        const qtd = contagem[p.id] || 0;
-        return `
-          <div class="opcao-linha">
-            <span class="opcao-icone">${icone('user', 17)}</span>
-            <div class="opcao-texto">
-              <div class="opcao-titulo">${escaparHtml(p.nome)}</div>
-              <div class="opcao-descricao">${qtd === 0 ? 'Nenhum documento' : qtd === 1 ? '1 documento' : qtd + ' documentos'}</div>
-            </div>
-            <button type="button" class="pessoa-acao" data-acao="renomear" data-id="${p.id}" data-nome="${escaparHtml(p.nome)}" aria-label="Renomear">${icone('edit', 16)}</button>
-            <button type="button" class="pessoa-acao pessoa-acao-excluir" data-acao="excluir" data-id="${p.id}" data-nome="${escaparHtml(p.nome)}" data-qtd="${qtd}" aria-label="Excluir">${icone('trash', 16)}</button>
-          </div>`;
-      }).join('');
+      const { count } = await sb.from('pessoas').select('id', { count: 'exact', head: true });
+      if (count) document.getElementById('pessoas-desc').textContent = count === 1 ? '1 pessoa cadastrada' : count + ' pessoas cadastradas';
     }
-
-    document.getElementById('lista-pessoas').addEventListener('click', async function (e) {
-      const btn = e.target.closest('.pessoa-acao');
-      if (!btn) return;
-      const id = btn.dataset.id;
-      const nomeAtual = btn.dataset.nome;
-      if (btn.dataset.acao === 'renomear') {
-        const novo = await Dialogo.pedir('Renomear ' + nomeAtual, nomeAtual);
-        if (!novo || !novo.trim() || novo.trim() === nomeAtual) return;
-        const { error } = await sb.from('pessoas').update({ nome: novo.trim() }).eq('id', id);
-        if (error) { await Dialogo.avisar('Não foi possível renomear agora. Tente de novo.'); return; }
-      } else {
-        const qtd = Number(btn.dataset.qtd || 0);
-        const aviso = qtd > 0
-          ? 'Excluir ' + nomeAtual + '?\n\nOs ' + qtd + ' documento(s) dessa pessoa continuam salvos, só ficam sem pessoa.'
-          : 'Excluir ' + nomeAtual + '?';
-        if (!await Dialogo.confirmar(aviso, { ok: 'Excluir', perigo: true })) return;
-        const { error } = await sb.from('pessoas').delete().eq('id', id);
-        if (error) { await Dialogo.avisar('Não foi possível excluir agora. Tente de novo.'); return; }
-      }
-      carregarPessoas();
-    });
 
     /* ---------- plano em vigor ---------- */
 
@@ -1341,8 +1298,8 @@
       planoEmVigor().then(function (plano) {
         iniciarClientes(resultado.data.session.user.id, plano);
         if (plano !== 'familia' && plano !== 'profissional') {
-          document.querySelector('#pessoas-vazio .opcao-descricao').innerHTML =
-            'Organizar documentos de outras pessoas é um recurso dos planos <a href="planos.html" style="color: var(--marca);">Família e Profissional</a>.';
+          document.getElementById('pessoas-desc').textContent =
+            'Organizar documentos de outras pessoas é um recurso dos planos Família e Profissional.';
         }
       });
 

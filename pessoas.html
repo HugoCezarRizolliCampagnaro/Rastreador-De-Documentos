@@ -244,6 +244,22 @@
   .limite-texto { font-size: 12px; color: var(--texto-muted); text-align: center; margin-top: 14px; }
   .limite-texto[hidden] { display: none; }
 
+  .aviso-desfazer {
+    position: fixed; left: 50%; bottom: 24px; z-index: 900;
+    transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+    width: calc(100% - 32px); max-width: 420px; overflow: hidden;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 16px; border-radius: 12px;
+    background: #1E2330; color: #F1F2F4; border: 1px solid #2E3546;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    font-size: 14px; transition: transform .2s ease, opacity .2s ease;
+  }
+  .aviso-desfazer.visivel { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+  .aviso-desfazer button { background: none; border: none; color: #8B9BFF; font: inherit; font-weight: 700; cursor: pointer; padding: 4px 6px; }
+  .aviso-desfazer-barra { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: #5B6EF5; transform-origin: left; }
+  @keyframes avisoDesfazerTempo { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+  @media (max-width: 959px) { .aviso-desfazer { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); } }
+
   .carregando { text-align: center; color: var(--texto-muted); font-size: 14px; padding: 40px 20px; }
 
   /* ---------- instalar app (pwa) ---------- */
@@ -479,6 +495,7 @@
     let usuarioAtual = null;
     let planoAtual = 'gratis';
     let pessoasCarregadas = [];
+    let ultimosDocs = [];
     let avisoEmailDisponivel = true;
     let cargoDisponivel = true;
 
@@ -537,7 +554,16 @@
       avisoEmailDisponivel = !pessoasRes.error;
       if (pessoasRes.error) pessoasRes = await sb.from('pessoas').select('id, nome').order('nome');
       pessoasCarregadas = pessoasRes.data || [];
-      const docs = docsRes.data || [];
+      let docs = docsRes.data || [];
+      ultimosDocs = docs;
+      // exclusão pendente (ainda dentro dos 5s do "Desfazer"): já mostra como se tivesse sido excluída
+      if (exclusaoPessoa) {
+        const pend = exclusaoPessoa;
+        pessoasCarregadas = pessoasCarregadas.filter(function (p) { return p.id !== pend.id; });
+        docs = pend.modo === 'tudo'
+          ? docs.filter(function (d) { return pend.docIds.indexOf(d.id) === -1; })
+          : docs.map(function (d) { return d.pessoa_id === pend.id ? Object.assign({}, d, { pessoa_id: null }) : d; });
+      }
 
       const meus = docs.filter(function (d) { return !d.pessoa_id; });
       const nomeUsuario = String((usuarioAtual.user_metadata || {}).full_name || '').trim();
@@ -704,15 +730,110 @@
         if (error) { await Dialogo.avisar('Não foi possível renomear agora. Tente de novo.'); return; }
       } else {
         const qtd = Number(btn.dataset.qtd || 0);
-        const aviso = qtd > 0
-          ? 'Excluir ' + nomeAtual + '?\n\n' + (qtd === 1 ? 'O documento dessa pessoa continua salvo e passa a aparecer como seu.' : 'Os ' + qtd + ' documentos dessa pessoa continuam salvos e passam a aparecer como seus.')
-          : 'Excluir ' + nomeAtual + '?';
-        if (!await Dialogo.confirmar(aviso, { ok: 'Excluir', perigo: true })) return;
-        const { error } = await sb.from('pessoas').delete().eq('id', id);
-        if (error) { await Dialogo.avisar('Não foi possível excluir agora. Tente de novo.'); return; }
+        let modo = 'so-pessoa';
+        if (qtd > 0) {
+          // tem documentos: a pessoa escolhe se apaga junto (ex.: funcionário que saiu) ou se ficam com ela
+          const escolha = await Dialogo.escolher(
+            'Excluir ' + nomeAtual + '?\n\n' + (qtd === 1 ? 'Tem 1 documento cadastrado. O que fazer com ele?' : 'Tem ' + qtd + ' documentos cadastrados. O que fazer com eles?'),
+            [
+              { valor: 'tudo', texto: qtd === 1 ? 'Excluir a pessoa e o documento' : 'Excluir a pessoa e os ' + qtd + ' documentos', perigo: true },
+              { valor: 'so-pessoa', texto: qtd === 1 ? 'Excluir só a pessoa (o documento fica com você)' : 'Excluir só a pessoa (os documentos ficam com você)' },
+            ]
+          );
+          if (!escolha) return;
+          modo = escolha;
+        } else if (!await Dialogo.confirmar('Excluir ' + nomeAtual + '?', { ok: 'Excluir', perigo: true })) {
+          return;
+        }
+        excluirPessoaComDesfazer(id, modo);
+        return;
       }
       carregar();
     });
+
+    /* ---------- excluir pessoa com "Desfazer" (mesma ideia do Início) ----------
+       A pessoa some na hora, mas só é apagada no banco depois de 5s.
+       modo 'tudo' = apaga também os documentos dela; 'so-pessoa' = documentos ficam com você. */
+
+    const TEMPO_DESFAZER = 5000;
+    let exclusaoPessoa = null; // { id, modo, docIds, token, timer }
+
+    async function excluirPessoaComDesfazer(id, modo) {
+      if (exclusaoPessoa) await concluirExclusaoPessoa(true);
+      const sessao = (await sb.auth.getSession()).data.session;
+      const docIds = ultimosDocs.filter(function (d) { return d.pessoa_id === id; }).map(function (d) { return d.id; });
+      exclusaoPessoa = { id: id, modo: modo, docIds: docIds, token: sessao ? sessao.access_token : '', timer: setTimeout(concluirExclusaoPessoa, TEMPO_DESFAZER) };
+      mostrarAvisoDesfazer(modo === 'tudo' && docIds.length ? 'Pessoa e documentos excluídos' : 'Pessoa excluída');
+      carregar();
+    }
+
+    async function concluirExclusaoPessoa(semRecarregar) {
+      const p = exclusaoPessoa;
+      if (!p) return;
+      exclusaoPessoa = null;
+      clearTimeout(p.timer);
+      esconderAvisoDesfazer();
+      let erro = null;
+      if (p.modo === 'tudo' && p.docIds.length) {
+        const r = await sb.from('documentos').delete().in('id', p.docIds);
+        erro = r.error;
+      }
+      if (!erro) {
+        const r = await sb.from('pessoas').delete().eq('id', p.id);
+        erro = r.error;
+      }
+      if (erro) await Dialogo.avisar('Não foi possível excluir agora. Tente de novo.');
+      if (erro || !semRecarregar) carregar();
+    }
+
+    function desfazerExclusaoPessoa() {
+      const p = exclusaoPessoa;
+      if (!p) return;
+      exclusaoPessoa = null;
+      clearTimeout(p.timer);
+      esconderAvisoDesfazer();
+      carregar();
+    }
+
+    // saiu da tela com exclusão pendente: termina mesmo com a página fechando
+    window.addEventListener('pagehide', function () {
+      const p = exclusaoPessoa;
+      if (!p || !p.token) return;
+      exclusaoPessoa = null;
+      clearTimeout(p.timer);
+      const cab = { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + p.token };
+      try {
+        // documentos por id (não depende da ordem em que os dois pedidos chegam)
+        if (p.modo === 'tudo' && p.docIds.length) {
+          fetch(SUPABASE_URL + '/rest/v1/documentos?id=in.(' + p.docIds.map(encodeURIComponent).join(',') + ')', { method: 'DELETE', keepalive: true, headers: cab });
+        }
+        fetch(SUPABASE_URL + '/rest/v1/pessoas?id=eq.' + encodeURIComponent(p.id), { method: 'DELETE', keepalive: true, headers: cab });
+      } catch (e) {}
+    });
+
+    function mostrarAvisoDesfazer(texto) {
+      let el = document.getElementById('aviso-desfazer');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'aviso-desfazer';
+        el.className = 'aviso-desfazer';
+        el.setAttribute('role', 'status');
+        el.innerHTML = '<span></span><button type="button">Desfazer</button><i class="aviso-desfazer-barra"></i>';
+        el.querySelector('button').addEventListener('click', desfazerExclusaoPessoa);
+        document.body.appendChild(el);
+      }
+      el.querySelector('span').textContent = texto;
+      const barra = el.querySelector('.aviso-desfazer-barra');
+      barra.style.animation = 'none';
+      void barra.offsetWidth;
+      barra.style.animation = 'avisoDesfazerTempo ' + TEMPO_DESFAZER + 'ms linear forwards';
+      el.classList.add('visivel');
+    }
+
+    function esconderAvisoDesfazer() {
+      const el = document.getElementById('aviso-desfazer');
+      if (el) el.classList.remove('visivel');
+    }
 
     document.getElementById('btn-adicionar').addEventListener('click', async function () {
       const nome = await Dialogo.pedir('Nova pessoa', '', { placeholder: 'Nome da pessoa', ok: 'Adicionar' });

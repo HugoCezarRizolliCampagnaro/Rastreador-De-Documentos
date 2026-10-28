@@ -4,6 +4,8 @@
 //   if (!(await Dialogo.confirmar('Excluir?', { ok: 'Excluir', perigo: true }))) return;
 //   const nome = await Dialogo.pedir('Nome da pessoa:', 'valor inicial', { placeholder: 'Ex.: Maria' });
 //   (pedir devolve null se a pessoa cancelar, igual ao prompt)
+//   const v = await Dialogo.escolher('Pergunta', [{ valor: 'a', texto: 'Opção A', perigo: true }, { valor: 'b', texto: 'Opção B' }]);
+//   (escolher devolve o valor do botão tocado, ou null se cancelar)
 (function () {
   var css = [
     '.dlg-fundo { position: fixed; inset: 0; z-index: 1000; background: rgba(5, 8, 15, 0.62); display: flex; align-items: center; justify-content: center; padding: 20px; animation: dlgFundo .15s ease; }',
@@ -20,6 +22,8 @@
     '.dlg-btn-ok { background: var(--marca, #5B6EF5); color: #FFFFFF; }',
     '.dlg-btn-ok:hover { filter: brightness(1.08); }',
     '.dlg-btn-perigo { background: var(--status-vermelho, #F2555C); color: #FFFFFF; }',
+    '.dlg-botoes.dlg-coluna { flex-direction: column; }',
+    '.dlg-botoes.dlg-coluna .dlg-btn { width: 100%; padding: 12px; }',
     '@keyframes dlgFundo { from { opacity: 0; } to { opacity: 1; } }',
     '@keyframes dlgCaixa { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }',
     '@media (max-width: 480px) { .dlg-botoes { flex-direction: column-reverse; } .dlg-btn { width: 100%; padding: 12px; } }'
@@ -86,6 +90,19 @@
       var botoes = document.createElement('div');
       botoes.className = 'dlg-botoes';
       var btnCancelar = null;
+      var escolhas = [];
+      if (tipo === 'escolher') {
+        botoes.classList.add('dlg-coluna');
+        (opcoes.botoes || []).forEach(function (b) {
+          var el = document.createElement('button');
+          el.type = 'button';
+          el.className = 'dlg-btn ' + (b.perigo ? 'dlg-btn-perigo' : b.principal ? 'dlg-btn-ok' : 'dlg-btn-sec');
+          el.textContent = b.texto;
+          el.addEventListener('click', function () { fechar(b.valor); });
+          botoes.appendChild(el);
+          escolhas.push(el);
+        });
+      }
       if (tipo !== 'avisar') {
         btnCancelar = document.createElement('button');
         btnCancelar.type = 'button';
@@ -93,11 +110,13 @@
         btnCancelar.textContent = opcoes.cancelar || 'Cancelar';
         botoes.appendChild(btnCancelar);
       }
+      if (tipo === 'escolher') botoes.appendChild(btnCancelar); // Cancelar por último, embaixo
       var btnOk = document.createElement('button');
       btnOk.type = 'button';
+      if (tipo === 'escolher') btnOk.hidden = true;
       btnOk.className = 'dlg-btn ' + (opcoes.perigo ? 'dlg-btn-perigo' : 'dlg-btn-ok');
       btnOk.textContent = opcoes.ok || (tipo === 'avisar' ? 'Entendi' : tipo === 'pedir' ? 'Salvar' : 'Confirmar');
-      botoes.appendChild(btnOk);
+      if (tipo !== 'escolher') botoes.appendChild(btnOk);
       caixa.appendChild(botoes);
 
       fundo.appendChild(caixa);
@@ -115,13 +134,13 @@
         else fechar(undefined);
       }
       function cancelar() {
-        if (tipo === 'pedir') fechar(null);
+        if (tipo === 'pedir' || tipo === 'escolher') fechar(null);
         else if (tipo === 'confirmar') fechar(false);
         else fechar(undefined);
       }
       function teclas(e) {
         if (e.key === 'Escape') { e.preventDefault(); cancelar(); }
-        else if (e.key === 'Enter' && (tipo !== 'confirmar' || document.activeElement !== btnCancelar)) { e.preventDefault(); confirmar(); }
+        else if (e.key === 'Enter' && tipo !== 'escolher' && (tipo !== 'confirmar' || document.activeElement !== btnCancelar)) { e.preventDefault(); confirmar(); }
       }
 
       btnOk.addEventListener('click', confirmar);
@@ -131,6 +150,7 @@
 
       setTimeout(function () {
         if (campo) { campo.focus(); campo.select(); }
+        else if (tipo === 'escolher') btnCancelar.focus(); // escolha perigosa nunca vem focada
         else btnOk.focus();
       }, 30);
     });
@@ -139,6 +159,7 @@
   window.Dialogo = {
     avisar: function (mensagem, opcoes) { return abrir('avisar', mensagem, null, opcoes); },
     confirmar: function (mensagem, opcoes) { return abrir('confirmar', mensagem, null, opcoes); },
-    pedir: function (mensagem, valorInicial, opcoes) { return abrir('pedir', mensagem, valorInicial, opcoes); }
+    pedir: function (mensagem, valorInicial, opcoes) { return abrir('pedir', mensagem, valorInicial, opcoes); },
+    escolher: function (mensagem, botoes, opcoes) { return abrir('escolher', mensagem, null, Object.assign({}, opcoes || {}, { botoes: botoes })); }
   };
 })();
