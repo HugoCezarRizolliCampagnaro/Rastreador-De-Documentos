@@ -1,5 +1,7 @@
 // Tour guiado do Início: destaca cada parte da tela com um balão explicando.
-// Uso: Tour.iniciar()  — abre pela janela de boas-vindas, por index.html?tour=1 (Perfil → Ver tour do app)
+// Uso: Tour.iniciar()  — tour do Início (boas-vindas, ou index.html?tour=1 pelo Perfil)
+//      Tour.iniciar({ passos: [...], chave: 'tour-documento-visto' }) — tour de outra tela
+// Um alvo pode ser um seletor CSS ou uma função que devolve o elemento.
 // Cada passo aponta pra uma lista de seletores; usa o primeiro que estiver visível
 // (celular e computador têm elementos diferentes). Passo sem nada visível é pulado.
 (function () {
@@ -71,8 +73,9 @@
 
   function acharAlvo(passo) {
     for (var i = 0; i < passo.alvos.length; i++) {
-      var el = document.querySelector(passo.alvos[i]);
-      if (visivel(el)) return { el: el, seletor: passo.alvos[i] };
+      var alvo = passo.alvos[i];
+      var el = typeof alvo === 'function' ? alvo() : document.querySelector(alvo);
+      if (visivel(el)) return { el: el, seletor: typeof alvo === 'string' ? alvo : '' };
     }
     return null;
   }
@@ -174,7 +177,7 @@
 
   function terminar() {
     if (!estado) return;
-    try { localStorage.setItem('tour-visto', 'true'); } catch (e) {}
+    try { localStorage.setItem(estado.chave, 'true'); } catch (e) {}
     window.removeEventListener('resize', posicionar);
     window.removeEventListener('scroll', posicionar, true);
     document.removeEventListener('keydown', teclas, true);
@@ -187,15 +190,20 @@
     if (aoFim) aoFim();
   }
 
-  function iniciar(aoFim) {
+  function iniciar(opcoes) {
     if (estado) return;
+    // compatível com o jeito antigo: Tour.iniciar(funcaoAoFim)
+    if (typeof opcoes === 'function') opcoes = { aoFim: opcoes };
+    opcoes = opcoes || {};
+    var lista = opcoes.passos || PASSOS;
+    var aoFim = opcoes.aoFim;
     var passos = [];
-    PASSOS.forEach(function (p) {
+    lista.forEach(function (p) {
       var achado = acharAlvo(p);
       if (achado) passos.push({ titulo: p.titulo, texto: (p.textoPor && p.textoPor[achado.seletor]) || p.texto, el: achado.el });
     });
     if (passos.length === 0) return;
-    estado = { passos: passos, i: 0, els: montar(), aoFim: aoFim };
+    estado = { passos: passos, i: 0, els: montar(), aoFim: aoFim, chave: opcoes.chave || 'tour-visto' };
     window.addEventListener('resize', posicionar);
     window.addEventListener('scroll', posicionar, true);
     document.addEventListener('keydown', teclas, true);

@@ -209,6 +209,8 @@
 
   .erro-campo { font-size: 12px; color: var(--status-vermelho); margin-top: 6px; }
 
+  .link-ajuda { background: none; border: none; padding: 0; font: inherit; font-size: inherit; font-weight: 600; color: var(--marca); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
   .dica-repeticao { font-size: 12px; color: var(--texto-muted); margin: 6px 0 0; line-height: 1.45; }
   .dica-repeticao strong { color: var(--texto); }
   .btn-recorrente {
@@ -443,7 +445,7 @@
           <a href="index.html" class="link-voltar"><span id="icone-voltar"></span> Voltar</a>
         </div>
         <h1 id="titulo-pagina">Adicionar documento</h1>
-        <p class="pagina-sub">Cadastre o documento e acompanhe sua validade, custos e renovação.</p>
+        <p class="pagina-sub">Cadastre o documento e acompanhe sua validade, custos e renovação. <button type="button" class="link-ajuda" id="btn-como-preencher">Como preencher?</button></p>
       </div>
 
       <div class="conteudo">
@@ -680,6 +682,7 @@
   </div>
   <script src="dialogos.js"></script>
   <script src="recorrencia.js"></script>
+  <script src="tour.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
@@ -1151,6 +1154,10 @@
       repeticaoDisponivel = !testeRepeticao.error;
       document.getElementById('campo-repeticao').hidden = !repeticaoDisponivel;
 
+      let jaViuTourDocumento = true;
+      try { jaViuTourDocumento = localStorage.getItem('tour-documento-visto') === 'true'; } catch (e) {}
+      if (!idEdicao && !jaViuTourDocumento) setTimeout(abrirTourDocumento, 500);
+
       if (idEdicao) {
         tituloPagina.textContent = 'Editar documento';
         document.title = 'Editar documento — DocTrack';
@@ -1216,6 +1223,33 @@
     /* ---------- categoria de documento -> categoria financeira, pro gasto vinculado ---------- */
 
     const mapaCategoriaParaGasto = { pessoal: 'outros', veiculo: 'transporte', trabalho: 'outros', casa: 'moradia', outro: 'outros' };
+
+    /* ---------- tour da tela do documento ---------- */
+
+    function cartaoDe(id) { const el = document.getElementById(id); return el ? el.closest('.secao-card') : null; }
+
+    const PASSOS_DOCUMENTO = [
+      { alvos: [function () { return cartaoDe('arquivo'); }], titulo: 'Comece pelo documento',
+        texto: 'Tire uma foto ou envie o PDF. Depois toque em "Preencher automaticamente com IA" que o app lê o documento e preenche nome, número e datas pra você.' },
+      { alvos: [function () { return cartaoDe('nome'); }], titulo: 'Nome do documento',
+        texto: 'Use um nome fácil de achar depois, tipo "ASO — Maria" ou "Alvará da loja". O número é opcional.' },
+      { alvos: [function () { return cartaoDe('categoria'); }], titulo: 'Tipo e categoria',
+        texto: 'O tipo monta o checklist de renovação (ASO, NR, Alvará…). A categoria separa os documentos no Início (Pessoal, Trabalho, Casa…), e dá pra criar a sua em "+ Nova categoria".' },
+      { alvos: [function () { return cartaoDe('pessoa'); }], titulo: 'De quem é',
+        texto: 'Escolha a pessoa (alguém da família ou um funcionário) ou o cliente dono do documento. Se o documento é seu, deixe "Ninguém específico".' },
+      { alvos: [function () { return cartaoDe('data_vencimento'); }], titulo: 'Vencimento e avisos',
+        texto: 'Coloque a data de vencimento e quantos dias antes quer ser avisado por e-mail. Se for uma conta que repete (aluguel, DAS), escolha em "Repete".' },
+      { alvos: [function () { return cartaoDe('custo_valor'); }], titulo: 'Custo (opcional)',
+        texto: 'Anote quanto custa renovar ou a mensalidade. Marcando a opção, o valor entra na tela de Gastos.' },
+      { alvos: ['#botao-salvar'], titulo: 'Pronto!',
+        texto: 'Toque aqui pra salvar. O documento aparece no Início com a cor do prazo, e os avisos começam a contar.' },
+    ];
+
+    function abrirTourDocumento() {
+      Tour.iniciar({ passos: PASSOS_DOCUMENTO, chave: 'tour-documento-visto' });
+    }
+
+    document.getElementById('btn-como-preencher').addEventListener('click', abrirTourDocumento);
 
     /* ---------- documento recorrente: "Repete" + botão Paguei/Renovei ---------- */
 
