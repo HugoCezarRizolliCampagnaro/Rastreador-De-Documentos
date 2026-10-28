@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<!-- Pessoas — situação dos documentos de cada pessoa (você, família ou funcionários) -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="description" content="DocTrack — organize seus documentos, controle vencimentos e receba lembretes.">
+<meta property="og:title" content="DocTrack">
+<meta property="og:description" content="Organize seus documentos, controle vencimentos e nunca mais perca um prazo.">
+<meta property="og:image" content="https://rastreador-de-documentos.vercel.app/icons/icon-512.png">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<meta name="theme-color" content="#0B0E14">
+<title>Pessoas — DocTrack</title>
+<script>
+  if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+  if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --marca: #3D4FE0; --marca-hover: #2E3FC0;
+    --bg: #F7F8FA; --superficie: #FFFFFF;
+    --texto: #14161A; --texto-muted: #6B7280; --borda: #E3E5E9;
+    --status-verde: #1F9D55; --status-amarelo: #F5A623; --status-vermelho: #E5484D;
+  }
+
+  html.escuro {
+    --bg: #0B0E14; --superficie: #141821;
+    --texto: #F1F2F4; --texto-muted: #8A93A3; --borda: #232833;
+    --marca: #5B6EF5; --marca-hover: #4457E0;
+    --status-verde: #22C55E; --status-amarelo: #F5A623; --status-vermelho: #F2555C;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    overflow-x: hidden;
+    max-width: 100vw;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg); color: var(--texto);
+    -webkit-font-smoothing: antialiased;
+    animation: entrada 0.3s ease;
+  }
+
+  @keyframes entrada { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  svg.icone { display: block; flex-shrink: 0; }
+
+  .glow-fundo {
+    position: fixed; top: -180px; left: 15%;
+    width: 560px; height: 560px;
+    background: radial-gradient(circle, rgba(91, 110, 245, 0.35), transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  html:not(.escuro) .glow-fundo { display: none; }
+
+  .app-shell { display: flex; min-height: 100vh; position: relative; z-index: 1; }
+
+  .sidebar {
+    position: fixed; top: 0; left: 0; height: 100vh; width: 250px;
+    display: flex; flex-direction: column;
+    padding: 22px 14px;
+    background: var(--superficie);
+    border-right: 1px solid var(--borda);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 40;
+  }
+
+  .sidebar.aberta { transform: translateX(0); }
+  .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 35; display: none; }
+  .sidebar-backdrop.ativo { display: block; }
+
+  @media (min-width: 960px) {
+    .sidebar { position: sticky; transform: none; }
+    .sidebar-backdrop { display: none !important; }
+    .botao-menu { display: none; }
+    .conteudo-principal { flex: 1; min-width: 0; }
+    .cabecalho, .conteudo { max-width: 860px; padding-left: 32px; padding-right: 32px; }
+  }
+
+  .sidebar-marca { display: flex; align-items: center; gap: 10px; padding: 6px 10px 22px; }
+  .sidebar-logo { width: 36px; height: 36px; border-radius: 10px; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sidebar-titulo { font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+  .sidebar-subtitulo { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  .sidebar-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; color: var(--texto-muted); text-decoration: none; font-size: 14px; font-weight: 500; }
+  .sidebar-item:hover { background: var(--bg); }
+  .sidebar-perfil { display: flex; align-items: center; gap: 10px; padding: 12px 10px 4px; border-top: 1px solid var(--borda); margin-top: 10px; text-decoration: none; color: var(--texto); }
+  .sidebar-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+  .sidebar-perfil-nome { font-size: 12.5px; font-weight: 600; word-break: break-all; }
+  .sidebar-perfil-sub { font-size: 11px; color: var(--texto-muted); }
+  .sidebar-perfil-seta { margin-left: auto; color: var(--texto-muted); flex-shrink: 0; }
+
+
+  .sidebar-item.ativo { background: rgba(91, 110, 245, 0.14); color: var(--marca); font-weight: 600; }
+
+  .cabecalho { max-width: 760px; margin: 0 auto; padding: 24px 20px 4px; }
+  .topo-pagina { display: flex; flex-wrap: wrap; row-gap: 12px; align-items: flex-start; justify-content: space-between; gap: 14px; }
+  .topo-esquerda { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+  .botao-menu { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--borda); background: var(--superficie); color: var(--texto); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+  .pagina-icone { width: 46px; height: 46px; border-radius: 12px; background: var(--marca); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .cabecalho h1 { font-size: 24px; font-weight: 700; margin: 0 0 4px; }
+  .pagina-sub { font-size: 13px; color: var(--texto-muted); margin: 0; }
+
+  .btn-adicionar {
+    display: flex; align-items: center; gap: 7px;
+    padding: 10px 16px;
+    font-family: inherit; font-size: 13.5px; font-weight: 600;
+    color: #FFFFFF; background: var(--marca);
+    border: none; border-radius: 9px;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .btn-adicionar:hover { background: var(--marca-hover); }
+  .btn-adicionar[hidden] { display: none; }
+
+  .conteudo { max-width: 760px; margin: 0 auto; padding: 20px 20px 60px; }
+
+  @media (min-width: 960px) {
+    .cabecalho, .conteudo { max-width: 760px; padding-left: 32px; padding-right: 32px; }
+  }
+
+  /* resumo no topo */
+  .resumo-pessoas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+  .resumo-card { background: var(--superficie); border: 1px solid var(--borda); border-radius: 14px; padding: 14px; }
+  .resumo-numero { font-size: 20px; font-weight: 700; display: block; }
+  .resumo-label { font-size: 11.5px; color: var(--texto-muted); white-space: nowrap; }
+
+  /* lista */
+  .lista-pessoas { display: flex; flex-direction: column; gap: 10px; }
+
+  .pessoa-card {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 12px;
+    padding: 12px 14px;
+    text-decoration: none; color: inherit;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    animation: subir 0.3s ease both;
+  }
+  .pessoa-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18); }
+
+  @keyframes subir { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .pessoa-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 15px; flex-shrink: 0;
+    background: rgba(91, 110, 245, 0.16); color: var(--marca);
+  }
+  .pessoa-avatar.eu { background: var(--marca); color: #FFFFFF; }
+
+  .pessoa-info { flex: 1; min-width: 0; }
+  .pessoa-nome { font-size: 14.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pessoa-detalhe { font-size: 12px; color: var(--texto-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0;
+  }
+  .status-badge.verde { background: rgba(34, 197, 94, 0.16); color: var(--status-verde); }
+  .status-badge.amarelo { background: rgba(245, 166, 35, 0.18); color: var(--status-amarelo); }
+  .status-badge.vermelho { background: rgba(242, 85, 92, 0.16); color: var(--status-vermelho); }
+  .status-badge.neutro { background: var(--bg); color: var(--texto-muted); border: 1px solid var(--borda); }
+
+  .pessoa-seta { color: var(--texto-muted); flex-shrink: 0; }
+  @media (max-width: 599px) { .pessoa-seta { display: none; } .pessoa-card { gap: 10px; } }
+
+  /* aviso de plano */
+  .aviso-plano {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 16px; padding: 14px 16px;
+    background: var(--superficie); border: 1px dashed var(--borda); border-radius: 12px;
+    text-decoration: none; color: inherit;
+  }
+  .aviso-plano[hidden] { display: none; }
+  .aviso-plano-icone { width: 36px; height: 36px; border-radius: 10px; background: rgba(91, 110, 245, 0.14); color: var(--marca); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .aviso-plano-titulo { font-size: 13.5px; font-weight: 600; }
+  .aviso-plano-texto { font-size: 12px; color: var(--texto-muted); margin-top: 2px; line-height: 1.45; }
+
+  .limite-texto { font-size: 12px; color: var(--texto-muted); text-align: center; margin-top: 14px; }
+  .limite-texto[hidden] { display: none; }
+
+  .carregando { text-align: center; color: var(--texto-muted); font-size: 14px; padding: 40px 20px; }
+
+  /* ---------- instalar app (pwa) ---------- */
+
+  .banner-instalar {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 92px;
+    z-index: 45;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    max-width: 400px;
+    margin: 0 auto;
+    animation: instalarSubir 0.3s ease both;
+  }
+
+  @keyframes instalarSubir {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (min-width: 960px) {
+    .banner-instalar { left: auto; right: 24px; margin: 0; }
+  }
+
+  .banner-instalar[hidden] { display: none; }
+
+  .banner-instalar-logo { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; object-fit: cover; }
+
+  .banner-instalar-conteudo { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+  .banner-instalar-conteudo strong { font-size: 13.5px; color: var(--texto); }
+
+  .banner-instalar-conteudo span { font-size: 12px; color: var(--texto-muted); line-height: 1.4; }
+
+  .banner-instalar-acoes { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+
+  .banner-instalar-cta {
+    background: var(--marca);
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .banner-instalar-cta:hover { background: var(--marca-hover); }
+
+  .banner-instalar-fechar {
+    background: none;
+    border: none;
+    color: var(--texto-muted);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 2px;
+    text-decoration: underline;
+  }
+
+  /* ---------- correção mobile: nada pode ser mais largo que a tela ---------- */
+  .app-shell { overflow-x: clip; max-width: 100%; }
+  .conteudo-principal { min-width: 0; max-width: 100%; }
+  .glow-fundo { max-width: 85vw; }
+</style>
+</head>
+<body>
+
+  <div class="glow-fundo"></div>
+  <div class="app-shell">
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-marca">
+        <img class="sidebar-logo" src="icons/icon-192.png" alt="DocTrack" style="object-fit: cover;">
+        <div>
+          <div class="sidebar-titulo">DocTrack</div>
+          <div class="sidebar-subtitulo">Rastreador de Documentos</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+      <a href="perfil.html" class="sidebar-perfil">
+        <span class="sidebar-avatar" id="sidebar-avatar">?</span>
+        <div>
+          <div class="sidebar-perfil-nome" id="sidebar-email">Carregando...</div>
+          <div class="sidebar-perfil-sub">Minha conta</div>
+        </div>
+        <span class="sidebar-perfil-seta" id="sidebar-perfil-seta"></span>
+      </a>
+    </aside>
+
+    <div class="conteudo-principal">
+      <div class="cabecalho">
+        <div class="topo-pagina">
+          <div class="topo-esquerda">
+            <button type="button" class="botao-menu" id="botao-menu" aria-label="Abrir menu"></button>
+            <div class="pagina-icone" id="pagina-icone"></div>
+            <div>
+              <h1>Pessoas</h1>
+              <p class="pagina-sub" id="subtitulo">Veja como estão os documentos de cada pessoa.</p>
+            </div>
+          </div>
+          <button type="button" class="btn-adicionar" id="btn-adicionar" hidden><span id="icone-adicionar"></span> Adicionar pessoa</button>
+        </div>
+      </div>
+
+      <div class="conteudo">
+        <div class="resumo-pessoas" id="resumo-pessoas"></div>
+        <div class="lista-pessoas" id="lista-pessoas"><p class="carregando">Carregando...</p></div>
+        <p class="limite-texto" id="limite-texto" hidden></p>
+        <a href="planos.html" class="aviso-plano" id="aviso-plano" hidden>
+          <span class="aviso-plano-icone" id="icone-aviso-plano"></span>
+          <div>
+            <div class="aviso-plano-titulo" id="aviso-plano-titulo">Controle os documentos de outras pessoas</div>
+            <div class="aviso-plano-texto" id="aviso-plano-texto">Família (até 4 pessoas) ou Profissional (pessoas ilimitadas, ideal pra funcionários). Toque para ver os planos.</div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="banner-instalar" id="banner-instalar" hidden>
+    <img class="banner-instalar-logo" src="icons/icon-192.png" alt="">
+    <div class="banner-instalar-conteudo">
+      <strong>Instalar o DocTrack</strong>
+      <span>Acesse mais rápido, direto da tela inicial.</span>
+    </div>
+    <div class="banner-instalar-acoes">
+      <button type="button" class="banner-instalar-cta" id="btn-instalar-banner">Instalar</button>
+      <button type="button" class="banner-instalar-fechar" id="btn-fechar-banner">Agora não</button>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_brDnSPSCu4ry9QTe-pYwag_zRqB6hkL';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const CORPOS_ICONE = {
+      home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+      users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+      dollarSign: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+      calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+      messageCircle: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+      menu: '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',
+      chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+      plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+      checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+      clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+      alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+      star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+    };
+
+    function icone(nome, tamanho, corTraco) {
+      const tam = tamanho || 18;
+      const cor = corTraco || 'currentColor';
+      return `<svg class="icone" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${CORPOS_ICONE[nome] || ''}</svg>`;
+    }
+
+    document.getElementById('botao-menu').innerHTML = icone('menu', 18);
+    document.getElementById('pagina-icone').innerHTML = icone('users', 22, '#FFFFFF');
+    document.getElementById('sidebar-perfil-seta').innerHTML = icone('chevronRight', 16);
+    document.getElementById('icone-adicionar').innerHTML = icone('plus', 15, '#FFFFFF');
+    document.getElementById('icone-aviso-plano').innerHTML = icone('star', 17);
+
+    document.getElementById('sidebar-nav').innerHTML = [
+      { href: 'index.html', nome: 'home', label: 'Início' },
+      { href: 'pessoas.html', nome: 'users', label: 'Pessoas', ativo: true },
+      { href: 'gastos.html', nome: 'dollarSign', label: 'Gastos' },
+      { href: 'calendario.html', nome: 'calendar', label: 'Calendário' },
+      { href: 'assistente.html', nome: 'messageCircle', label: 'Assistente' },
+    ].map(function (item) {
+      return `<a href="${item.href}" class="sidebar-item${item.ativo ? ' ativo' : ''}">${icone(item.nome, 18)}${item.label}</a>`;
+    }).join('');
+
+    const sidebarEl = document.getElementById('sidebar');
+    const backdropEl = document.getElementById('sidebar-backdrop');
+    document.getElementById('botao-menu').addEventListener('click', function () {
+      sidebarEl.classList.add('aberta');
+      backdropEl.classList.add('ativo');
+    });
+    backdropEl.addEventListener('click', function () {
+      sidebarEl.classList.remove('aberta');
+      backdropEl.classList.remove('ativo');
+    });
+
+    /* ---------- utilidades (mesmas regras de cor do Início) ---------- */
+
+    function escapeHtml(texto) {
+      const div = document.createElement('div');
+      div.textContent = texto;
+      return div.innerHTML;
+    }
+
+    function diasRestantes(dataStr) {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const alvo = new Date(dataStr + 'T00:00:00');
+      return Math.round((alvo - hoje) / 86400000);
+    }
+
+    function statusPorDias(dias) {
+      if (dias < 7) return 'vermelho';
+      if (dias < 30) return 'amarelo';
+      return 'verde';
+    }
+
+    function plural(n, singular, pluralTxt) { return n + ' ' + (n === 1 ? singular : pluralTxt); }
+
+    // limite de pessoas além de você (igual à trava do banco)
+    const LIMITE_PESSOAS = { gratis: 0, premium: 0, familia: 4, profissional: Infinity };
+
+    let usuarioAtual = null;
+    let planoAtual = 'gratis';
+    let pessoasCarregadas = [];
+
+    async function planoEmVigor() {
+      const { data } = await sb.from('perfis').select('plano, plano_valido_ate').maybeSingle();
+      const hoje = new Date().toLocaleDateString('sv-SE');
+      return data && data.plano !== 'gratis' && data.plano_valido_ate >= hoje ? data.plano : 'gratis';
+    }
+
+    /* ---------- monta o resumo de uma pessoa a partir dos documentos dela ---------- */
+
+    function resumir(docs) {
+      let vencidos = 0, urgentes = 0, atencao = 0, emDia = 0;
+      let proximo = null;
+      docs.forEach(function (d) {
+        const dias = diasRestantes(d.data_vencimento);
+        const st = statusPorDias(dias);
+        if (dias < 0) vencidos++;
+        else if (st === 'vermelho') urgentes++;
+        else if (st === 'amarelo') atencao++;
+        else emDia++;
+        if (dias >= 0 && (!proximo || dias < proximo.dias)) proximo = { dias: dias, nome: d.nome };
+      });
+
+      let selo, classe, icon, peso;
+      if (docs.length === 0) { selo = 'Sem documentos'; classe = 'neutro'; icon = ''; peso = 4; }
+      else if (vencidos) { selo = plural(vencidos, 'vencido', 'vencidos'); classe = 'vermelho'; icon = 'alertTriangle'; peso = 0; }
+      else if (urgentes) { selo = plural(urgentes, 'urgente', 'urgentes'); classe = 'vermelho'; icon = 'alertTriangle'; peso = 1; }
+      else if (atencao) { selo = plural(atencao, 'vencendo', 'vencendo'); classe = 'amarelo'; icon = 'clock'; peso = 2; }
+      else { selo = 'Tudo em dia'; classe = 'verde'; icon = 'checkCircle'; peso = 3; }
+
+      const detalhe = plural(docs.length, 'documento', 'documentos');
+      let proximoTxt = '';
+      if (proximo) proximoTxt = proximo.dias === 0 ? 'Um vence hoje' : 'Próximo em ' + plural(proximo.dias, 'dia', 'dias');
+      else if (vencidos) proximoTxt = 'Nenhum a vencer';
+
+      return { selo: selo, classe: classe, icon: icon, peso: peso, detalhe: detalhe, proximoTxt: proximoTxt, pendente: vencidos + urgentes + atencao > 0 };
+    }
+
+    /* ---------- carregar e desenhar ---------- */
+
+    async function carregar() {
+      const [pessoasRes, docsRes] = await Promise.all([
+        sb.from('pessoas').select('id, nome').order('nome'),
+        sb.from('documentos').select('id, nome, data_vencimento, pessoa_id'),
+      ]);
+      pessoasCarregadas = pessoasRes.data || [];
+      const docs = docsRes.data || [];
+
+      const meus = docs.filter(function (d) { return !d.pessoa_id; });
+      const nomeUsuario = String((usuarioAtual.user_metadata || {}).full_name || '').trim();
+
+      const linhas = pessoasCarregadas.map(function (p) {
+        const r = resumir(docs.filter(function (d) { return d.pessoa_id === p.id; }));
+        return Object.assign({ id: p.id, nome: p.nome, eu: false }, r);
+      });
+      // quem tem problema aparece primeiro; empate, ordem alfabética
+      linhas.sort(function (a, b) { return a.peso - b.peso || a.nome.localeCompare(b.nome, 'pt-BR'); });
+
+      const eu = Object.assign({ id: '__eu__', nome: nomeUsuario ? nomeUsuario + ' (você)' : 'Você', eu: true }, resumir(meus));
+      const todas = [eu].concat(linhas);
+
+      desenharResumo(todas);
+      desenharLista(todas);
+      atualizarPlano();
+    }
+
+    function desenharResumo(todas) {
+      const comPendencia = todas.filter(function (l) { return l.pendente; }).length;
+      const emDia = todas.filter(function (l) { return l.classe === 'verde'; }).length;
+      document.getElementById('resumo-pessoas').innerHTML = `
+        <div class="resumo-card"><span class="resumo-numero">${todas.length}</span><span class="resumo-label">${todas.length === 1 ? 'pessoa' : 'pessoas'}</span></div>
+        <div class="resumo-card"><span class="resumo-numero" style="color: var(--status-verde);">${emDia}</span><span class="resumo-label">tudo em dia</span></div>
+        <div class="resumo-card"><span class="resumo-numero" style="color: ${comPendencia ? 'var(--status-vermelho)' : 'var(--texto)'};">${comPendencia}</span><span class="resumo-label">pendentes</span></div>
+      `;
+    }
+
+    function desenharLista(todas) {
+      document.getElementById('lista-pessoas').innerHTML = todas.map(function (l, i) {
+        const inicial = escapeHtml(l.nome.trim().charAt(0).toUpperCase() || '?');
+        return `
+          <a class="pessoa-card" href="index.html?pessoa=${encodeURIComponent(l.id)}" style="animation-delay: ${Math.min(i * 0.04, 0.4)}s;">
+            <span class="pessoa-avatar${l.eu ? ' eu' : ''}">${inicial}</span>
+            <div class="pessoa-info">
+              <div class="pessoa-nome">${escapeHtml(l.nome)}</div>
+              <div class="pessoa-detalhe">${l.detalhe}</div>
+              ${l.proximoTxt ? `<div class="pessoa-detalhe">${l.proximoTxt}</div>` : ''}
+            </div>
+            <span class="status-badge ${l.classe}">${l.icon ? icone(l.icon, 12) : ''} ${l.selo}</span>
+            <span class="pessoa-seta">${icone('chevronRight', 16)}</span>
+          </a>
+        `;
+      }).join('');
+    }
+
+    function atualizarPlano() {
+      const limite = LIMITE_PESSOAS[planoAtual] === undefined ? 0 : LIMITE_PESSOAS[planoAtual];
+      const qtd = pessoasCarregadas.length;
+      const btn = document.getElementById('btn-adicionar');
+      const aviso = document.getElementById('aviso-plano');
+      const limiteTexto = document.getElementById('limite-texto');
+
+      if (limite === 0) {
+        btn.hidden = true;
+        aviso.hidden = false;
+        limiteTexto.hidden = true;
+        return;
+      }
+
+      btn.hidden = false;
+      if (limite === Infinity) {
+        aviso.hidden = true;
+        limiteTexto.hidden = true;
+      } else {
+        limiteTexto.hidden = false;
+        limiteTexto.textContent = `Você + ${qtd} de ${limite} pessoas no plano Família`;
+        aviso.hidden = qtd < limite;
+        if (qtd >= limite) {
+          document.getElementById('aviso-plano-titulo').textContent = 'Precisa de mais pessoas?';
+          document.getElementById('aviso-plano-texto').textContent = 'No plano Profissional as pessoas são ilimitadas, ideal pra funcionários. Toque para ver os planos.';
+        }
+      }
+    }
+
+    document.getElementById('btn-adicionar').addEventListener('click', async function () {
+      const nome = prompt('Nome da pessoa:');
+      if (!nome || !nome.trim()) return;
+      const { error } = await sb.from('pessoas').insert([{ user_id: usuarioAtual.id, nome: nome.trim().slice(0, 80) }]);
+      if (error) {
+        const msg = error.message || 'Não foi possível adicionar agora.';
+        if (/plano/i.test(msg)) { if (confirm(msg + '\n\nQuer ver os planos?')) window.location.href = 'planos.html'; }
+        else alert('Não foi possível adicionar agora. Tente de novo.');
+        return;
+      }
+      carregar();
+    });
+
+    /* ---------- sessão ---------- */
+
+    sb.auth.getSession().then(async function (resultado) {
+      if (!resultado.data.session) { window.location.href = 'login.html'; return; }
+      usuarioAtual = resultado.data.session.user;
+      document.getElementById('sidebar-email').textContent = usuarioAtual.email;
+      document.getElementById('sidebar-avatar').textContent = usuarioAtual.email.charAt(0).toUpperCase();
+      planoAtual = await planoEmVigor();
+      carregar();
+    });
+
+      /* ---------- instalar app (pwa) ---------- */
+
+    let eventoInstalacao = null;
+    const appJaInstalado = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+    function mostrarBannerInstalar() {
+      if (appJaInstalado || localStorage.getItem('app-instalado') === 'true' || localStorage.getItem('instalar-app-dispensado') === 'true') return;
+      const banner = document.getElementById('banner-instalar');
+      if (banner) banner.hidden = false;
+      atualizarOpcaoInstalarPerfil();
+    }
+
+    function ocultarBannerInstalar() {
+      const banner = document.getElementById('banner-instalar');
+      if (banner) banner.hidden = true;
+    }
+
+    function atualizarOpcaoInstalarPerfil() {
+      const grupo = document.getElementById('grupo-instalar-app');
+      const card = document.getElementById('card-instalar-app');
+      if (!grupo || !card) return;
+      const podeMostrar = !appJaInstalado && localStorage.getItem('app-instalado') !== 'true';
+      grupo.hidden = !podeMostrar;
+      card.hidden = !podeMostrar;
+    }
+
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      eventoInstalacao = e;
+      mostrarBannerInstalar();
+    });
+
+    window.addEventListener('appinstalled', function () {
+      localStorage.setItem('app-instalado', 'true');
+      eventoInstalacao = null;
+      ocultarBannerInstalar();
+      atualizarOpcaoInstalarPerfil();
+    });
+
+    const btnInstalarBanner = document.getElementById('btn-instalar-banner');
+    if (btnInstalarBanner) {
+      btnInstalarBanner.addEventListener('click', async function () {
+        if (!eventoInstalacao) { ocultarBannerInstalar(); return; }
+        ocultarBannerInstalar();
+        eventoInstalacao.prompt();
+        const resultado = await eventoInstalacao.userChoice;
+        if (resultado.outcome === 'accepted') localStorage.setItem('app-instalado', 'true');
+        eventoInstalacao = null;
+        atualizarOpcaoInstalarPerfil();
+      });
+    }
+
+    const btnFecharBanner = document.getElementById('btn-fechar-banner');
+    if (btnFecharBanner) {
+      btnFecharBanner.addEventListener('click', function () {
+        localStorage.setItem('instalar-app-dispensado', 'true');
+        ocultarBannerInstalar();
+      });
+    }
+
+    atualizarOpcaoInstalarPerfil();
+  </script>
+
+  <script src="barra-inferior.js"></script>
+</body>
+</html>
