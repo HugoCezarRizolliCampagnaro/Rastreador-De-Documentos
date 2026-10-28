@@ -603,8 +603,10 @@
       const { data } = await sb.from('documentos').select('id, nome, data_vencimento');
       const docs = data || [];
 
-      const nome = (usuarioAtual.email || '').split('@')[0];
-      document.getElementById('boas-vindas-titulo').textContent = `Olá, ${nome}! 👋`;
+      // usa o nome do cadastro ("Como quer ser chamado") ou do Google; só o primeiro nome. Sem nome: "Olá! 👋"
+      const meta = usuarioAtual.user_metadata || {};
+      const nome = String(meta.full_name || meta.name || '').trim().split(/\s+/)[0];
+      document.getElementById('boas-vindas-titulo').textContent = nome ? `Olá, ${nome}! 👋` : 'Olá! 👋';
 
       const vencidos = docs.filter(function (d) { return diasRestantes(d.data_vencimento) < 0; });
       const proximos = docs.filter(function (d) { const dd = diasRestantes(d.data_vencimento); return dd >= 0 && dd < 30; });
