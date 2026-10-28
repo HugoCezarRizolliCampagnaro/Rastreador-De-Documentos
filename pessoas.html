@@ -132,6 +132,18 @@
 
   /* resumo no topo */
   .resumo-pessoas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+  .resumo-pessoas[hidden] { display: none; }
+
+  .busca-pessoas { position: relative; margin-bottom: 14px; }
+  .busca-pessoas[hidden] { display: none; }
+  .busca-pessoas span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--texto-muted); }
+  .busca-pessoas input {
+    width: 100%; padding: 12px 14px 12px 42px;
+    font: inherit; font-size: 14px; color: var(--texto);
+    background: var(--superficie); border: 1px solid var(--borda); border-radius: 10px; outline: none;
+  }
+  .busca-pessoas input:focus { border-color: var(--marca); }
+  .sem-resultado { text-align: center; color: var(--texto-muted); font-size: 13.5px; padding: 24px 12px; }
   .resumo-card { background: var(--superficie); border: 1px solid var(--borda); border-radius: 14px; padding: 14px; }
   .resumo-numero { font-size: 20px; font-weight: 700; display: block; }
   .resumo-label { font-size: 11.5px; color: var(--texto-muted); white-space: nowrap; }
@@ -345,6 +357,10 @@
 
       <div class="conteudo">
         <div class="resumo-pessoas" id="resumo-pessoas"></div>
+        <div class="busca-pessoas" id="busca-pessoas-wrap" hidden>
+          <span id="icone-busca-pessoas"></span>
+          <input type="search" id="busca-pessoas" placeholder="Buscar pessoa..." aria-label="Buscar pessoa" autocomplete="off">
+        </div>
         <div class="lista-pessoas" id="lista-pessoas"><p class="carregando">Carregando...</p></div>
         <p class="limite-texto" id="limite-texto" hidden></p>
         <a href="planos.html" class="aviso-plano" id="aviso-plano" hidden>
@@ -391,6 +407,7 @@
       checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
       clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
       alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+      search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
       star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
     };
 
@@ -405,6 +422,7 @@
     document.getElementById('sidebar-perfil-seta').innerHTML = icone('chevronRight', 16);
     document.getElementById('icone-adicionar').innerHTML = icone('plus', 15, '#FFFFFF');
     document.getElementById('icone-aviso-plano').innerHTML = icone('star', 17);
+    document.getElementById('icone-busca-pessoas').innerHTML = icone('search', 17);
 
     document.getElementById('sidebar-nav').innerHTML = [
       { href: 'index.html', nome: 'home', label: 'Início' },
@@ -528,8 +546,13 @@
       const eu = Object.assign({ id: '__eu__', nome: nomeUsuario ? nomeUsuario + ' (você)' : 'Você', eu: true }, resumir(meus));
       const todas = [eu].concat(linhas);
 
+      todasPessoas = todas;
+      // com só "Você" na lista o resumo não diz nada, então some
+      document.getElementById('resumo-pessoas').hidden = todas.length <= 1;
+      // busca aparece quando a lista fica grande
+      document.getElementById('busca-pessoas-wrap').hidden = todas.length <= 5;
       desenharResumo(todas);
-      desenharLista(todas);
+      filtrarEDesenhar();
       atualizarPlano();
     }
 
@@ -542,6 +565,22 @@
         <div class="resumo-card"><span class="resumo-numero" style="color: ${comPendencia ? 'var(--status-vermelho)' : 'var(--texto)'};">${comPendencia}</span><span class="resumo-label">pendentes</span></div>
       `;
     }
+
+    let todasPessoas = [];
+
+    function semAcento(t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+
+    function filtrarEDesenhar() {
+      const termo = semAcento(document.getElementById('busca-pessoas').value.trim());
+      const lista = termo ? todasPessoas.filter(function (l) { return semAcento(l.nome).includes(termo); }) : todasPessoas;
+      if (lista.length === 0) {
+        document.getElementById('lista-pessoas').innerHTML = '<p class="sem-resultado">Nenhuma pessoa encontrada.</p>';
+        return;
+      }
+      desenharLista(lista);
+    }
+
+    document.getElementById('busca-pessoas').addEventListener('input', filtrarEDesenhar);
 
     function desenharLista(todas) {
       document.getElementById('lista-pessoas').innerHTML = todas.map(function (l, i) {
