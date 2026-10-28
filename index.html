@@ -604,6 +604,9 @@
 
   .doc-menu button:hover { background: var(--bg); }
   .doc-menu button.perigo { color: var(--status-vermelho); }
+  .doc-card-wrap.menu-aberto { z-index: 10; }
+  .doc-menu button.destaque { color: var(--status-verde); font-weight: 700; }
+  .doc-recorrente { color: var(--marca); display: inline-flex; flex-shrink: 0; }
 
   .vazio, .erro {
     text-align: center;
@@ -872,6 +875,7 @@
   </div>
 
   <script src="dialogos.js"></script>
+  <script src="recorrencia.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
@@ -1083,10 +1087,12 @@
 
     function toggleDocMenu(id) {
       document.querySelectorAll('.doc-menu').forEach(function (m) {
-        if (m.id !== 'menu-' + id) m.hidden = true;
+        if (m.id !== 'menu-' + id) { m.hidden = true; m.parentElement.classList.remove('menu-aberto'); }
       });
       const menu = document.getElementById('menu-' + id);
       menu.hidden = !menu.hidden;
+      // o cartão com o menu aberto fica por cima do cartão de baixo
+      menu.parentElement.classList.toggle('menu-aberto', !menu.hidden);
     }
 
     document.addEventListener('click', function (e) {
@@ -1106,6 +1112,20 @@
       const { error: erroInsercao } = await sb.from('documentos').insert([copia]);
       if (erroInsercao) { await Dialogo.avisar('Não foi possível duplicar: ' + erroInsercao.message); return; }
       carregar();
+    }
+
+    function iconeRecorrente() {
+      return `<svg class="icone" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${Recorrencia.ICONE}</svg>`;
+    }
+
+    // documento recorrente: "Paguei"/"Renovei" pula o vencimento pro próximo período
+    async function marcarRecorrente(id) {
+      document.querySelectorAll('.doc-menu').forEach(function (m) { m.hidden = true; });
+      const doc = documentosCarregados.find(function (d) { return d.id === id; });
+      const sessao = (await sb.auth.getSession()).data.session;
+      if (!doc || !sessao) return;
+      const nova = await Recorrencia.marcar(sb, doc, sessao.user.id);
+      if (nova) carregar();
     }
 
     async function excluirRapido(id) {
@@ -1255,7 +1275,7 @@
             <a class="doc-card" href="novo-documento.html?id=${doc.id}">
               <div class="doc-icone" style="background: ${catInfo.bg}; color: ${catInfo.cor};">${icone(catIconeNome, 17, catInfo.cor)}</div>
               <div class="doc-info">
-                <div class="doc-nome">${escapeHtml(doc.nome)}${doc.arquivo_path ? icone('paperclip', 12) : ''}</div>
+                <div class="doc-nome">${escapeHtml(doc.nome)}${doc.repeticao ? `<span class="doc-recorrente" title="${Recorrencia.ROTULOS[doc.repeticao] || 'Recorrente'}">${iconeRecorrente()}</span>` : ''}${doc.arquivo_path ? icone('paperclip', 12) : ''}</div>
                 <div class="doc-meta">${catLabel} · ${escapeHtml(tipoLabel)}</div>
                 <div class="doc-detalhe">${icone('calendar', 12)}<span class="doc-detalhe-textos"><span class="doc-detalhe-linha"><span class="doc-detalhe-parte">${dataFormatada}</span><span class="doc-detalhe-parte doc-prazo ${status}">${textoDias(dias).charAt(0).toLowerCase() + textoDias(dias).slice(1)}</span></span></span></div>
               </div>
@@ -1263,6 +1283,7 @@
             </a>
             <button type="button" class="doc-menu-btn" onclick="event.stopPropagation(); toggleDocMenu('${doc.id}')" aria-label="Mais opções">${icone('moreHorizontal', 16)}</button>
             <div class="doc-menu" id="menu-${doc.id}" hidden>
+              ${doc.repeticao ? `<button type="button" class="destaque" onclick="marcarRecorrente('${doc.id}')">${Recorrencia.rotuloBotao(doc)}</button>` : ''}
               <button type="button" onclick="duplicarRapido('${doc.id}')">Duplicar</button>
               <button type="button" class="perigo" onclick="excluirRapido('${doc.id}')">Excluir</button>
             </div>

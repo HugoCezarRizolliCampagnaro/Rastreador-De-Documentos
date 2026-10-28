@@ -3,12 +3,12 @@
 // 2) Notificações push (avisos de vencimento).
 // Chamadas ao Supabase, às rotas /api e a CDNs passam direto pela rede, nunca são cacheadas.
 
-const CACHE_NAME = 'doctrack-v29';
+const CACHE_NAME = 'doctrack-v30';
 
 const ARQUIVOS_ESSENCIAIS = [
   'index.html', 'login.html', 'calendario.html', 'assistente.html', 'gastos.html',
   'perfil.html', 'planos.html', 'relatorio.html', 'novo-documento.html', 'pessoas.html',
-  'termos.html', 'privacidade.html', 'manifest.json', 'barra-inferior.js', 'dialogos.js',
+  'termos.html', 'privacidade.html', 'manifest.json', 'barra-inferior.js', 'dialogos.js', 'recorrencia.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/favicon-32.png', 'icons/favicon-16.png',
 ];
 

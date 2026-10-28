@@ -209,6 +209,17 @@
 
   .erro-campo { font-size: 12px; color: var(--status-vermelho); margin-top: 6px; }
 
+  .dica-repeticao { font-size: 12px; color: var(--texto-muted); margin: 6px 0 0; line-height: 1.45; }
+  .dica-repeticao strong { color: var(--texto); }
+  .btn-recorrente {
+    display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 10px;
+    padding: 12px; font: inherit; font-size: 14px; font-weight: 700; color: #FFFFFF;
+    background: var(--status-verde); border: none; border-radius: 10px; cursor: pointer;
+  }
+  .btn-recorrente[hidden] { display: none; }
+  .btn-recorrente { flex-wrap: wrap; row-gap: 2px; }
+  .btn-recorrente small { flex-basis: 100%; text-align: center; font-size: 12px; font-weight: 500; opacity: .9; }
+
   .preview-vencimento {
     display: flex; align-items: center; gap: 6px;
     font-size: 12.5px; font-weight: 600;
@@ -542,6 +553,18 @@
                 <p class="preview-vencimento" id="preview-vencimento"></p>
               </div>
             </div>
+            <div class="campo" id="campo-repeticao" hidden>
+              <label for="repeticao">Repete <span class="opcional">(contas, mensalidades, exames anuais…)</span></label>
+              <select id="repeticao" name="repeticao">
+                <option value="">Não repete</option>
+                <option value="mensal">Todo mês</option>
+                <option value="trimestral">A cada 3 meses</option>
+                <option value="semestral">A cada 6 meses</option>
+                <option value="anual">Todo ano</option>
+              </select>
+              <p class="dica-repeticao" id="dica-repeticao" hidden>Quando pagar ou renovar, toque em <strong>Paguei</strong> (ou <strong>Renovei</strong>) e o vencimento pula pro próximo período.</p>
+              <button type="button" class="btn-recorrente" id="btn-recorrente" hidden></button>
+            </div>
             <div class="campo" style="margin-bottom: 0;">
               <label>Avisar quantos dias antes</label>
               <div class="avisos-grupo">
@@ -654,6 +677,7 @@
     </div>
   </div>
   <script src="dialogos.js"></script>
+  <script src="recorrencia.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
@@ -864,6 +888,8 @@
     const idEdicao = new URLSearchParams(window.location.search).get('id');
     let usuarioAtual = null;
     let dataVencimentoOriginal = null;
+    let repeticaoDisponivel = false;
+    let documentoCarregado = null;
 
     function escapeHtml(texto) {
       const div = document.createElement('div');
@@ -1118,6 +1144,11 @@
       await carregarClientesDoc();
       await carregarCategorias();
 
+      // "Repete" só aparece se o banco já tem a coluna repeticao
+      const testeRepeticao = await sb.from('documentos').select('repeticao').limit(1);
+      repeticaoDisponivel = !testeRepeticao.error;
+      document.getElementById('campo-repeticao').hidden = !repeticaoDisponivel;
+
       if (idEdicao) {
         tituloPagina.textContent = 'Editar documento';
         document.title = 'Editar documento — DocTrack';
@@ -1139,6 +1170,11 @@
           form.data_vencimento.value = data.data_vencimento;
           dataVencimentoOriginal = data.data_vencimento;
           atualizarPreviewVencimento();
+          documentoCarregado = data;
+          if (repeticaoDisponivel) {
+            form.repeticao.value = data.repeticao || '';
+            atualizarBlocoRepeticao();
+          }
 
           if (data.custo_valor) {
             form.custo_valor.value = data.custo_valor;
@@ -1178,6 +1214,31 @@
     /* ---------- categoria de documento -> categoria financeira, pro gasto vinculado ---------- */
 
     const mapaCategoriaParaGasto = { pessoal: 'outros', veiculo: 'transporte', trabalho: 'outros', casa: 'moradia', outro: 'outros' };
+
+    /* ---------- documento recorrente: "Repete" + botão Paguei/Renovei ---------- */
+
+    function atualizarBlocoRepeticao() {
+      const rep = form.repeticao.value;
+      document.getElementById('dica-repeticao').hidden = !rep;
+      const btn = document.getElementById('btn-recorrente');
+      // o botão só aparece em documento já salvo como recorrente (com a mesma repetição salva)
+      const salvo = documentoCarregado && documentoCarregado.repeticao && documentoCarregado.repeticao === rep;
+      btn.hidden = !salvo;
+      if (salvo) {
+        const proxima = Recorrencia.proximaData(documentoCarregado.data_vencimento, rep);
+        btn.innerHTML = `${icone('checkCircle', 17, '#FFFFFF')} ${Recorrencia.rotuloBotao(documentoCarregado)}<small>Próximo vencimento: ${Recorrencia.dataBR(proxima)}</small>`;
+      }
+    }
+
+    document.getElementById('repeticao').addEventListener('change', atualizarBlocoRepeticao);
+
+    document.getElementById('btn-recorrente').addEventListener('click', async function () {
+      if (!documentoCarregado) return;
+      this.disabled = true;
+      const nova = await Recorrencia.marcar(sb, documentoCarregado, usuarioAtual.id);
+      this.disabled = false;
+      if (nova) setTimeout(function () { window.location.reload(); }, 1500);
+    });
 
     /* ---------- salvar ---------- */
 
@@ -1226,6 +1287,7 @@
         proximo_pagamento_status: form.proximo_pagamento_data.value ? form.proximo_pagamento_status.value : null,
         user_id: usuarioAtual ? usuarioAtual.id : null,
       };
+      if (repeticaoDisponivel) dados.repeticao = form.repeticao.value || null;
 
       // cliente escolhido na lista: guarda o vínculo e o nome (o nome aparece na busca e nos avisos)
       if (!document.getElementById('campo-cliente-cadastrado').hidden) {

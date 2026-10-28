@@ -331,3 +331,9 @@ alter table public.pessoas add constraint pessoas_email_check check (email is nu
 alter table public.pessoas add column if not exists cargo text;
 alter table public.pessoas drop constraint if exists pessoas_cargo_check;
 alter table public.pessoas add constraint pessoas_cargo_check check (cargo is null or char_length(cargo) <= 60);
+
+-- ---------- documentos recorrentes (contas, mensalidades, exames anuais) ----------
+-- repeticao: o botão "Paguei"/"Renovei" pula o vencimento pro próximo período
+alter table public.documentos add column if not exists repeticao text;
+alter table public.documentos drop constraint if exists documentos_repeticao_check;
+alter table public.documentos add constraint documentos_repeticao_check check (repeticao is null or repeticao in ('mensal', 'trimestral', 'semestral', 'anual'));
