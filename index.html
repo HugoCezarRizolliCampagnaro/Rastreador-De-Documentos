@@ -319,12 +319,7 @@
 
   /* ---------- estatísticas ---------- */
 
-  .stats-linha {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-top: 20px;
-  }
+  .stats-linha { margin-top: 20px; }
 
   .stat-card {
     background: var(--superficie);
@@ -359,10 +354,20 @@
     gap: 14px;
   }
 
-  @media (min-width: 640px) {
-    .stats-linha { grid-template-columns: repeat(3, 1fr) 1.7fr; }
-    .score-card { grid-column: auto; }
+  /* faixa única do topo (substitui os 3 cartões + cartão do score) */
+  .resumo-faixa {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--superficie); border: 1px solid var(--borda); border-radius: 14px;
+    padding: 12px 16px;
   }
+  .faixa-score { display: flex; flex-direction: column; align-items: center; gap: 3px; padding-right: 16px; border-right: 1px solid var(--borda); flex-shrink: 0; }
+  .faixa-gauge { position: relative; width: 56px; height: 56px; }
+  .faixa-gauge .gauge { width: 56px; height: 56px; }
+  .faixa-gauge-numero { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; }
+  .faixa-contadores { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .faixa-contador { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .faixa-numero { font-size: 22px; font-weight: 700; line-height: 1; }
+  .faixa-legenda { font-size: 11px; color: var(--texto-muted); white-space: nowrap; }
 
   .gauge { width: 52px; height: 52px; flex-shrink: 0; transform: rotate(-90deg); }
   .gauge-fundo { fill: none; stroke: var(--borda); stroke-width: 8; }
@@ -535,6 +540,10 @@
   .doc-prazo.amarelo { color: var(--status-amarelo); }
   .doc-prazo.verde { color: var(--status-verde); }
   .doc-prazo::before { color: var(--texto-muted); font-weight: 400; }
+  /* celular: o prazo colorido já mostra o status, então o selo sai e o texto cabe inteiro */
+  @media (max-width: 599px) {
+    .doc-card .status-badge { display: none; }
+  }
 
   .status-badge {
     display: inline-flex;
@@ -1311,32 +1320,24 @@
       const circunferencia = 2 * Math.PI * raio;
       const corGauge = score >= 80 ? 'var(--status-verde)' : score >= 50 ? 'var(--status-amarelo)' : 'var(--status-vermelho)';
 
+      // faixa única: conformidade (círculo com % dentro) + os três números por status
       statsEl.innerHTML = `
-        <div class="stat-card">
-          <div class="stat-icone-circulo" style="background: rgba(34, 197, 94, 0.16); color: var(--status-verde);">${icone('checkCircle', 16)}</div>
-          <span class="stat-numero-grande" id="stat-verde">0</span>
-          <span class="stat-legenda">em dia</span>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icone-circulo" style="background: rgba(245, 166, 35, 0.18); color: var(--status-amarelo);">${icone('clock', 16)}</div>
-          <span class="stat-numero-grande" id="stat-amarelo">0</span>
-          <span class="stat-legenda">atenção</span>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icone-circulo" style="background: rgba(242, 85, 92, 0.16); color: var(--status-vermelho);">${icone('alertTriangle', 16)}</div>
-          <span class="stat-numero-grande" id="stat-vermelho">0</span>
-          <span class="stat-legenda">urgente</span>
-        </div>
-        <div class="score-card">
-          <svg class="gauge" viewBox="0 0 80 80">
-            <circle class="gauge-fundo" cx="40" cy="40" r="${raio}"></circle>
-            <circle class="gauge-progresso" id="gauge-progresso" cx="40" cy="40" r="${raio}" stroke="${corGauge}"
-              stroke-dasharray="${circunferencia}" stroke-dashoffset="${circunferencia}"></circle>
-          </svg>
-          <div>
-            <div class="score-label">Score de conformidade</div>
-            <div class="score-numero-grande" id="score-numero">0%</div>
-            <div class="score-sub">dos documentos dentro da validade</div>
+        <div class="resumo-faixa">
+          <div class="faixa-score" title="Conformidade: documentos que ainda não venceram (dentro da validade)">
+            <div class="faixa-gauge">
+              <svg class="gauge" viewBox="0 0 80 80">
+                <circle class="gauge-fundo" cx="40" cy="40" r="${raio}"></circle>
+                <circle class="gauge-progresso" id="gauge-progresso" cx="40" cy="40" r="${raio}" stroke="${corGauge}"
+                  stroke-dasharray="${circunferencia}" stroke-dashoffset="${circunferencia}"></circle>
+              </svg>
+              <span class="faixa-gauge-numero" id="score-numero">0%</span>
+            </div>
+            <span class="faixa-legenda">conformidade</span>
+          </div>
+          <div class="faixa-contadores">
+            <div class="faixa-contador"><span class="faixa-numero" id="stat-verde" style="color: var(--status-verde);">0</span><span class="faixa-legenda">em dia</span></div>
+            <div class="faixa-contador"><span class="faixa-numero" id="stat-amarelo" style="color: var(--status-amarelo);">0</span><span class="faixa-legenda">atenção</span></div>
+            <div class="faixa-contador"><span class="faixa-numero" id="stat-vermelho" style="color: var(--status-vermelho);">0</span><span class="faixa-legenda">urgente</span></div>
           </div>
         </div>
       `;
