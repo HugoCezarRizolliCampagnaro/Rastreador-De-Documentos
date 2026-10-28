@@ -46,7 +46,8 @@
     '  .fab { bottom: calc(82px + env(safe-area-inset-bottom, 0px)) !important; }',
     /* tela do assistente ocupa a tela toda: termina em cima da barra */
     '  body.tela-assistente .app-shell { bottom: calc(66px + env(safe-area-inset-bottom, 0px)) !important; }',
-    '}'
+    '}',
+    '@media print { .barra-inferior { display: none !important; } body { padding-bottom: 0 !important; } }'
   ].join('\n');
 
   var estilo = document.createElement('style');

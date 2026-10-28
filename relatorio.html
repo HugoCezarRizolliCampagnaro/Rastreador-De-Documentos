@@ -156,14 +156,50 @@
   .filtro-pessoa-rel[hidden] { display: none; }
   .filtro-pessoa-rel a { color: var(--marca); font-weight: 600; text-decoration: none; white-space: nowrap; }
 
+  /* ---------- só na impressão / PDF ---------- */
+  .impressao-topo, .impressao-rodape { display: none; }
+
+  @page { size: A4; margin: 14mm 14mm 16mm; }
+
   @media print {
-    .filtro-relatorio, .filtro-pessoa-rel { display: none !important; }
-    .glow-fundo, .sidebar, .sidebar-backdrop, .botao-menu, .btn-imprimir, .banner-instalar { display: none !important; }
-    .app-shell { display: block; }
-    .conteudo-principal { margin-left: 0; }
-    .cabecalho, .conteudo { max-width: 100%; padding-left: 0; padding-right: 0; }
-    body { background: #FFFFFF; color: #14161A; }
-    html.escuro { --bg: #FFFFFF; --superficie: #FFFFFF; --texto: #14161A; --texto-muted: #6B7280; --borda: #E3E5E9; }
+    html, html.escuro { --bg: #FFFFFF; --superficie: #FFFFFF; --texto: #14161A; --texto-muted: #5B6170; --borda: #DADDE3; --marca: #3D4FE0; }
+    body { background: #FFFFFF !important; color: #14161A; animation: none; padding: 0 !important; font-size: 12px; }
+    .filtro-relatorio, .filtro-pessoa-rel, .glow-fundo, .sidebar, .sidebar-backdrop, .botao-menu, .btn-imprimir,
+    .banner-instalar, .barra-inferior, .pagina-icone, .empresa-relatorio { display: none !important; }
+    .app-shell { display: block; min-height: 0; overflow: visible !important; }
+    .conteudo-principal { margin: 0; height: auto; }
+    .cabecalho, .conteudo { max-width: 100%; padding: 0 !important; margin: 0; }
+
+    /* cabeçalho: logo + marca à esquerda, empresa à direita */
+    .impressao-topo { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 2px solid #3D4FE0; }
+    .impressao-marca { display: flex; align-items: center; gap: 10px; }
+    .impressao-marca img { width: 34px; height: 34px; border-radius: 8px; }
+    .impressao-marca strong { display: block; font-size: 15px; color: #14161A; }
+    .impressao-marca span { font-size: 10.5px; color: #5B6170; }
+    .impressao-empresa { text-align: right; font-size: 13px; font-weight: 700; color: #14161A; }
+    .impressao-empresa span { display: block; font-size: 10.5px; font-weight: 400; color: #5B6170; }
+
+    .topo-pagina { display: block; }
+    .cabecalho h1 { font-size: 18px; margin: 0 0 2px; }
+    .pagina-sub { font-size: 10.5px; margin-bottom: 14px; }
+
+    /* resumo compacto em 4 colunas */
+    .stats-relatorio { grid-template-columns: repeat(4, 1fr) !important; gap: 8px; margin-bottom: 14px; }
+    .stat-card { padding: 10px 12px; border-radius: 8px; break-inside: avoid; }
+    .stat-icone-circulo { display: none; }
+    .stat-numero { font-size: 16px; }
+    .stat-label { font-size: 10px; }
+
+    /* tabela inteira, sem rolagem e sem cortar linha */
+    .secao-card { overflow: visible !important; padding: 0; border: none; border-radius: 0; }
+    table { min-width: 0; font-size: 11px; }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; }
+    th, td { padding: 8px 8px; }
+    th { background: #F2F3F7; color: #3B4050; }
+    .status-badge, th, .impressao-topo { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    .impressao-rodape { display: block; margin-top: 18px; padding-top: 10px; border-top: 1px solid #DADDE3; font-size: 9.5px; color: #5B6170; line-height: 1.5; }
   }
 
   /* ---------- instalar app (pwa) ---------- */
@@ -264,6 +300,13 @@
 
     <div class="conteudo-principal">
       <div class="cabecalho">
+        <div class="impressao-topo">
+          <div class="impressao-marca">
+            <img src="icons/icon-192.png" alt="">
+            <div><strong>DocTrack</strong><span>Controle de vencimento de documentos</span></div>
+          </div>
+          <div class="impressao-empresa" id="impressao-empresa" hidden></div>
+        </div>
         <div class="topo-pagina">
           <div class="topo-esquerda">
             <button type="button" class="botao-menu" id="botao-menu" aria-label="Abrir menu"></button>
@@ -298,6 +341,7 @@
           </table>
           <p class="vazio" id="vazio" hidden>Nenhum documento cadastrado ainda.</p>
         </div>
+        <div class="impressao-rodape" id="impressao-rodape"></div>
       </div>
     </div>
   </div>
@@ -421,7 +465,17 @@
         const el = document.getElementById('empresa-relatorio');
         el.textContent = nomeEmpresa;
         el.hidden = false;
+        const imp = document.getElementById('impressao-empresa');
+        imp.textContent = nomeEmpresa;
+        imp.hidden = false;
       }
+
+      // rodapé do PDF: quando e por quem foi gerado
+      const agoraCompleto = new Date();
+      document.getElementById('impressao-rodape').textContent =
+        'Relatório gerado pelo DocTrack em ' + agoraCompleto.toLocaleDateString('pt-BR') + ' às ' +
+        agoraCompleto.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' · conta ' + email +
+        '. A situação de cada documento é calculada na data de geração.';
 
       if (clientesRel.length > 0) {
         const sel = document.getElementById('filtro-cliente-rel');
