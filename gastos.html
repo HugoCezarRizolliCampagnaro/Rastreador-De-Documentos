@@ -213,6 +213,18 @@
   .cabecalho h1 { font-size: 24px; font-weight: 700; margin: 0 0 4px; }
   .pagina-sub { font-size: 13.5px; color: var(--texto-muted); margin: 0; max-width: 52ch; }
 
+  /* botão "Adicionar gasto" no topo (mesmo estilo do "Adicionar pessoa") */
+  .topo-acoes-gastos { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .btn-adicionar-gasto {
+    display: flex; align-items: center; gap: 7px;
+    padding: 10px 16px;
+    font-family: inherit; font-size: 13.5px; font-weight: 600;
+    color: #FFFFFF; background: var(--marca);
+    border: none; border-radius: 9px;
+    cursor: pointer; white-space: nowrap;
+  }
+  .btn-adicionar-gasto:hover { background: var(--marca-hover); }
+
   .botao-notif {
     position: relative;
     width: 38px; height: 38px;
@@ -229,7 +241,7 @@
 
   .conteudo { max-width: 1040px; margin: 0 auto; padding: 20px 20px 60px; }
   /* celular: espaço no fim pra o último gasto poder subir acima do botão + */
-  @media (max-width: 959px) { .conteudo { padding-bottom: 110px; } }
+  @media (max-width: 959px) { .conteudo { padding-bottom: 32px; } }
 
   .layout-gastos { display: grid; grid-template-columns: 1fr; gap: 16px; }
 
@@ -608,7 +620,10 @@
               <p class="pagina-sub">Acompanhe seus gastos, organize suas finanças e mantenha tudo sob controle.</p>
             </div>
           </div>
-          <button type="button" class="botao-notif" id="botao-notif" aria-label="Ver documentos" onclick="window.location.href='index.html'"></button>
+          <div class="topo-acoes-gastos">
+            <button type="button" class="botao-notif" id="botao-notif" aria-label="Ver documentos" onclick="window.location.href='index.html'"></button>
+            <button type="button" class="btn-adicionar-gasto" id="fab-adicionar"><span id="icone-adicionar-gasto"></span> Adicionar gasto</button>
+          </div>
         </div>
       </div>
 
@@ -661,7 +676,6 @@
     </div>
   </div>
 
-  <button type="button" class="fab" id="fab-adicionar" aria-label="Registrar novo gasto"></button>
 
   <div class="banner-instalar" id="banner-instalar" hidden>
     <img class="banner-instalar-logo" src="icons/icon-192.png" alt="">
@@ -755,7 +769,7 @@
     document.getElementById('pagina-icone').innerHTML = icone('creditCard', 22, '#FFFFFF');
     document.getElementById('botao-notif').innerHTML = icone('bell', 17);
     document.getElementById('sidebar-perfil-seta').innerHTML = icone('chevronRight', 16);
-    document.getElementById('fab-adicionar').innerHTML = icone('plus', 26, '#FFFFFF');
+    document.getElementById('icone-adicionar-gasto').innerHTML = icone('plus', 15, '#FFFFFF');
     document.getElementById('sheet-fechar').innerHTML = icone('x', 16);
     document.getElementById('titulo-grafico').innerHTML = icone('barChart', 17) + ' Seus gastos';
     document.getElementById('titulo-ultimos').innerHTML = icone('clock', 17) + ' Últimos gastos';
