@@ -152,9 +152,12 @@
   .filtro-relatorio select { flex: 1 1 200px; min-width: 0; padding: 9px 12px; font: inherit; font-size: 13.5px; color: var(--texto); background: var(--superficie); border: 1.5px solid var(--borda); border-radius: 10px; }
   .empresa-relatorio { font-size: 13px; font-weight: 700; color: var(--marca); letter-spacing: 0.3px; margin: 0 0 2px; }
   .empresa-relatorio[hidden] { display: none; }
+  .filtro-pessoa-rel { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; padding: 10px 14px; background: rgba(91, 110, 245, 0.10); border: 1px solid rgba(91, 110, 245, 0.35); border-radius: 10px; font-size: 13px; }
+  .filtro-pessoa-rel[hidden] { display: none; }
+  .filtro-pessoa-rel a { color: var(--marca); font-weight: 600; text-decoration: none; white-space: nowrap; }
 
   @media print {
-    .filtro-relatorio { display: none !important; }
+    .filtro-relatorio, .filtro-pessoa-rel { display: none !important; }
     .glow-fundo, .sidebar, .sidebar-backdrop, .botao-menu, .btn-imprimir, .banner-instalar { display: none !important; }
     .app-shell { display: block; }
     .conteudo-principal { margin-left: 0; }
@@ -276,6 +279,10 @@
       </div>
 
       <div class="conteudo">
+        <div class="filtro-pessoa-rel" id="filtro-pessoa-rel" hidden>
+          <span id="filtro-pessoa-texto"></span>
+          <a href="relatorio.html">Ver todos</a>
+        </div>
         <div class="filtro-relatorio" id="filtro-relatorio" hidden>
           <label for="filtro-cliente-rel">Cliente</label>
           <select id="filtro-cliente-rel"></select>
@@ -392,6 +399,7 @@
       if (!sessao.session) { window.location.href = 'login.html'; return; }
 
       const email = sessao.session.user.email;
+      nomeUsuario = String((sessao.session.user.user_metadata || {}).full_name || '').trim();
       document.getElementById('sidebar-email').textContent = email;
       document.getElementById('sidebar-avatar').textContent = email.charAt(0).toUpperCase();
 
@@ -429,6 +437,9 @@
     }
 
     let todosDocumentos = [];
+    let nomeUsuario = '';
+    // vindo da tela Pessoas: relatorio.html?pessoa=ID (ou __eu__ = só os seus)
+    const pessoaPedida = new URLSearchParams(window.location.search).get('pessoa') || '';
     let clientesRel = [];
     const nomesPessoas = {};
 
@@ -442,21 +453,35 @@
     function renderRelatorio() {
       const idCliente = document.getElementById('filtro-cliente-rel').value;
       const cliente = clientesRel.find(function (c) { return c.id === idCliente; });
-      const documentos = cliente
+      let documentos = cliente
         ? todosDocumentos.filter(function (d) { return d.cliente_id === cliente.id; })
         : todosDocumentos;
 
+      // filtro por pessoa (só se a pessoa existe nesta conta)
+      let nomePessoaFiltro = '';
+      if (pessoaPedida === '__eu__') {
+        documentos = documentos.filter(function (d) { return !d.pessoa_id; });
+        nomePessoaFiltro = nomeUsuario || 'Você';
+      } else if (pessoaPedida && nomesPessoas[pessoaPedida]) {
+        documentos = documentos.filter(function (d) { return d.pessoa_id === pessoaPedida; });
+        nomePessoaFiltro = nomesPessoas[pessoaPedida];
+      }
+      const avisoPessoa = document.getElementById('filtro-pessoa-rel');
+      avisoPessoa.hidden = !nomePessoaFiltro;
+      document.getElementById('filtro-pessoa-texto').textContent = nomePessoaFiltro ? 'Mostrando só os documentos de ' + nomePessoaFiltro : '';
+
       document.getElementById('titulo-relatorio').textContent = cliente
         ? 'Relatório — ' + cliente.nome + (cliente.documento ? ' (' + formatarDocCliente(cliente.documento) + ')' : '')
-        : 'Relatório de documentos';
+        : nomePessoaFiltro ? 'Relatório — ' + nomePessoaFiltro : 'Relatório de documentos';
 
-      const temQuem = documentos.some(function (d) { return d.pessoa_id || d.cliente; });
+      // relatório de uma pessoa: o nome dela não precisa repetir em toda linha
+      const temQuem = documentos.some(function (d) { return (!nomePessoaFiltro && d.pessoa_id) || d.cliente; });
       document.getElementById('th-quem').hidden = !temQuem;
 
       if (documentos.length === 0) {
         document.getElementById('stats-relatorio').innerHTML = '';
         document.getElementById('tabela').hidden = true;
-        document.getElementById('vazio').textContent = cliente ? 'Nenhum documento ligado a este cliente.' : 'Nenhum documento cadastrado ainda.';
+        document.getElementById('vazio').textContent = cliente ? 'Nenhum documento ligado a este cliente.' : nomePessoaFiltro ? 'Nenhum documento cadastrado pra ' + nomePessoaFiltro + '.' : 'Nenhum documento cadastrado ainda.';
         document.getElementById('vazio').hidden = false;
         return;
       }
@@ -495,7 +520,7 @@
         const status = statusPorDias(dias);
         const dataFormatada = new Date(doc.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
         const cor = status === 'verde' ? 'var(--status-verde)' : status === 'amarelo' ? 'var(--status-amarelo)' : 'var(--status-vermelho)';
-        const quem = [doc.pessoa_id ? nomesPessoas[doc.pessoa_id] : null, doc.cliente].filter(Boolean).join(' · ');
+        const quem = [doc.pessoa_id && !nomePessoaFiltro ? nomesPessoas[doc.pessoa_id] : null, doc.cliente].filter(Boolean).join(' · ');
         return `
           <tr>
             <td>${escapeHtml(doc.nome)}</td>
