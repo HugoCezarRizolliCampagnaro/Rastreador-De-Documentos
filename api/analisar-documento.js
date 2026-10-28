@@ -88,13 +88,13 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    const prompt = `Você está analisando a foto de um documento real: pode ser ASO, NR, alvará, contrato, certificação, RG, CNH ou outro documento com data de validade.
+    const prompt = `Você está analisando a foto de um documento real: pode ser ASO, NR, alvará, contrato, certificação, conta/boleto (aluguel, luz, mensalidade), imposto/taxa (DAS, IPTU, IPVA), RG, CNH ou outro documento com data de validade ou vencimento.
 
 Extraia as informações que conseguir identificar COM CLAREZA na imagem e devolva ESTRITAMENTE um JSON (sem markdown, sem texto fora do JSON) no formato:
 
 {
   "nome": "nome curto e descritivo pro documento (ex: 'ASO - João Silva' ou 'Alvará de Funcionamento')",
-  "tipo": "um destes valores exatos: aso, nr, alvara, contrato, certificacao, outro",
+  "tipo": "um destes valores exatos: aso, nr, alvara, contrato, certificacao, conta, imposto, outro (conta = boleto ou fatura; imposto = guia de imposto ou taxa)",
   "numero_documento": "número ou código do documento, ou null se não encontrar",
   "data_emissao": "no formato AAAA-MM-DD, ou null se não encontrar",
   "data_vencimento": "no formato AAAA-MM-DD, ou null se não encontrar",

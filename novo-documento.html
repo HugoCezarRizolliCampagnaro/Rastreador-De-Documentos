@@ -498,6 +498,8 @@
                   <option value="alvara">Alvará</option>
                   <option value="contrato">Contrato</option>
                   <option value="certificacao">Certificação</option>
+                  <option value="conta">Conta / boleto</option>
+                  <option value="imposto">Imposto / taxa</option>
                   <option value="outro">Outro</option>
                 </select>
               </div>
@@ -566,6 +568,7 @@
                 <option value="semestral">A cada 6 meses</option>
                 <option value="anual">Todo ano</option>
               </select>
+              <p class="dica-repeticao" id="dica-imposto" hidden>Dica: DAS do MEI repete <strong>todo mês</strong>; IPTU e IPVA, <strong>todo ano</strong>.</p>
               <p class="dica-repeticao" id="dica-repeticao" hidden>Quando pagar ou renovar, toque em <strong>Paguei</strong> (ou <strong>Renovei</strong>) e o vencimento pula pro próximo período.</p>
               <button type="button" class="btn-recorrente" id="btn-recorrente" hidden></button>
             </div>
@@ -826,7 +829,7 @@
         }
 
         const campos = dados.extraido;
-        const tiposValidos = ['aso', 'nr', 'alvara', 'contrato', 'certificacao', 'outro'];
+        const tiposValidos = ['aso', 'nr', 'alvara', 'contrato', 'certificacao', 'conta', 'imposto', 'outro'];
         const categoriasValidas = ['pessoal', 'veiculo', 'trabalho', 'casa', 'outro'];
 
         if (campos.nome) form.nome.value = campos.nome;
@@ -966,6 +969,8 @@
       alvara: ['Reunir documentos exigidos', 'Protocolar pedido de renovação', 'Pagar taxas', 'Receber alvará novo', 'Anexar novo documento'],
       contrato: ['Revisar termos', 'Negociar renovação', 'Assinar novo contrato', 'Anexar novo documento'],
       certificacao: ['Agendar avaliação ou prova', 'Realizar avaliação', 'Receber certificado', 'Anexar novo documento'],
+      conta: ['Conferir o valor', 'Gerar boleto ou Pix', 'Pagar', 'Guardar o comprovante'],
+      imposto: ['Emitir a guia', 'Conferir o valor', 'Pagar até o vencimento', 'Guardar o comprovante'],
       outro: ['Verificar requisitos de renovação', 'Providenciar renovação', 'Anexar novo documento', 'Atualizar validade'],
     };
 
@@ -1267,6 +1272,14 @@
     }
 
     document.getElementById('repeticao').addEventListener('change', atualizarBlocoRepeticao);
+
+    // Conta / boleto quase sempre repete todo mês: já sugere (só se a pessoa ainda não escolheu nada)
+    document.getElementById('tipo').addEventListener('change', function () {
+      if (!repeticaoDisponivel) return;
+      const rep = form.repeticao;
+      if (this.value === 'conta' && !rep.value) { rep.value = 'mensal'; atualizarBlocoRepeticao(); }
+      document.getElementById('dica-imposto').hidden = this.value !== 'imposto';
+    });
 
     document.getElementById('btn-recorrente').addEventListener('click', async function () {
       if (!documentoCarregado) return;
