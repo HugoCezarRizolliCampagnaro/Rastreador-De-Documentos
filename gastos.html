@@ -708,7 +708,7 @@
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
@@ -973,6 +973,19 @@
         return;
       }
 
+      // se a biblioteca do gráfico não carregou (internet ruim, bloqueador), avisa em vez de travar a tela
+      if (typeof Chart === 'undefined') {
+        if (grafico) { grafico = null; }
+        areaEl.innerHTML = `
+          <div class="estado-vazio">
+            <div class="estado-vazio-icone">${icone('barChart', 22)}</div>
+            <p class="estado-vazio-titulo">Não foi possível carregar o gráfico</p>
+            <p class="estado-vazio-sub">Confira sua internet e abra a tela de novo. Seus gastos estão salvos.</p>
+          </div>
+        `;
+        return;
+      }
+
       areaEl.innerHTML = '<canvas id="grafico" height="230"></canvas>';
       const ctx = document.getElementById('grafico').getContext('2d');
       const corMarca = getComputedStyle(document.documentElement).getPropertyValue('--marca').trim();
@@ -1073,11 +1086,11 @@
       });
     }
 
+    // cada parte desenha sozinha: se uma falhar, as outras continuam aparecendo
     function renderTudo() {
-      renderResumoCards();
-      renderGrafico();
-      renderCategorias();
-      renderUltimos();
+      [renderResumoCards, renderGrafico, renderCategorias, renderUltimos].forEach(function (desenhar) {
+        try { desenhar(); } catch (e) { console.error('Gastos: falha em ' + desenhar.name, e); }
+      });
     }
 
     /* ---------- carregar dados ---------- */
