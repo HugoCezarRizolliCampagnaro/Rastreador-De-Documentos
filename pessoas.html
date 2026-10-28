@@ -705,7 +705,7 @@
       } else {
         const qtd = Number(btn.dataset.qtd || 0);
         const aviso = qtd > 0
-          ? 'Excluir ' + nomeAtual + '?\n\n' + (qtd === 1 ? 'O documento dessa pessoa continua salvo' : 'Os ' + qtd + ' documentos dessa pessoa continuam salvos') + ', só passam a aparecer como seus.'
+          ? 'Excluir ' + nomeAtual + '?\n\n' + (qtd === 1 ? 'O documento dessa pessoa continua salvo e passa a aparecer como seu.' : 'Os ' + qtd + ' documentos dessa pessoa continuam salvos e passam a aparecer como seus.')
           : 'Excluir ' + nomeAtual + '?';
         if (!await Dialogo.confirmar(aviso, { ok: 'Excluir', perigo: true })) return;
         const { error } = await sb.from('pessoas').delete().eq('id', id);

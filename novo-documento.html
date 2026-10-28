@@ -1312,18 +1312,9 @@
 
     btnExcluir.addEventListener('click', async function () {
       if (!idEdicao) return;
-      if (!window.confirm('Excluir este documento? Essa ação não pode ser desfeita.')) return;
-
-      btnExcluir.disabled = true;
-
-      const { error } = await sb.from('documentos').delete().eq('id', idEdicao);
-
-      if (error) {
-        await Dialogo.avisar('Não foi possível excluir: ' + error.message);
-        btnExcluir.disabled = false;
-        return;
-      }
-      window.location.href = 'index.html';
+      if (!await Dialogo.confirmar('Excluir este documento?\n\nVocê ainda vai poder desfazer por alguns segundos.', { ok: 'Excluir', perigo: true })) return;
+      // o Início esconde o documento, mostra "Desfazer" por 5s e só então apaga de verdade
+      window.location.href = 'index.html?excluir=' + encodeURIComponent(idEdicao);
     });
 
     btnDuplicar.addEventListener('click', async function () {

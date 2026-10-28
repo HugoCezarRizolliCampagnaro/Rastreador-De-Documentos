@@ -598,6 +598,24 @@
     line-height: 1.6;
   }
 
+  /* ---------- aviso "Documento excluído · Desfazer" ---------- */
+
+  .aviso-desfazer {
+    position: fixed; left: 50%; bottom: 24px; z-index: 900;
+    transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+    width: calc(100% - 32px); max-width: 420px; overflow: hidden;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 16px; border-radius: 12px;
+    background: #1E2330; color: #F1F2F4; border: 1px solid #2E3546;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    font-size: 14px; transition: transform .2s ease, opacity .2s ease;
+  }
+  .aviso-desfazer.visivel { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+  .aviso-desfazer button { background: none; border: none; color: #8B9BFF; font: inherit; font-weight: 700; cursor: pointer; padding: 4px 6px; }
+  .aviso-desfazer-barra { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: #5B6EF5; transform-origin: left; }
+  @keyframes avisoDesfazerTempo { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+  @media (max-width: 959px) { .aviso-desfazer { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); } }
+
   /* ---------- fab ---------- */
 
   .fab {
@@ -1077,10 +1095,94 @@
 
     async function excluirRapido(id) {
       document.querySelectorAll('.doc-menu').forEach(function (m) { m.hidden = true; });
-      if (!await Dialogo.confirmar('Excluir este documento?\n\nEssa ação não pode ser desfeita.', { ok: 'Excluir', perigo: true })) return;
-      const { error } = await sb.from('documentos').delete().eq('id', id);
-      if (error) { await Dialogo.avisar('Não foi possível excluir: ' + error.message); return; }
-      carregar();
+      if (!await Dialogo.confirmar('Excluir este documento?\n\nVocê ainda vai poder desfazer por alguns segundos.', { ok: 'Excluir', perigo: true })) return;
+      excluirComDesfazer(id);
+    }
+
+    /* ---------- excluir com "Desfazer" ----------
+       O documento some da tela na hora, mas só é apagado no banco depois de 5 segundos.
+       Assim "Desfazer" devolve tudo (checklist, histórico), já que nada foi apagado ainda.
+       Se a pessoa sair da tela antes, a exclusão é concluída mesmo assim (keepalive). */
+
+    const TEMPO_DESFAZER = 5000;
+    let exclusaoPendente = null; // { id, doc, timer, token }
+
+    async function excluirComDesfazer(id) {
+      if (exclusaoPendente) await concluirExclusao(); // uma de cada vez
+      const doc = documentosCarregados.find(function (d) { return d.id === id; });
+      if (!doc) return;
+      const sessao = (await sb.auth.getSession()).data.session;
+      documentosCarregados = documentosCarregados.filter(function (d) { return d.id !== id; });
+      renderStats();
+      renderLista();
+      exclusaoPendente = { id: id, doc: doc, token: sessao ? sessao.access_token : '', timer: setTimeout(concluirExclusao, TEMPO_DESFAZER) };
+      mostrarAvisoDesfazer();
+    }
+
+    async function concluirExclusao() {
+      const p = exclusaoPendente;
+      if (!p) return;
+      exclusaoPendente = null;
+      clearTimeout(p.timer);
+      esconderAvisoDesfazer();
+      const { error } = await sb.from('documentos').delete().eq('id', p.id);
+      if (error) {
+        documentosCarregados.push(p.doc);
+        documentosCarregados.sort(function (a, b) { return String(a.data_vencimento).localeCompare(String(b.data_vencimento)); });
+        renderStats();
+        renderLista();
+        await Dialogo.avisar('Não foi possível excluir: ' + error.message);
+      }
+    }
+
+    function desfazerExclusao() {
+      const p = exclusaoPendente;
+      if (!p) return;
+      exclusaoPendente = null;
+      clearTimeout(p.timer);
+      esconderAvisoDesfazer();
+      documentosCarregados.push(p.doc);
+      documentosCarregados.sort(function (a, b) { return String(a.data_vencimento).localeCompare(String(b.data_vencimento)); });
+      renderStats();
+      renderLista();
+    }
+
+    // saiu da tela com exclusão pendente: termina a exclusão mesmo com a página fechando
+    window.addEventListener('pagehide', function () {
+      const p = exclusaoPendente;
+      if (!p || !p.token) return;
+      exclusaoPendente = null;
+      clearTimeout(p.timer);
+      try {
+        fetch(SUPABASE_URL + '/rest/v1/documentos?id=eq.' + encodeURIComponent(p.id), {
+          method: 'DELETE',
+          keepalive: true,
+          headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + p.token },
+        });
+      } catch (e) {}
+    });
+
+    function mostrarAvisoDesfazer() {
+      let el = document.getElementById('aviso-desfazer');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'aviso-desfazer';
+        el.className = 'aviso-desfazer';
+        el.setAttribute('role', 'status');
+        el.innerHTML = '<span>Documento excluído</span><button type="button">Desfazer</button><i class="aviso-desfazer-barra"></i>';
+        el.querySelector('button').addEventListener('click', desfazerExclusao);
+        document.body.appendChild(el);
+      }
+      const barra = el.querySelector('.aviso-desfazer-barra');
+      barra.style.animation = 'none';
+      void barra.offsetWidth; // reinicia a barrinha de tempo
+      barra.style.animation = 'avisoDesfazerTempo ' + TEMPO_DESFAZER + 'ms linear forwards';
+      el.classList.add('visivel');
+    }
+
+    function esconderAvisoDesfazer() {
+      const el = document.getElementById('aviso-desfazer');
+      if (el) el.classList.remove('visivel');
     }
 
     function renderLista() {
@@ -1260,6 +1362,16 @@
       renderFiltros();
       renderStats();
       renderLista();
+
+      // veio da tela do documento com "Excluir": faz a exclusão aqui, com "Desfazer"
+      const params = new URLSearchParams(window.location.search);
+      const idExcluir = params.get('excluir');
+      if (idExcluir) {
+        params.delete('excluir');
+        const resto = params.toString();
+        history.replaceState(null, '', window.location.pathname + (resto ? '?' + resto : ''));
+        excluirComDesfazer(idExcluir);
+      }
     }
 
     /* ---------- filtro por pessoa (Família) e por cliente (Profissional) ---------- */
