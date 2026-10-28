@@ -332,6 +332,8 @@
   .app-shell { overflow-x: clip; max-width: 100%; }
   .conteudo-principal { min-width: 0; max-width: 100%; }
   .glow-fundo { max-width: 85vw; }
+  a.sidebar-marca { text-decoration: none; color: inherit; border-radius: 10px; }
+  a.sidebar-marca:hover .sidebar-titulo { color: var(--marca); }
 </style>
 </head>
 <body>
@@ -340,13 +342,13 @@
   <div class="app-shell">
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-marca">
+      <a href="index.html" class="sidebar-marca" aria-label="DocTrack — voltar pro Início">
         <img class="sidebar-logo" src="icons/icon-192.png" alt="DocTrack" style="object-fit: cover;">
         <div>
           <div class="sidebar-titulo">DocTrack</div>
           <div class="sidebar-subtitulo">Rastreador de Documentos</div>
         </div>
-      </div>
+      </a>
       <nav class="sidebar-nav" id="sidebar-nav"></nav>
       <a href="perfil.html" class="sidebar-perfil">
         <span class="sidebar-avatar" id="sidebar-avatar">?</span>
