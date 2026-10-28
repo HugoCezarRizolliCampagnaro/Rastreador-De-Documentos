@@ -163,6 +163,7 @@
   }
   .pessoa-menu a:hover, .pessoa-menu button:hover { background: var(--bg); }
   .pessoa-menu .perigo { color: var(--status-vermelho); }
+  .pessoa-menu button[hidden] { display: none; }
 
   .pessoa-card {
     flex: 1; min-width: 0;
@@ -455,6 +456,7 @@
     let usuarioAtual = null;
     let planoAtual = 'gratis';
     let pessoasCarregadas = [];
+    let avisoEmailDisponivel = true;
 
     async function planoEmVigor() {
       const { data } = await sb.from('perfis').select('plano, plano_valido_ate').maybeSingle();
@@ -500,10 +502,13 @@
     /* ---------- carregar e desenhar ---------- */
 
     async function carregar() {
-      const [pessoasRes, docsRes] = await Promise.all([
+      let [pessoasRes, docsRes] = await Promise.all([
         sb.from('pessoas').select('id, nome, email, avisar_email').order('nome'),
         sb.from('documentos').select('id, nome, data_vencimento, pessoa_id'),
       ]);
+      // se o banco ainda não tem os campos de e-mail, carrega sem eles e esconde a opção
+      avisoEmailDisponivel = !pessoasRes.error;
+      if (pessoasRes.error) pessoasRes = await sb.from('pessoas').select('id, nome').order('nome');
       pessoasCarregadas = pessoasRes.data || [];
       const docs = docsRes.data || [];
 
@@ -557,7 +562,7 @@
           <div class="pessoa-menu" id="menu-${l.id}" hidden>
             <a href="novo-documento.html${l.eu ? '' : '?pessoa=' + encodeURIComponent(l.id)}">${icone('plus', 14)} Novo documento</a>
             ${l.eu ? '' : `
-            <button type="button" data-acao="email" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}" data-email="${escapeHtml(l.email || '')}">${icone('mail', 14)} ${l.email ? 'E-mail de aviso' : 'Avisar por e-mail'}</button>
+            <button type="button" ${avisoEmailDisponivel ? '' : 'hidden '}data-acao="email" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}" data-email="${escapeHtml(l.email || '')}">${icone('mail', 14)} ${l.email ? 'E-mail de aviso' : 'Avisar por e-mail'}</button>
             <button type="button" data-acao="renomear" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}">${icone('edit', 14)} Renomear</button>
             <button type="button" class="perigo" data-acao="excluir" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}" data-qtd="${l.qtd}">${icone('trash', 14)} Excluir</button>`}
           </div>
