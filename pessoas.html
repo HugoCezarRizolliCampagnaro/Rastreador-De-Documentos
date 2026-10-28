@@ -139,7 +139,33 @@
   /* lista */
   .lista-pessoas { display: flex; flex-direction: column; gap: 10px; }
 
+  .pessoa-wrap { display: flex; align-items: stretch; gap: 6px; position: relative; animation: subir 0.3s ease both; }
+  .pessoa-wrap.menu-aberto { z-index: 10; }
+
+  .pessoa-menu-btn {
+    width: 32px; flex-shrink: 0;
+    border: 1px solid var(--borda); border-radius: 10px;
+    background: var(--superficie); color: var(--texto-muted);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+
+  .pessoa-menu {
+    position: absolute; top: calc(100% - 6px); right: 0; z-index: 5;
+    min-width: 180px; overflow: hidden;
+    background: var(--superficie); border: 1px solid var(--borda); border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  }
+  .pessoa-menu[hidden] { display: none; }
+  .pessoa-menu a, .pessoa-menu button {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 11px 14px; background: none; border: none; text-align: left;
+    font-family: inherit; font-size: 13px; color: var(--texto); text-decoration: none; cursor: pointer;
+  }
+  .pessoa-menu a:hover, .pessoa-menu button:hover { background: var(--bg); }
+  .pessoa-menu .perigo { color: var(--status-vermelho); }
+
   .pessoa-card {
+    flex: 1; min-width: 0;
     display: flex; align-items: center; gap: 12px;
     background: var(--superficie);
     border: 1px solid var(--borda);
@@ -147,7 +173,6 @@
     padding: 12px 14px;
     text-decoration: none; color: inherit;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
-    animation: subir 0.3s ease both;
   }
   .pessoa-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18); }
 
@@ -176,7 +201,18 @@
   .status-badge.neutro { background: var(--bg); color: var(--texto-muted); border: 1px solid var(--borda); }
 
   .pessoa-seta { color: var(--texto-muted); flex-shrink: 0; }
-  @media (max-width: 599px) { .pessoa-seta { display: none; } .pessoa-card { gap: 10px; } }
+  .pessoa-urgente { display: flex; align-items: center; gap: 5px; }
+  .pessoa-urgente span { overflow: hidden; text-overflow: ellipsis; }
+  .pessoa-urgente .icone { display: none; }
+  /* celular: a linha do documento mais urgente ganha cor e ícone e o selo sai, pra caber o texto */
+  @media (max-width: 599px) {
+    .pessoa-seta, .pessoa-card .status-badge { display: none; }
+    .pessoa-card { gap: 10px; }
+    .pessoa-urgente .icone { display: block; }
+    .pessoa-urgente.vermelho { color: var(--status-vermelho); }
+    .pessoa-urgente.amarelo { color: var(--status-amarelo); }
+    .pessoa-urgente.verde { color: var(--status-verde); }
+  }
 
   /* aviso de plano */
   .aviso-plano {
@@ -347,6 +383,9 @@
       menu: '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',
       chevronRight: '<polyline points="9 18 15 12 9 6"/>',
       plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+      moreHorizontal: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+      edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+      trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
       checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
       clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
       alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
@@ -426,7 +465,7 @@
 
     function resumir(docs) {
       let vencidos = 0, urgentes = 0, atencao = 0, emDia = 0;
-      let proximo = null;
+      let maisUrgente = null; // o documento com a data mais próxima (ou mais atrasado)
       docs.forEach(function (d) {
         const dias = diasRestantes(d.data_vencimento);
         const st = statusPorDias(dias);
@@ -434,7 +473,7 @@
         else if (st === 'vermelho') urgentes++;
         else if (st === 'amarelo') atencao++;
         else emDia++;
-        if (dias >= 0 && (!proximo || dias < proximo.dias)) proximo = { dias: dias, nome: d.nome };
+        if (!maisUrgente || dias < maisUrgente.dias) maisUrgente = { dias: dias, nome: d.nome };
       });
 
       let selo, classe, icon, peso;
@@ -445,9 +484,14 @@
       else { selo = 'Tudo em dia'; classe = 'verde'; icon = 'checkCircle'; peso = 3; }
 
       const detalhe = plural(docs.length, 'documento', 'documentos');
+      // mostra o que precisa de atenção primeiro: ex. "ASO venceu há 24 dias"
       let proximoTxt = '';
-      if (proximo) proximoTxt = proximo.dias === 0 ? 'Um vence hoje' : 'Próximo em ' + plural(proximo.dias, 'dia', 'dias');
-      else if (vencidos) proximoTxt = 'Nenhum a vencer';
+      if (maisUrgente) {
+        const n = maisUrgente.nome, dd = maisUrgente.dias;
+        if (dd < 0) proximoTxt = n + ' venceu há ' + plural(Math.abs(dd), 'dia', 'dias');
+        else if (dd === 0) proximoTxt = n + ' vence hoje';
+        else proximoTxt = n + ' vence em ' + plural(dd, 'dia', 'dias');
+      }
 
       return { selo: selo, classe: classe, icon: icon, peso: peso, detalhe: detalhe, proximoTxt: proximoTxt, pendente: vencidos + urgentes + atencao > 0 };
     }
@@ -467,7 +511,8 @@
 
       const linhas = pessoasCarregadas.map(function (p) {
         const r = resumir(docs.filter(function (d) { return d.pessoa_id === p.id; }));
-        return Object.assign({ id: p.id, nome: p.nome, eu: false }, r);
+        const qtd = docs.filter(function (d) { return d.pessoa_id === p.id; }).length;
+        return Object.assign({ id: p.id, nome: p.nome, eu: false, qtd: qtd }, r);
       });
       // quem tem problema aparece primeiro; empate, ordem alfabética
       linhas.sort(function (a, b) { return a.peso - b.peso || a.nome.localeCompare(b.nome, 'pt-BR'); });
@@ -494,16 +539,25 @@
       document.getElementById('lista-pessoas').innerHTML = todas.map(function (l, i) {
         const inicial = escapeHtml(l.nome.trim().charAt(0).toUpperCase() || '?');
         return `
-          <a class="pessoa-card" href="index.html?pessoa=${encodeURIComponent(l.id)}" style="animation-delay: ${Math.min(i * 0.04, 0.4)}s;">
+          <div class="pessoa-wrap" id="wrap-${l.id}" style="animation-delay: ${Math.min(i * 0.04, 0.4)}s;">
+          <a class="pessoa-card" href="index.html?pessoa=${encodeURIComponent(l.id)}">
             <span class="pessoa-avatar${l.eu ? ' eu' : ''}">${inicial}</span>
             <div class="pessoa-info">
               <div class="pessoa-nome">${escapeHtml(l.nome)}</div>
               <div class="pessoa-detalhe">${l.detalhe}</div>
-              ${l.proximoTxt ? `<div class="pessoa-detalhe">${l.proximoTxt}</div>` : ''}
+              ${l.proximoTxt ? `<div class="pessoa-detalhe pessoa-urgente ${l.classe}">${l.icon ? icone(l.icon, 12) : ''}<span>${escapeHtml(l.proximoTxt)}</span></div>` : ''}
             </div>
             <span class="status-badge ${l.classe}">${l.icon ? icone(l.icon, 12) : ''} ${l.selo}</span>
             <span class="pessoa-seta">${icone('chevronRight', 16)}</span>
           </a>
+          <button type="button" class="pessoa-menu-btn" data-menu="${l.id}" aria-label="Opções de ${escapeHtml(l.nome)}">${icone('moreHorizontal', 16)}</button>
+          <div class="pessoa-menu" id="menu-${l.id}" hidden>
+            <a href="novo-documento.html${l.eu ? '' : '?pessoa=' + encodeURIComponent(l.id)}">${icone('plus', 14)} Novo documento</a>
+            ${l.eu ? '' : `
+            <button type="button" data-acao="renomear" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}">${icone('edit', 14)} Renomear</button>
+            <button type="button" class="perigo" data-acao="excluir" data-id="${l.id}" data-nome="${escapeHtml(l.nome)}" data-qtd="${l.qtd}">${icone('trash', 14)} Excluir</button>`}
+          </div>
+          </div>
         `;
       }).join('');
     }
@@ -536,6 +590,49 @@
         }
       }
     }
+
+    /* ---------- menu ⋯ de cada pessoa: novo documento, renomear, excluir ---------- */
+
+    function fecharMenus(excetoId) {
+      document.querySelectorAll('.pessoa-menu').forEach(function (m) {
+        if (m.id !== 'menu-' + excetoId) { m.hidden = true; m.parentElement.classList.remove('menu-aberto'); }
+      });
+    }
+
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.pessoa-wrap')) fecharMenus();
+    });
+
+    document.getElementById('lista-pessoas').addEventListener('click', async function (e) {
+      const btnMenu = e.target.closest('.pessoa-menu-btn');
+      if (btnMenu) {
+        const menu = document.getElementById('menu-' + btnMenu.dataset.menu);
+        fecharMenus(btnMenu.dataset.menu);
+        menu.hidden = !menu.hidden;
+        menu.parentElement.classList.toggle('menu-aberto', !menu.hidden);
+        return;
+      }
+      const btn = e.target.closest('.pessoa-menu button[data-acao]');
+      if (!btn) return;
+      fecharMenus();
+      const id = btn.dataset.id;
+      const nomeAtual = btn.dataset.nome;
+      if (btn.dataset.acao === 'renomear') {
+        const novo = prompt('Novo nome para ' + nomeAtual + ':', nomeAtual);
+        if (!novo || !novo.trim() || novo.trim() === nomeAtual) return;
+        const { error } = await sb.from('pessoas').update({ nome: novo.trim().slice(0, 80) }).eq('id', id);
+        if (error) { alert('Não foi possível renomear agora. Tente de novo.'); return; }
+      } else {
+        const qtd = Number(btn.dataset.qtd || 0);
+        const aviso = qtd > 0
+          ? 'Excluir ' + nomeAtual + '? ' + (qtd === 1 ? 'O documento dessa pessoa continua salvo' : 'Os ' + qtd + ' documentos dessa pessoa continuam salvos') + ', só passam a aparecer como seus.'
+          : 'Excluir ' + nomeAtual + '?';
+        if (!confirm(aviso)) return;
+        const { error } = await sb.from('pessoas').delete().eq('id', id);
+        if (error) { alert('Não foi possível excluir agora. Tente de novo.'); return; }
+      }
+      carregar();
+    });
 
     document.getElementById('btn-adicionar').addEventListener('click', async function () {
       const nome = prompt('Nome da pessoa:');
