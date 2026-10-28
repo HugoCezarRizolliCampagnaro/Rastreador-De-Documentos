@@ -228,6 +228,8 @@
   /* ---------- conteúdo ---------- */
 
   .conteudo { max-width: 1040px; margin: 0 auto; padding: 20px 20px 60px; }
+  /* celular: espaço no fim pra o último gasto poder subir acima do botão + */
+  @media (max-width: 959px) { .conteudo { padding-bottom: 110px; } }
 
   .layout-gastos { display: grid; grid-template-columns: 1fr; gap: 16px; }
 
@@ -999,10 +1001,14 @@
         },
         options: {
           responsive: true,
-          plugins: { legend: { display: false } },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: function (c) { return formatarMoeda(Number(c.parsed.y)); } } },
+          },
           scales: {
             x: { ticks: { color: corMuted, font: { size: 10 } }, grid: { display: false } },
-            y: { beginAtZero: true, ticks: { color: corMuted, callback: function (v) { return 'R$ ' + v; } }, grid: { color: 'rgba(138,147,163,0.12)' } },
+            // valores no formato brasileiro: R$ 0,05 / R$ 1.250,00
+            y: { beginAtZero: true, ticks: { color: corMuted, callback: function (v) { return formatarMoeda(Number(v)); } }, grid: { color: 'rgba(138,147,163,0.12)' } },
           },
         },
       });
