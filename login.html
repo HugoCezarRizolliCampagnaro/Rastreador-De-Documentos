@@ -534,6 +534,7 @@
     });
 
     if (location.hash === '#conta-excluida') mostrarMensagem('Sua conta foi excluída. Sentiremos sua falta!', 'sucesso');
+    if (location.hash === '#criar') escolherAba('criar'); // vindo do "Criar conta" da página inicial
 
     // voltou do Google com erro (ex.: pessoa cancelou)?
     (function () {
