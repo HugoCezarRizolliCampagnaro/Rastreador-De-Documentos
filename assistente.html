@@ -347,6 +347,10 @@
   .botao-mic:hover { color: var(--marca); background: var(--bg); }
   .botao-mic.gravando { color: var(--status-vermelho); animation: piscar 1s infinite; }
   .botao-mic[hidden] { display: none; }
+  .botao-mic:disabled { opacity: 0.5; cursor: default; }
+  .aviso-mic { max-width: 640px; margin: 0 auto 8px; padding: 9px 14px; border-radius: 10px; font-size: 13px; line-height: 1.45; background: var(--superficie); border: 1px solid var(--borda); color: var(--texto-muted); }
+  .aviso-mic.erro { color: var(--status-vermelho); border-color: rgba(242, 85, 92, 0.4); }
+  .aviso-mic[hidden] { display: none; }
 
   /* ---------- instalar app (pwa) ---------- */
 
@@ -483,6 +487,7 @@
       </div>
 
       <div class="barra-envio-wrap">
+        <p class="aviso-mic" id="aviso-mic" role="status" hidden></p>
         <form class="barra-envio" id="form-envio">
           <input type="text" id="pergunta" placeholder="Pergunte sobre seus documentos..." autocomplete="off">
           <button type="button" class="botao-mic" id="botao-mic" aria-label="Falar" hidden></button>
@@ -896,56 +901,210 @@
       }
     }
 
-    /* ---------- microfone (voz -> texto) ---------- */
+    /* ---------- microfone (voz -> texto) ----------
+       Dois jeitos:
+       - 'nativo': reconhecimento de voz do próprio navegador (Chrome, Edge, Safari)
+       - 'gravar': grava o áudio e o servidor transcreve (Brave, Firefox, ou quando o nativo falha)
+       Se o nativo falhar por falta do serviço, passa pro 'gravar' sozinho e lembra disso. */
 
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     const botaoMic = document.getElementById('botao-mic');
+    const avisoMic = document.getElementById('aviso-mic');
+    const podeGravar = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+    const ehBrave = !!navigator.brave; // o Brave tem o reconhecimento "de enfeite": não funciona
+    let modoMic = '';
+    let modoSalvo = '';
+    try { modoSalvo = localStorage.getItem('mic-modo') || ''; } catch (e) {}
+    if (SpeechRecognitionAPI && !ehBrave && modoSalvo !== 'gravar') modoMic = 'nativo';
+    else if (podeGravar) modoMic = 'gravar';
 
-    if (SpeechRecognitionAPI) {
+    let micOcupado = false; // ouvindo, gravando ou transcrevendo
+    let timerAvisoMic = null;
+
+    function mostrarAvisoMic(texto, tipo, duracao) {
+      clearTimeout(timerAvisoMic);
+      avisoMic.textContent = texto;
+      avisoMic.className = 'aviso-mic' + (tipo ? ' ' + tipo : '');
+      avisoMic.hidden = !texto;
+      if (texto && duracao) timerAvisoMic = setTimeout(function () { avisoMic.hidden = true; }, duracao);
+    }
+
+    function estadoMic(ligado) {
+      botaoMic.classList.toggle('gravando', ligado);
+      botaoMic.setAttribute('aria-label', ligado ? 'Parar e enviar' : 'Falar');
+    }
+
+    function usarTexto(texto) {
+      texto = String(texto || '').trim();
+      if (!texto) { mostrarAvisoMic('Não entendi o que você falou. Tente de novo, falando perto do microfone.', 'erro', 5000); return; }
+      mostrarAvisoMic('', '', 0);
+      enviarPergunta(texto);
+    }
+
+    function mensagemPermissao() {
+      mostrarAvisoMic('O navegador bloqueou o microfone. Clique no cadeado ao lado do endereço do site, permita o microfone e tente de novo.', 'erro', 9000);
+    }
+
+    if (modoMic) {
       botaoMic.innerHTML = icone('mic', 17);
       botaoMic.hidden = false;
+    }
 
-      const reconhecimento = new SpeechRecognitionAPI();
+    /* --- nativo --- */
+    let reconhecimento = null;
+    if (SpeechRecognitionAPI && modoMic === 'nativo') {
+      reconhecimento = new SpeechRecognitionAPI();
       reconhecimento.lang = 'pt-BR';
       reconhecimento.interimResults = false;
       reconhecimento.maxAlternatives = 1;
-
-      let gravando = false;
-
-      botaoMic.addEventListener('click', function () {
-        if (gravando) { reconhecimento.stop(); return; }
-        try {
-          reconhecimento.start();
-        } catch (err) {
-          // já estava iniciando; ignora
-        }
-      });
+      let recebeuTexto = false;
 
       reconhecimento.addEventListener('start', function () {
-        gravando = true;
-        botaoMic.classList.add('gravando');
+        micOcupado = true; recebeuTexto = false; estadoMic(true);
+        mostrarAvisoMic('Ouvindo... pode falar.', '', 0);
       });
-
       reconhecimento.addEventListener('end', function () {
-        gravando = false;
-        botaoMic.classList.remove('gravando');
+        micOcupado = false; estadoMic(false);
+        if (!recebeuTexto && avisoMic.textContent.indexOf('Ouvindo') === 0) mostrarAvisoMic('', '', 0);
       });
-
       reconhecimento.addEventListener('result', function (e) {
-        const texto = e.results[0][0].transcript;
-        const inputEl = document.getElementById('pergunta');
-        inputEl.value = texto;
-        enviarPergunta(texto);
-        inputEl.value = '';
+        recebeuTexto = true;
+        usarTexto(e.results[0][0].transcript);
       });
-
-      reconhecimento.addEventListener('error', function () {
-        gravando = false;
-        botaoMic.classList.remove('gravando');
+      reconhecimento.addEventListener('error', function (e) {
+        micOcupado = false; estadoMic(false);
+        const erro = e && e.error;
+        if (erro === 'not-allowed') { mensagemPermissao(); return; }
+        if (erro === 'no-speech') { mostrarAvisoMic('Não ouvi nada. Toque no microfone e fale de novo.', 'erro', 5000); return; }
+        if (erro === 'aborted') return;
+        // 'network', 'service-not-allowed', 'audio-capture'...: o serviço do navegador não funciona aqui
+        if (podeGravar && erro !== 'audio-capture') {
+          modoMic = 'gravar';
+          try { localStorage.setItem('mic-modo', 'gravar'); } catch (err) {}
+          mostrarAvisoMic('Esse navegador não reconhece voz sozinho, então mudei pro modo gravação. Toque no microfone de novo.', '', 8000);
+        } else {
+          mostrarAvisoMic('Não achei um microfone funcionando. Confira se ele está ligado e permitido pro navegador.', 'erro', 7000);
+        }
       });
     }
-    // Se o navegador não suportar (ex.: alguns navegadores no iPhone), o botão
-    // simplesmente continua escondido — o chat por texto funciona normalmente.
+
+    /* --- gravar e transcrever no servidor --- */
+    const LIMITE_GRAVACAO_MS = 60000;
+    let gravador = null;
+    let streamMic = null;
+    let pedacos = [];
+    let timerLimite = null;
+    let cancelouGravacao = false;
+
+    async function comecarGravacao() {
+      try {
+        streamMic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      } catch (err) {
+        if (err && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) mensagemPermissao();
+        else mostrarAvisoMic('Não achei um microfone funcionando. Confira se ele está ligado e permitido pro navegador.', 'erro', 7000);
+        return;
+      }
+      pedacos = [];
+      cancelouGravacao = false;
+      gravador = new MediaRecorder(streamMic);
+      gravador.addEventListener('dataavailable', function (e) { if (e.data && e.data.size) pedacos.push(e.data); });
+      gravador.addEventListener('stop', terminarGravacao);
+      gravador.start();
+      micOcupado = true;
+      estadoMic(true);
+      mostrarAvisoMic('Gravando... fale e toque no microfone de novo pra enviar.', '', 0);
+      timerLimite = setTimeout(pararGravacao, LIMITE_GRAVACAO_MS);
+    }
+
+    function pararGravacao() {
+      clearTimeout(timerLimite);
+      if (gravador && gravador.state !== 'inactive') gravador.stop();
+    }
+
+    function soltarMicrofone() {
+      if (streamMic) streamMic.getTracks().forEach(function (t) { t.stop(); });
+      streamMic = null;
+    }
+
+    async function terminarGravacao() {
+      soltarMicrofone();
+      estadoMic(false);
+      const tipo = (gravador && gravador.mimeType) || 'audio/webm';
+      gravador = null;
+      if (cancelouGravacao || !pedacos.length) { micOcupado = false; mostrarAvisoMic('', '', 0); return; }
+      botaoMic.disabled = true;
+      mostrarAvisoMic('Entendendo o que você falou...', '', 0);
+      try {
+        const wav = await paraWav16k(new Blob(pedacos, { type: tipo }));
+        const sessao = (await sb.auth.getSession()).data.session;
+        const resp = await fetch('/api/transcrever-audio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (sessao ? sessao.access_token : '') },
+          body: JSON.stringify({ audio: await blobParaBase64(wav) }),
+        });
+        const dados = await resp.json().catch(function () { return {}; });
+        if (!resp.ok) throw new Error(dados.erro || 'Não consegui entender o áudio agora. Tente de novo ou digite a pergunta.');
+        usarTexto(dados.texto);
+      } catch (err) {
+        mostrarAvisoMic(err && err.message && !/decode|audio data|unable/i.test(err.message) ? err.message : 'Não consegui entender o áudio agora. Tente de novo ou digite a pergunta.', 'erro', 7000);
+      } finally {
+        micOcupado = false;
+        botaoMic.disabled = false;
+      }
+    }
+
+    // áudio gravado (webm/ogg/mp4) -> WAV mono 16 kHz, que o servidor aceita e fica pequeno
+    async function paraWav16k(blob) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx();
+      let audio;
+      try { audio = await ctx.decodeAudioData(await blob.arrayBuffer()); } finally { if (ctx.close) ctx.close(); }
+      const taxa = 16000;
+      const offline = new OfflineAudioContext(1, Math.max(1, Math.ceil(audio.duration * taxa)), taxa);
+      const fonte = offline.createBufferSource();
+      fonte.buffer = audio;
+      fonte.connect(offline.destination);
+      fonte.start();
+      const amostras = (await offline.startRendering()).getChannelData(0);
+      const buffer = new ArrayBuffer(44 + amostras.length * 2);
+      const v = new DataView(buffer);
+      function txt(pos, s) { for (let i = 0; i < s.length; i++) v.setUint8(pos + i, s.charCodeAt(i)); }
+      txt(0, 'RIFF'); v.setUint32(4, 36 + amostras.length * 2, true); txt(8, 'WAVE');
+      txt(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, taxa, true); v.setUint32(28, taxa * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+      txt(36, 'data'); v.setUint32(40, amostras.length * 2, true);
+      for (let i = 0; i < amostras.length; i++) {
+        const x = Math.max(-1, Math.min(1, amostras[i]));
+        v.setInt16(44 + i * 2, x < 0 ? x * 0x8000 : x * 0x7FFF, true);
+      }
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    function blobParaBase64(blob) {
+      return new Promise(function (resolver, rejeitar) {
+        const leitor = new FileReader();
+        leitor.onload = function () { resolver(String(leitor.result).split(',')[1] || ''); };
+        leitor.onerror = rejeitar;
+        leitor.readAsDataURL(blob);
+      });
+    }
+
+    botaoMic.addEventListener('click', function () {
+      if (modoMic === 'nativo' && reconhecimento) {
+        if (micOcupado) { reconhecimento.stop(); return; }
+        try { reconhecimento.start(); } catch (err) { /* já estava iniciando */ }
+        return;
+      }
+      if (modoMic === 'gravar') {
+        if (gravador) { pararGravacao(); return; }
+        if (micOcupado) return; // transcrevendo
+        comecarGravacao();
+      }
+    });
+
+    // saiu da tela gravando: desliga o microfone
+    window.addEventListener('pagehide', function () { cancelouGravacao = true; pararGravacao(); soltarMicrofone(); });
+    // Sem nenhum dos dois jeitos (navegador bem antigo), o botão continua escondido e o chat por texto funciona normalmente.
 
     document.getElementById('form-envio').addEventListener('submit', function (e) {
       e.preventDefault();
