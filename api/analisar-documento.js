@@ -93,17 +93,19 @@ module.exports = async function handler(req, res) {
 Extraia as informações que conseguir identificar COM CLAREZA na imagem e devolva ESTRITAMENTE um JSON (sem markdown, sem texto fora do JSON) no formato:
 
 {
-  "nome": "nome curto e descritivo pro documento (ex: 'ASO - João Silva' ou 'Alvará de Funcionamento')",
+  "nome": "nome curto e comum pro documento, como as pessoas falam (ex: 'RG', 'CNH', 'ASO - João Silva', 'Alvará de Funcionamento', 'DAS - outubro')",
   "tipo": "um destes valores exatos: aso, nr, alvara, contrato, certificacao, conta, imposto, outro (conta = boleto ou fatura; imposto = guia de imposto ou taxa)",
   "numero_documento": "número ou código do documento, ou null se não encontrar",
-  "data_emissao": "no formato AAAA-MM-DD, ou null se não encontrar",
+  "data_emissao": "data de EMISSÃO ou EXPEDIÇÃO do documento, no formato AAAA-MM-DD, ou null se não estiver escrita como emissão/expedição",
   "data_vencimento": "no formato AAAA-MM-DD, ou null se não encontrar",
   "categoria_sugerida": "um destes valores exatos: pessoal, veiculo, trabalho, casa, outro",
-  "observacoes": "outras informações relevantes visíveis no documento, ou null"
+  "observacoes": "UM texto curto (string, até 200 caracteres) com algo útil pra renovação, como órgão emissor ou categoria da CNH, ou null"
 }
 
 Datas no documento costumam estar no formato brasileiro DD/MM/AAAA — converta para AAAA-MM-DD.
-Se não tiver certeza de um campo, use null nele em vez de chutar. Nunca invente datas ou números.`;
+Se não tiver certeza de um campo, use null nele em vez de chutar. Nunca invente datas ou números.
+NUNCA use a data de nascimento como data de emissão ou de vencimento. Data de nascimento, nome dos pais, naturalidade e CPF não vão em observacoes.
+Na carteira de identidade (RG/CIN), a validade costuma aparecer como "Validade" e a emissão como "Data de expedição"; se só tiver data de nascimento e validade, data_emissao é null.`;
 
     const resposta = await chamarMistral(apiKey, {
         model: MODELO_IA,
@@ -141,6 +143,22 @@ Se não tiver certeza de um campo, use null nele em vez de chutar. Nunca invente
       res.status(502).json({ erro: 'A IA devolveu um formato inesperado. Tenta de novo ou preenche manualmente.' });
       return;
     }
+
+    // a IA às vezes devolve objeto/lista onde era pra ser texto: vira texto simples (ou some)
+    function comoTexto(v, max) {
+      if (v == null) return null;
+      if (typeof v === 'object') {
+        v = Array.isArray(v) ? v.join(', ') : Object.keys(v).map(function (k) { return k + ': ' + v[k]; }).join('; ');
+      }
+      v = String(v).trim();
+      return v && v !== 'null' ? v.slice(0, max) : null;
+    }
+    extraido = extraido && typeof extraido === 'object' ? extraido : {};
+    ['nome', 'tipo', 'numero_documento', 'data_emissao', 'data_vencimento', 'categoria_sugerida'].forEach(function (k) {
+      extraido[k] = comoTexto(extraido[k], 120);
+    });
+    extraido.observacoes = comoTexto(extraido.observacoes, 300);
+    if (extraido.data_emissao && extraido.data_emissao === extraido.data_vencimento) extraido.data_emissao = null;
 
     res.status(200).json({ extraido: extraido });
   } catch (erro) {

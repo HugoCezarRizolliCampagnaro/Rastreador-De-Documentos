@@ -769,20 +769,43 @@
           canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
           URL.revokeObjectURL(url);
           const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          // sem memória, o celular devolve uma imagem vazia
+          if (!dataUrl || dataUrl.length < 1000) { reject(new Error(MSG_FOTO_MEMORIA)); return; }
           resolve(dataUrl.slice(dataUrl.indexOf(',') + 1));
         };
-        img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Não foi possível abrir a imagem.')); };
+        img.onerror = function () { URL.revokeObjectURL(url); reject(new Error(MSG_FOTO_MEMORIA)); };
         img.src = url;
       });
     }
 
     const LIMITE_PDF_IA = 3 * 1024 * 1024;
 
+    // celular com pouco espaço ou memória: a foto não abre, ou a página recarrega quando a câmera abre
+    const MSG_FOTO_MEMORIA = 'Não consegui abrir a foto. Isso costuma acontecer quando o celular está com pouco espaço ou memória. ' +
+      'Feche outros apps abertos (ou libere espaço) e tente de novo. Se preferir, tire a foto pela câmera do celular e depois escolha ela aqui em "Escolher arquivo".';
+
+    (function avisarSeACameraDerrubouAPagina() {
+      const statusIA = document.getElementById('ia-preencher-status');
+      const campoArquivo = document.getElementById('arquivo');
+      let aberto = 0;
+      try { aberto = Number(sessionStorage.getItem('camera-aberta') || 0); sessionStorage.removeItem('camera-aberta'); } catch (e) {}
+      // a página recarregou até 3 min depois de abrir a câmera, sem a foto chegar: foi o celular sem memória
+      if (aberto && Date.now() - aberto < 3 * 60 * 1000) {
+        statusIA.className = 'ia-preencher-status erro';
+        statusIA.textContent = 'A página recarregou enquanto a câmera estava aberta. ' + MSG_FOTO_MEMORIA.replace('Não consegui abrir a foto. ', '');
+        statusIA.hidden = false;
+      }
+      campoArquivo.addEventListener('click', function () { try { sessionStorage.setItem('camera-aberta', String(Date.now())); } catch (e) {} });
+      function limpar() { try { sessionStorage.removeItem('camera-aberta'); } catch (e) {} }
+      campoArquivo.addEventListener('change', limpar);
+      campoArquivo.addEventListener('cancel', limpar);
+    })();
+
     function lerComoBase64(arquivo) {
       return new Promise(function (resolve, reject) {
         const leitor = new FileReader();
         leitor.onload = function () { resolve(String(leitor.result).split(',')[1]); };
-        leitor.onerror = function () { reject(new Error('Não consegui ler o arquivo.')); };
+        leitor.onerror = function () { reject(new Error(MSG_FOTO_MEMORIA.replace('a foto', 'o arquivo'))); };
         leitor.readAsDataURL(arquivo);
       });
     }
@@ -843,7 +866,10 @@
         if (campos.categoria_sugerida && categoriasValidas.includes(campos.categoria_sugerida)) {
           form.categoria.value = campos.categoria_sugerida;
         }
-        if (campos.observacoes) {
+        if (campos.observacoes && typeof campos.observacoes === 'object') {
+          campos.observacoes = Object.values(campos.observacoes).filter(Boolean).join(', ');
+        }
+        if (campos.observacoes && typeof campos.observacoes === 'string') {
           form.observacoes.value = form.observacoes.value ? form.observacoes.value + '\n' + campos.observacoes : campos.observacoes;
         }
 
