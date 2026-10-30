@@ -108,7 +108,7 @@
   </div>
 
   <div class="conteudo">
-    <p>Esta política explica quais dados o DocTrack coleta, como eles são usados e quais são os seus direitos sobre eles.</p>
+    <p>Esta política explica quais dados o DocTrack coleta, como eles são usados e quais são os seus direitos sobre eles. O DocTrack é mantido pela <strong>Equipe DocTrack</strong>, responsável pelo tratamento dos dados. Contato: <a href="mailto:doctrack.suporte@gmail.com" style="color: var(--marca);">doctrack.suporte@gmail.com</a>.</p>
 
     <div class="secao-legal">
       <h2>1. Quais dados coletamos</h2>
@@ -116,6 +116,7 @@
         <li>Seu e-mail (e seu nome, se informado), usados para login e comunicação sobre a conta. Se você entrar com o Google, recebemos do Google apenas nome e e-mail.</li>
         <li>Os documentos que você cadastra: nome, tipo, categoria, datas, observações e anexos (PDF ou foto) que você mesmo envia.</li>
         <li>Gastos que você registra, se usar essa função.</li>
+        <li>Dados de outras pessoas que você cadastra (familiares, funcionários ou clientes): nome, cargo ou setor e, se você informar, o e-mail delas, usado só para enviar os avisos de vencimento dos documentos delas.</li>
         <li>Se você assinar um plano pago: nome completo, CPF e celular, exigidos pela instituição de pagamento para gerar a cobrança. Se pagar com cartão, os dados do cartão são enviados direto para a processadora de pagamento e não ficam salvos no DocTrack; guardamos só os 4 últimos dígitos, para você identificar o pagamento.</li>
         <li>Se ativar as notificações: um identificador técnico do seu aparelho para enviar os avisos.</li>
         <li>Preferências (como tema claro/escuro) e a conversa recente com o assistente, guardadas só no seu navegador.</li>
@@ -125,19 +126,20 @@
 
     <div class="secao-legal">
       <h2>2. Onde os dados ficam guardados</h2>
-      <p>Usamos o Supabase como banco de dados e armazenamento de arquivos. Seus documentos e anexos são protegidos por regras de acesso que garantem que só você (dono da conta) pode vê-los.</p>
+      <p>Usamos o Supabase como banco de dados e armazenamento de arquivos. Os servidores ficam nos Estados Unidos, então seus dados são transferidos para fora do Brasil, com proteção de acesso e criptografia na transmissão. Seus documentos e anexos são protegidos por regras de acesso que garantem que só você (dono da conta) pode vê-los.</p>
+      <p>A exceção é quando você mesmo convida alguém pelo app (planos Família e Profissional): a pessoa convidada passa a ver os documentos cadastrados no nome dela, com o nível de acesso que você escolher. Você pode remover esse acesso a qualquer momento.</p>
     </div>
 
     <div class="secao-legal">
       <h2>2.1. Inteligência artificial</h2>
-      <p>Quando você usa o assistente, enviamos sua pergunta e um resumo dos seus documentos (nome, tipo, datas e valores) ao provedor de IA (Mistral AI) para gerar a resposta. Quando você usa o preenchimento automático por foto, a imagem do documento é enviada ao mesmo provedor para leitura. Nada disso é feito sem uma ação sua. Em contas gratuitas do provedor, os dados enviados podem ser usados por ele para melhorar seus modelos, conforme os termos dele. Se isso for um problema para você, não use o assistente nem o preenchimento por foto: o restante do app funciona normalmente.</p>
+      <p>Quando você usa o assistente, enviamos sua pergunta e um resumo dos seus documentos (nome, tipo, datas e valores) ao provedor de IA (Mistral AI) para gerar a resposta. Quando você usa o preenchimento automático por foto ou PDF, o arquivo do documento é enviado ao mesmo provedor para leitura. Quando você fala com o assistente pelo microfone, em alguns navegadores o áudio é enviado ao mesmo provedor só para virar texto; o áudio não fica guardado no DocTrack. Nada disso é feito sem uma ação sua. Em contas gratuitas do provedor, os dados enviados podem ser usados por ele para melhorar seus modelos, conforme os termos dele. Se isso for um problema para você, não use o assistente nem o preenchimento por foto: o restante do app funciona normalmente.</p>
     </div>
 
     <div class="secao-legal">
       <h2>3. Para que usamos seus dados</h2>
       <ul>
         <li>Mostrar seus documentos e organizar os vencimentos.</li>
-        <li>Enviar avisos de vencimento, se você ativar as notificações.</li>
+        <li>Enviar avisos de vencimento, se você ativar as notificações, para você e, se você pedir, para as pessoas ou clientes ligados ao documento.</li>
         <li>Processar a assinatura de planos pagos.</li>
         <li>Melhorar o funcionamento do aplicativo.</li>
       </ul>
@@ -150,12 +152,14 @@
         <li>Acessar todos os seus documentos, exportando-os em CSV pela tela de Perfil.</li>
         <li>Corrigir ou excluir qualquer documento cadastrado.</li>
         <li>Excluir a sua conta e todos os seus dados, de forma definitiva, na tela de Perfil.</li>
+        <li>Pedir informações sobre o uso dos seus dados, correções ou a exclusão pelo e-mail <a href="mailto:doctrack.suporte@gmail.com" style="color: var(--marca);">doctrack.suporte@gmail.com</a>. Respondemos em até 15 dias.</li>
+        <li>Se você foi cadastrado por outra pessoa (como familiar, funcionário ou cliente) e não quer mais receber avisos, é só responder o e-mail de aviso ou escrever para o mesmo endereço.</li>
       </ul>
     </div>
 
     <div class="secao-legal">
       <h2>5. Compartilhamento com terceiros</h2>
-      <p>Não vendemos seus dados e não compartilhamos seus documentos com ninguém para outros fins. Usamos prestadores que processam dados só para operar o serviço: Supabase (banco de dados, login e arquivos), Vercel (hospedagem), Mistral AI (inteligência artificial, só quando você usa o assistente ou a leitura automática de foto ou PDF), ZuckPay (pagamentos por Pix e cartão, só se você assinar um plano) e Google (login, só se você escolher entrar com o Google).</p>
+      <p>Não vendemos seus dados e não compartilhamos seus documentos com ninguém para outros fins. Usamos prestadores que processam dados só para operar o serviço: Supabase (banco de dados, login e arquivos), Vercel (hospedagem), Mistral AI (inteligência artificial, só quando você usa o assistente ou a leitura automática de foto ou PDF), ZuckPay (pagamentos por Pix e cartão, só se você assinar um plano) e Google (login, só se você escolher entrar com o Google, e envio dos e-mails de aviso pelo Gmail).</p>
     </div>
 
     <div class="secao-legal">
