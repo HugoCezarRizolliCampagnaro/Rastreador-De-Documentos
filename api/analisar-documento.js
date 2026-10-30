@@ -111,44 +111,57 @@ Se não tiver certeza de um campo, use null nele em vez de chutar. Nunca invente
 NUNCA use a data de nascimento como data de emissão ou de vencimento. Data de nascimento, nome dos pais, naturalidade e CPF não vão em observacoes.
 Na carteira de identidade (RG/CIN), a validade costuma aparecer como "Validade" e a emissão como "Data de expedição"; se só tiver data de nascimento e validade, data_emissao é null.`;
 
-    const resposta = await chamarMistral(apiKey, {
+    // pergunta pra IA com um conteúdo (texto do PDF ou 1 foto) e devolve o JSON lido
+    async function perguntar(conteudo) {
+      const resposta = await chamarMistral(apiKey, {
         model: MODELO_IA,
         temperature: 0.1,
         max_tokens: 700,
         response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'user',
-            content: ehPdf
-              ? [{ type: 'text', text: prompt.replace('a foto de um documento real', 'o texto extraído de um PDF de documento real').replace('na imagem', 'no texto') + '\n\nTEXTO DO DOCUMENTO:\n' + textoPdf }]
-              : [
-                  { type: 'text', text: imagens.length > 1
-                    ? prompt.replace('a foto de um documento real', 'as ' + imagens.length + ' fotos do MESMO documento real (frente, verso ou páginas)') + '\nJunte as informações de todas as fotos num único JSON.'
-                    : prompt },
-                ].concat((imagens.length ? imagens : [imagemBase64]).map(function (b) {
-                  return { type: 'image_url', image_url: `data:${imagens.length ? 'image/jpeg' : mimeType};base64,${b}` };
-                })),
-          },
-        ],
+        messages: [{ role: 'user', content: conteudo }],
       });
-
-    const dados = await resposta.json();
-
-    if (!resposta.ok) {
-      console.error('Erro Mistral (visão):', JSON.stringify(dados));
-      res.status(502).json({ erro: 'A IA não conseguiu analisar a foto agora. (erro '+resposta.status+': '+String((dados && (dados.message || (dados.error && dados.error.message) || dados.detail)) || 'sem detalhe').slice(0,200)+')' });
-      return;
+      const dados = await resposta.json().catch(function () { return {}; });
+      if (!resposta.ok) {
+        console.error('Erro Mistral (visão):', JSON.stringify(dados));
+        return { erro: 'A IA não conseguiu analisar a foto agora. (erro ' + resposta.status + ': ' + String((dados && (dados.message || (dados.error && dados.error.message) || dados.detail)) || 'sem detalhe').slice(0, 200) + ')' };
+      }
+      const textoJson = (dados.choices && dados.choices[0] && dados.choices[0].message && dados.choices[0].message.content) || '';
+      try {
+        return { extraido: JSON.parse(String(textoJson).trim()) };
+      } catch (erroParse) {
+        console.error('JSON inválido da IA (visão):', textoJson);
+        return { erro: 'A IA devolveu um formato inesperado. Tenta de novo ou preenche manualmente.' };
+      }
     }
 
-    const textoJson = (dados.choices && dados.choices[0] && dados.choices[0].message && dados.choices[0].message.content) || '';
-
     let extraido;
-    try {
-      extraido = JSON.parse(String(textoJson).trim());
-    } catch (erroParse) {
-      console.error('JSON inválido da IA (visão):', textoJson);
-      res.status(502).json({ erro: 'A IA devolveu um formato inesperado. Tenta de novo ou preenche manualmente.' });
-      return;
+    if (ehPdf) {
+      const r = await perguntar([{ type: 'text', text: prompt.replace('a foto de um documento real', 'o texto extraído de um PDF de documento real').replace('na imagem', 'no texto') + '\n\nTEXTO DO DOCUMENTO:\n' + textoPdf }]);
+      if (r.erro) { res.status(502).json({ erro: r.erro }); return; }
+      extraido = r.extraido;
+    } else {
+      // uma foto por vez (a IA lê melhor assim) e junta: o que a 1ª (frente) achou vale primeiro,
+      // o que faltar vem das outras (ex.: data de expedição no verso do RG)
+      const fotos = imagens.length ? imagens : [imagemBase64];
+      const tipoFoto = imagens.length ? 'image/jpeg' : mimeType;
+      extraido = {};
+      let ultimoErro = null, algumaDeuCerto = false;
+      for (let i = 0; i < fotos.length; i++) {
+        const texto = fotos.length > 1
+          ? prompt + '\nEsta é a foto ' + (i + 1) + ' de ' + fotos.length + ' do mesmo documento (pode ser a frente, o verso ou outra página). Extraia só o que aparece nesta foto.'
+          : prompt;
+        const r = await perguntar([{ type: 'text', text: texto }, { type: 'image_url', image_url: `data:${tipoFoto};base64,${fotos[i]}` }]);
+        if (r.erro) { ultimoErro = r.erro; continue; }
+        algumaDeuCerto = true;
+        const e = r.extraido && typeof r.extraido === 'object' ? r.extraido : {};
+        Object.keys(e).forEach(function (k) {
+          const vazio = extraido[k] == null || extraido[k] === '' || extraido[k] === 'null';
+          if (vazio && e[k] != null && e[k] !== '' && e[k] !== 'null') extraido[k] = e[k];
+        });
+        // tipo "outro" da frente não impede um tipo mais certo das outras fotos
+        if (extraido.tipo === 'outro' && e.tipo && e.tipo !== 'outro') extraido.tipo = e.tipo;
+      }
+      if (!algumaDeuCerto) { res.status(502).json({ erro: ultimoErro || 'A IA não conseguiu analisar a foto agora.' }); return; }
     }
 
     // a IA às vezes devolve objeto/lista onde era pra ser texto: vira texto simples (ou some)

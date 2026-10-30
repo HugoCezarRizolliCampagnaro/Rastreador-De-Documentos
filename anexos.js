@@ -331,7 +331,7 @@
     var stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 3840 }, height: { ideal: 2160 } },
         audio: false,
       });
     } catch (e) {
@@ -354,6 +354,12 @@
     document.body.style.overflow = 'hidden';
     var video = el.querySelector('video');
     video.srcObject = stream;
+    var trilha = stream.getVideoTracks()[0];
+    // foco automático contínuo, quando o celular deixa
+    try { trilha.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {}); } catch (e) {}
+    // foto de verdade (resolução cheia da câmera, com foco), quando o navegador tem ImageCapture
+    var capturador = null;
+    try { if (window.ImageCapture) capturador = new ImageCapture(trilha); } catch (e) { capturador = null; }
     var tiradas = [];
     var ocupado = false;
 
@@ -384,22 +390,33 @@
     el.querySelector('.anx-cam-disparo').addEventListener('click', function () {
       if (ocupado || !video.videoWidth || itens.length + tiradas.length >= limite()) return;
       ocupado = true;
-      var w = video.videoWidth, h = video.videoHeight;
-      var escala = Math.min(1, 2000 / Math.max(w, h));
-      var c = document.createElement('canvas');
-      c.width = Math.round(w * escala); c.height = Math.round(h * escala);
-      c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
       var flash = el.querySelector('.anx-cam-flash');
       flash.style.opacity = '0.8';
       setTimeout(function () { flash.style.opacity = '0'; }, 120);
-      c.toBlob(function (blob) {
+      el.querySelector('.anx-cam-dica').textContent = 'Segure firme...';
+
+      function quadroDoVideo() {
+        return new Promise(function (resolver) {
+          var w = video.videoWidth, h = video.videoHeight;
+          var escala = Math.min(1, 2000 / Math.max(w, h));
+          var c = document.createElement('canvas');
+          c.width = Math.round(w * escala); c.height = Math.round(h * escala);
+          c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
+          c.toBlob(resolver, 'image/jpeg', 0.9);
+        });
+      }
+      function guardar(blob) {
         ocupado = false;
-        if (!blob) { if (window.Dialogo) Dialogo.avisar('Não consegui tirar a foto. Tente de novo.'); return; }
+        if (!blob) { atualizarTextos(); if (window.Dialogo) Dialogo.avisar('Não consegui tirar a foto. Tente de novo.'); return; }
         var file = new File([blob], 'foto-' + Date.now() + '.jpg', { type: 'image/jpeg' });
         tiradas.push({ file: file, url: URL.createObjectURL(file) });
         atualizarTextos();
         if (itens.length + tiradas.length >= limite()) fechar(true);
-      }, 'image/jpeg', 0.88);
+      }
+      var foto = capturador
+        ? capturador.takePhoto().then(function (b) { return reduzir(b, 2000, 0.9); }).catch(function () { return quadroDoVideo(); })
+        : quadroDoVideo();
+      foto.then(guardar, function () { guardar(null); });
     });
     el.querySelector('.anx-cam-pronto').addEventListener('click', function () { fechar(true); });
     el.querySelector('.anx-cam-fechar').addEventListener('click', function () { fechar(tiradas.length > 0); });
