@@ -280,7 +280,7 @@
       <div class="selo" id="selo-confirmar"></div>
       <h2>Confira seu e-mail</h2>
       <p>Enviamos um link de confirmação para<br><strong id="confirmar-email-texto"></strong></p>
-      <p>Clique no link para ativar a conta e depois volte aqui para entrar. Se não achar, olhe a caixa de spam.</p>
+      <p>Clique no link pra ativar a conta. Pode ser pelo celular: assim que confirmar, esta tela entra sozinha. Se não achar o e-mail, olhe a caixa de spam.</p>
       <button type="button" class="btn-secundario" id="btn-reenviar">Reenviar e-mail</button>
       <button type="button" class="link-botao" id="btn-ja-confirmei" style="margin-top:14px;">Já confirmei, quero entrar</button>
     </section>
@@ -405,6 +405,7 @@
     });
     $('voltar-recuperar').addEventListener('click', function () { mostrarVista('principal'); });
     $('btn-ja-confirmei').addEventListener('click', function () {
+      pararEspera();
       $('entrar-email').value = emailPendente;
       abaAtual = 'entrar';
       mostrarVista('principal');
@@ -485,7 +486,44 @@
       emailPendente = email;
       $('confirmar-email-texto').textContent = email;
       mostrarVista('confirmar');
+      esperarConfirmacao(email, senha);
     });
+
+    /* ---------- entra sozinho depois de confirmar o e-mail ----------
+       Enquanto a tela "Confira seu e-mail" está aberta, tenta entrar de tempos em tempos
+       (e na hora que a pessoa volta pra esta aba). Quando o e-mail é confirmado
+       (até pelo celular), o login dá certo e vai direto pro app. */
+    let esperaConfirmacao = null;
+
+    function esperarConfirmacao(email, senha) {
+      pararEspera();
+      const inicio = Date.now();
+      let tentando = false;
+      async function tentar() {
+        if (tentando || vistas.confirmar.hidden) return;
+        if (Date.now() - inicio > 20 * 60 * 1000) { pararEspera(); return; } // desiste depois de 20 min
+        tentando = true;
+        const { data, error } = await sb.auth.signInWithPassword({ email: email, password: senha }).catch(function () { return {}; });
+        tentando = false;
+        if (!error && data && data.session) {
+          pararEspera();
+          window.location.replace('index.html');
+        }
+      }
+      function aoVoltar() { if (document.visibilityState === 'visible') tentar(); }
+      const timer = setInterval(tentar, 15000);
+      document.addEventListener('visibilitychange', aoVoltar);
+      window.addEventListener('focus', tentar);
+      esperaConfirmacao = { timer: timer, aoVoltar: aoVoltar, tentar: tentar };
+    }
+
+    function pararEspera() {
+      if (!esperaConfirmacao) return;
+      clearInterval(esperaConfirmacao.timer);
+      document.removeEventListener('visibilitychange', esperaConfirmacao.aoVoltar);
+      window.removeEventListener('focus', esperaConfirmacao.tentar);
+      esperaConfirmacao = null;
+    }
 
     $('btn-reenviar').addEventListener('click', async function () {
       if (!emailPendente) return;
