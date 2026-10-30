@@ -267,6 +267,7 @@
   }
 
   .btn-ia-preencher:hover { background: rgba(91, 110, 245, 0.2); }
+  .btn-ia-preencher[hidden] { display: none; }
 
   .btn-ia-preencher:disabled { opacity: 0.65; cursor: wait; }
 
@@ -456,11 +457,17 @@
           <div class="secao-card">
             <div class="secao-cabecalho">
               <span class="secao-icone" id="icone-secao-anexo"></span>
-              <span class="secao-titulo">Documento anexado</span>
+              <span class="secao-titulo">Fotos e arquivos</span>
             </div>
-            <p class="secao-descricao" style="margin: -8px 0 12px;">Adicione uma foto ou PDF para manter o documento sempre disponível.</p>
-            <input type="file" id="arquivo" name="arquivo" accept="application/pdf,image/*" capture="environment">
-            <div id="arquivo-atual" class="arquivo-atual" hidden></div>
+            <p class="secao-descricao" style="margin: -8px 0 12px;">Frente, verso ou PDF: o documento sempre à mão.</p>
+            <div class="anexos-grade" id="anexos-grade"></div>
+            <div class="anexos-botoes">
+              <button type="button" class="principal" id="btn-tirar-foto">Tirar foto</button>
+              <button type="button" id="btn-galeria">Galeria ou PDF</button>
+            </div>
+            <p class="anexos-dica" id="anexos-dica"></p>
+            <input type="file" id="arquivo" name="arquivo" accept="application/pdf,image/*" multiple hidden>
+            <input type="file" id="arquivo-camera" accept="image/*" capture="environment" hidden>
             <button type="button" class="btn-ia-preencher" id="btn-ia-preencher" hidden>
               <span id="icone-ia-preencher"></span>
               <span id="texto-ia-preencher">Preencher automaticamente com IA</span>
@@ -684,6 +691,7 @@
     </div>
   </div>
   <script src="dialogos.js"></script>
+  <script src="anexos.js"></script>
   <script src="recorrencia.js"></script>
   <script src="tour.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -810,40 +818,35 @@
       });
     }
 
-    document.getElementById('arquivo').addEventListener('change', function () {
-      const statusIA = document.getElementById('ia-preencher-status');
-      statusIA.hidden = true;
-      const arquivo = this.files[0];
-      const botaoIA = document.getElementById('btn-ia-preencher');
-      const ehPdf = !!arquivo && arquivo.type === 'application/pdf';
-      botaoIA.hidden = !arquivo || !(arquivo.type.startsWith('image/') || ehPdf);
-      if (ehPdf && arquivo.size > LIMITE_PDF_IA) {
-        botaoIA.hidden = true;
-        statusIA.className = 'ia-preencher-status';
-        statusIA.textContent = 'Esse PDF é grande demais para a leitura automática (máx. 3 MB). Preencha os campos manualmente.';
-        statusIA.hidden = false;
-      }
-    });
-
     document.getElementById('btn-ia-preencher').addEventListener('click', async function () {
-      const arquivo = form.arquivo.files[0];
       const statusIA = document.getElementById('ia-preencher-status');
       const textoBotao = document.getElementById('texto-ia-preencher');
-      if (!arquivo) return;
+      if (!Anexos.itens().length) return;
 
       this.disabled = true;
       textoBotao.textContent = 'Analisando com IA...';
       statusIA.hidden = true;
 
       try {
-        const ehPdf = arquivo.type === 'application/pdf';
-        if (ehPdf) textoBotao.textContent = 'Lendo o PDF com IA...';
-        const base64 = ehPdf ? await lerComoBase64(arquivo) : await reduzirImagem(arquivo);
+        // fotos (frente, verso...) vão juntas; sem foto, lê o PDF
+        let corpoIA;
+        let imagens = [];
+        try { imagens = await Anexos.imagensParaIA(3); } catch (e) { throw new Error(MSG_FOTO_MEMORIA); }
+        if (imagens.length) {
+          if (imagens.length > 1) textoBotao.textContent = 'Lendo ' + imagens.length + ' fotos com IA...';
+          corpoIA = { imagens: imagens, mimeType: 'image/jpeg' };
+        } else {
+          const pdf = Anexos.pdfParaIA();
+          if (!pdf) throw new Error('Adicione uma foto ou PDF do documento.');
+          if (pdf.file && pdf.file.size > LIMITE_PDF_IA) throw new Error('Esse PDF é grande demais para a leitura automática (máx. 3 MB). Preencha os campos manualmente.');
+          textoBotao.textContent = 'Lendo o PDF com IA...';
+          corpoIA = { imagemBase64: await Anexos.arquivoBase64(pdf), mimeType: 'application/pdf' };
+        }
         const sessaoIA = (await sb.auth.getSession()).data.session;
         const resp = await fetch('/api/analisar-documento', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (sessaoIA ? sessaoIA.access_token : '') },
-          body: JSON.stringify({ imagemBase64: base64, mimeType: ehPdf ? 'application/pdf' : 'image/jpeg' }),
+          body: JSON.stringify(corpoIA),
         });
         const dados = await resp.json();
 
@@ -1167,6 +1170,40 @@
       }
     });
 
+    /* ---------- rascunho (página recarregou com a galeria ou câmera do celular aberta) ---------- */
+
+    function salvarRascunho() {
+      const campos = {};
+      form.querySelectorAll('input, select, textarea').forEach(function (el) {
+        if (!el.name || el.type === 'file') return;
+        if (el.type === 'checkbox') { (campos[el.name] = campos[el.name] || []); if (el.checked) campos[el.name].push(el.value); }
+        else campos[el.name] = el.value;
+      });
+      try { sessionStorage.setItem('rascunho-documento', JSON.stringify({ id: idEdicao || '', quando: Date.now(), campos: campos })); } catch (e) {}
+    }
+
+    function restaurarRascunho() {
+      let r = null;
+      try { r = JSON.parse(sessionStorage.getItem('rascunho-documento') || 'null'); sessionStorage.removeItem('rascunho-documento'); } catch (e) {}
+      if (!r || r.id !== (idEdicao || '') || Date.now() - r.quando > 5 * 60 * 1000) return;
+      Object.keys(r.campos).forEach(function (nome) {
+        const els = form.querySelectorAll('[name="' + nome + '"]');
+        if (!els.length) return;
+        if (els[0].type === 'checkbox') els.forEach(function (el) { el.checked = r.campos[nome].indexOf(el.value) !== -1; });
+        else if (r.campos[nome] !== '' || !els[0].value) els[0].value = r.campos[nome];
+      });
+      atualizarPreviewVencimento();
+    }
+
+    Anexos.iniciar({
+      sb: sb,
+      aoSair: salvarRascunho,
+      aoMudar: function (lista) {
+        document.getElementById('btn-ia-preencher').hidden = lista.length === 0;
+        document.getElementById('ia-preencher-status').hidden = true;
+      },
+    });
+
     /* ---------- sessão / carregar edição ---------- */
 
     sb.auth.getSession().then(async function (resultado) {
@@ -1184,6 +1221,8 @@
       const testeRepeticao = await sb.from('documentos').select('repeticao').limit(1);
       repeticaoDisponivel = !testeRepeticao.error;
       document.getElementById('campo-repeticao').hidden = !repeticaoDisponivel;
+
+      if (!idEdicao) restaurarRascunho();
 
       let jaViuTourDocumento = true;
       try { jaViuTourDocumento = localStorage.getItem('tour-documento-visto') === 'true'; } catch (e) {}
@@ -1239,14 +1278,8 @@
             document.getElementById('historico').hidden = false;
           }
 
-          if (data.arquivo_path) {
-            const { data: urlData } = await sb.storage.from('documentos-arquivos').createSignedUrl(data.arquivo_path, 3600);
-            if (urlData) {
-              const arquivoAtualEl = document.getElementById('arquivo-atual');
-              arquivoAtualEl.innerHTML = `${icone('paperclip', 15)} <a href="${urlData.signedUrl}" target="_blank" rel="noopener">${escapeHtml(data.arquivo_nome || 'ver arquivo atual')}</a> — escolher outro arquivo abaixo substitui este.`;
-              arquivoAtualEl.hidden = false;
-            }
-          }
+          await Anexos.carregar(idEdicao, data);
+          restaurarRascunho();
         }
       }
     });
@@ -1261,7 +1294,7 @@
 
     const PASSOS_DOCUMENTO = [
       { alvos: [function () { return cartaoDe('arquivo'); }], titulo: 'Comece pelo documento',
-        texto: 'Tire uma foto ou envie o PDF. Depois toque em "Preencher automaticamente com IA" que o app lê o documento e preenche nome, número e datas pra você.' },
+        texto: 'Tire a foto da frente e, se tiver, do verso (ou envie o PDF). Depois toque em "Preencher automaticamente com IA" que o app lê tudo e preenche nome, número e datas pra você. Tocando na foto, ela abre grande.' },
       { alvos: [function () { return cartaoDe('nome'); }], titulo: 'Nome do documento',
         texto: 'Use um nome fácil de achar depois, tipo "ASO — Maria" ou "Alvará da loja". O número é opcional.' },
       { alvos: [function () { return cartaoDe('categoria'); }], titulo: 'Tipo e categoria',
@@ -1376,27 +1409,39 @@
         }
       }
 
-      const arquivo = form.arquivo.files[0];
-      if (arquivo) {
-        const caminho = `${usuarioAtual.id}/${Date.now()}-${arquivo.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
-        const { error: erroUpload } = await sb.storage.from('documentos-arquivos').upload(caminho, arquivo);
-        if (erroUpload) {
-          botao.disabled = false;
-          botao.textContent = idEdicao ? 'Salvar alterações' : 'Cadastrar documento';
-          confirmacao.style.borderLeftColor = 'var(--status-vermelho)';
-          confirmacao.innerHTML = `<strong>Não foi possível enviar o anexo</strong>${escapeHtml(erroUpload.message)}`;
-          confirmacao.hidden = false;
-          return;
-        }
-        dados.arquivo_path = caminho;
-        dados.arquivo_nome = arquivo.name;
+      // sobe as fotos/PDFs novos antes de salvar o documento
+      try {
+        if (Anexos.temNovos()) botao.textContent = 'Enviando arquivos...';
+        await Anexos.enviarNovos(usuarioAtual.id);
+      } catch (erroUpload) {
+        botao.disabled = false;
+        botao.textContent = idEdicao ? 'Salvar alterações' : 'Cadastrar documento';
+        confirmacao.style.borderLeftColor = 'var(--status-vermelho)';
+        confirmacao.innerHTML = `<strong>Não foi possível enviar os arquivos</strong>${escapeHtml(erroUpload.message)}`;
+        confirmacao.hidden = false;
+        confirmacao.scrollIntoView({ behavior: 'smooth' });
+        return;
       }
+      botao.textContent = 'Salvando...';
 
       const resultado = idEdicao
         ? await sb.from('documentos').update(dados).eq('id', idEdicao).select().single()
         : await sb.from('documentos').insert([dados]).select().single();
 
-      const { data: docSalvo, error } = resultado;
+      const { data: docSalvo } = resultado;
+      let { error } = resultado;
+
+      // grava a lista de arquivos; o 1º fica também no documento (cartões, convite e e-mails usam ele)
+      if (!error && docSalvo) {
+        try {
+          const primeiro = await Anexos.gravar(docSalvo.id, usuarioAtual.id);
+          const novoPath = primeiro ? primeiro.path : null;
+          if (novoPath !== (docSalvo.arquivo_path || null)) {
+            const r = await sb.from('documentos').update({ arquivo_path: novoPath, arquivo_nome: primeiro ? primeiro.nome : null }).eq('id', docSalvo.id);
+            if (r.error) error = r.error;
+          }
+        } catch (e) { error = e; }
+      }
 
       if (!error && idEdicao && dataVencimentoOriginal && dataVencimentoOriginal !== dados.data_vencimento) {
         await sb.from('historico_documentos').insert([{
@@ -1476,6 +1521,7 @@
         btnDuplicar.disabled = false;
         return;
       }
+      try { await Anexos.duplicar(sb, idEdicao, novo.id, usuarioAtual.id); } catch (e) {}
       window.location.href = 'novo-documento.html?id=' + novo.id;
     });
       /* ---------- instalar app (pwa) ---------- */

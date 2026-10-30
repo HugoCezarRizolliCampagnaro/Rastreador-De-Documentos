@@ -539,7 +539,23 @@
 
     async function abrirArquivo(doc) {
       const janela = window.open('', '_blank'); // abre já no toque, senão o navegador bloqueia
-      const { data, error } = await sb.storage.from('documentos-arquivos').createSignedUrl(doc.arquivo_path, 3600);
+      // documento com várias fotos (frente, verso...): a pessoa escolhe qual abrir
+      const lista = await sb.rpc('arquivos_compartilhados', { p_documento: doc.id });
+      const arquivos = (!lista.error && lista.data) ? lista.data : [];
+      if (arquivos.length > 1) {
+        if (janela) janela.close();
+        const padrao = function (i) { return i === 0 ? 'Frente' : i === 1 ? 'Verso' : 'Página ' + (i + 1); };
+        const escolhido = await Dialogo.escolher(doc.nome + '\n\nQual arquivo você quer abrir?', arquivos.map(function (a, i) {
+          return { valor: a.path, texto: a.rotulo || padrao(i), principal: i === 0 };
+        }));
+        if (!escolhido) return;
+        const u = await sb.storage.from('documentos-arquivos').createSignedUrl(escolhido, 3600);
+        if (u.error || !u.data) { await Dialogo.avisar('Não foi possível abrir o arquivo agora. Tente de novo.'); return; }
+        window.open(u.data.signedUrl, '_blank');
+        return;
+      }
+      const caminho = arquivos.length ? arquivos[0].path : doc.arquivo_path;
+      const { data, error } = await sb.storage.from('documentos-arquivos').createSignedUrl(caminho, 3600);
       if (error || !data) {
         if (janela) janela.close();
         await Dialogo.avisar('Não foi possível abrir o arquivo agora. Tente de novo.');

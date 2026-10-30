@@ -1167,8 +1167,16 @@
       delete copia.id;
       delete copia.criado_em;
       copia.nome = original.nome + ' (cópia)';
-      const { error: erroInsercao } = await sb.from('documentos').insert([copia]);
+      const { data: novo, error: erroInsercao } = await sb.from('documentos').insert([copia]).select('id').single();
       if (erroInsercao) { await Dialogo.avisar('Não foi possível duplicar: ' + erroInsercao.message); return; }
+      // copia também a lista de fotos/arquivos (frente, verso...), se o banco já tiver
+      try {
+        const arqs = await sb.from('documento_arquivos').select('path, nome, rotulo, mime, ordem').eq('documento_id', id).order('ordem');
+        if (!arqs.error && arqs.data && arqs.data.length > 1 && novo) {
+          await sb.from('documento_arquivos').delete().eq('documento_id', novo.id);
+          await sb.from('documento_arquivos').insert(arqs.data.map(function (a) { return Object.assign({ documento_id: novo.id, user_id: original.user_id }, a); }));
+        }
+      } catch (e) {}
       carregar();
     }
 

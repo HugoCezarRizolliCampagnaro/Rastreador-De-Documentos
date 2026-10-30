@@ -51,8 +51,12 @@ module.exports = async function handler(req, res) {
     const corpo = req.body || {};
     const imagemBase64 = corpo.imagemBase64;
     const mimeType = corpo.mimeType;
+    // várias fotos do mesmo documento (frente, verso...): até 3
+    const imagens = (Array.isArray(corpo.imagens) ? corpo.imagens : [])
+      .filter(function (b) { return typeof b === 'string' && b.length > 100; })
+      .slice(0, 3);
 
-    if (!imagemBase64 || !mimeType) {
+    if ((!imagemBase64 && !imagens.length) || !mimeType) {
       res.status(400).json({ erro: 'Envie a imagem (imagemBase64) e o tipo do arquivo (mimeType).' });
       return;
     }
@@ -118,9 +122,12 @@ Na carteira de identidade (RG/CIN), a validade costuma aparecer como "Validade" 
             content: ehPdf
               ? [{ type: 'text', text: prompt.replace('a foto de um documento real', 'o texto extraído de um PDF de documento real').replace('na imagem', 'no texto') + '\n\nTEXTO DO DOCUMENTO:\n' + textoPdf }]
               : [
-                  { type: 'text', text: prompt },
-                  { type: 'image_url', image_url: `data:${mimeType};base64,${imagemBase64}` },
-                ],
+                  { type: 'text', text: imagens.length > 1
+                    ? prompt.replace('a foto de um documento real', 'as ' + imagens.length + ' fotos do MESMO documento real (frente, verso ou páginas)') + '\nJunte as informações de todas as fotos num único JSON.'
+                    : prompt },
+                ].concat((imagens.length ? imagens : [imagemBase64]).map(function (b) {
+                  return { type: 'image_url', image_url: `data:${imagens.length ? 'image/jpeg' : mimeType};base64,${b}` };
+                })),
           },
         ],
       });
