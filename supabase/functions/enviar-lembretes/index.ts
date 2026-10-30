@@ -21,6 +21,12 @@ const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false, max: 1 
 const APP_URL = 'https://rastreador-de-documentos.vercel.app/'
 const REMETENTE = Deno.env.get('GMAIL_USER') ?? 'doctrack.suporte@gmail.com'
 
+// nomes dos tipos como aparecem no app (no banco ficam sem acento/minúsculos)
+const TIPOS: Record<string, string> = {
+  aso: 'ASO', nr: 'NR', alvara: 'Alvará', contrato: 'Contrato', certificacao: 'Certificação',
+  conta: 'Conta / boleto', imposto: 'Imposto / taxa', outro: 'Outro',
+}
+
 type Lembrete = {
   id: string
   user_id: string
@@ -464,6 +470,7 @@ Deno.serve(async (req) => {
 
   // 2) lembretes de documentos
   const reservados = (await sql.unsafe(RESERVAR)) as unknown as Lembrete[]
+  for (const l of reservados) if (l.tipo) l.tipo = TIPOS[l.tipo] ?? l.tipo
   if (reservados.length === 0) return resposta({ modo, emails: 0, lembretes: 0, mensalidades })
 
   const porUsuario = new Map<string, Lembrete[]>()
