@@ -276,9 +276,16 @@
         <p class="campo-dica" id="atualizar-dica"></p>
       </div>
       <div class="campo">
-        <label for="atualizar-arquivo">Documento novo (opcional)</label>
-        <input type="file" id="atualizar-arquivo" accept="application/pdf,image/*">
-        <p class="campo-dica">Foto ou PDF. Substitui o arquivo anterior.</p>
+        <label>Documento novo (opcional)</label>
+        <div class="anexos-grade" id="anexos-grade"></div>
+        <div class="anexos-botoes">
+          <button type="button" class="principal" id="btn-tirar-foto">Tirar foto</button>
+          <button type="button" id="btn-galeria">Galeria / PDF</button>
+        </div>
+        <p class="anexos-dica" id="anexos-dica"></p>
+        <input type="file" id="arquivo" accept="application/pdf,image/*" hidden>
+        <input type="file" id="arquivo-camera" accept="image/*" capture="environment" hidden>
+        <p class="campo-dica">Substitui o arquivo anterior.</p>
       </div>
       <p class="folha-erro" id="atualizar-erro" hidden></p>
       <div class="folha-botoes">
@@ -357,6 +364,7 @@
   <div class="aviso-rapido" id="aviso-rapido" role="status"></div>
 
   <script src="dialogos.js"></script>
+  <script src="anexos.js"></script>
   <script src="recorrencia.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -604,7 +612,7 @@
       const sugestao = doc.repeticao ? Recorrencia.proximaData(doc.data_vencimento, doc.repeticao) : '';
       document.getElementById('atualizar-data').value = sugestao || '';
       document.getElementById('atualizar-dica').textContent = 'Vencimento atual: ' + dataBR(doc.data_vencimento) + (sugestao ? '. Já sugerimos o próximo.' : '.');
-      document.getElementById('atualizar-arquivo').value = '';
+      Anexos.limpar();
       mostrarErro('atualizar-erro', '');
       const ok = document.getElementById('atualizar-ok');
       ok.disabled = false; ok.textContent = 'Salvar';
@@ -617,13 +625,15 @@
       const doc = docAtualizando;
       if (!doc) return;
       const data = document.getElementById('atualizar-data').value;
-      const arquivo = document.getElementById('atualizar-arquivo').files[0];
+      const arquivo = Anexos.itens()[0] || null;
       if (!data) { mostrarErro('atualizar-erro', 'Coloque a nova data de vencimento.'); return; }
       if (data === doc.data_vencimento && !arquivo) { mostrarErro('atualizar-erro', 'A data é a mesma de antes. Mude a data ou anexe o arquivo novo.'); return; }
       const ok = document.getElementById('atualizar-ok');
       ok.disabled = true; ok.textContent = 'Salvando...';
       try {
-        const env = arquivo ? await enviarArquivo(doc.dono_id, arquivo) : null;
+        // a foto/PDF vai pra pasta do convidado dentro da pasta de quem compartilhou
+        if (arquivo) await Anexos.enviarNovos(doc.dono_id + '/compartilhado/' + usuarioAtual.id);
+        const env = arquivo ? { path: Anexos.itens()[0].path, nome: Anexos.itens()[0].nome } : null;
         const { error } = await sb.rpc('atualizar_documento_compartilhado', {
           p_id: doc.id, p_data_vencimento: data,
           p_arquivo_path: env ? env.path : null, p_arquivo_nome: env ? env.nome : null,
@@ -701,6 +711,9 @@
       avisoRapido(editando ? 'Alterações salvas!' : 'Documento cadastrado!');
       carregar();
     });
+
+    // mesmo jeito de escolher arquivo do cadastro, mas 1 arquivo só
+    Anexos.iniciar({ sb: sb, umArquivo: true });
 
     /* ---------- sessão ---------- */
 

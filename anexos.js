@@ -133,7 +133,9 @@
     document.getElementById('anexos-grade').addEventListener('click', cliqueGrade);
 
     // o banco já tem a lista de arquivos? (senão aceita 1, como antes)
-    if (sb) {
+    // opcoes.umArquivo: só 1 arquivo, sem nome Frente/Verso (ex.: renovação feita pelo convidado)
+    if (opcoes.umArquivo) multiDisponivel = false;
+    else if (sb) {
       sb.from('documento_arquivos').select('id').limit(1).then(function (r) {
         multiDisponivel = !r.error;
         desenhar();
@@ -540,6 +542,7 @@
     iniciar: iniciar, carregar: carregar, enviarNovos: enviarNovos, gravar: gravar,
     imagensParaIA: imagensParaIA, pdfParaIA: pdfParaIA, arquivoBase64: arquivoBase64, duplicar: duplicar,
     itens: function () { return itens.slice(); },
+    limpar: function () { itens.forEach(function (it) { if (it.novo && it.url) URL.revokeObjectURL(it.url); }); itens = []; removidos = []; desenhar(); avisarMudanca(); },
     temNovos: function () { return itens.some(function (it) { return it.novo; }); },
   };
 })();
