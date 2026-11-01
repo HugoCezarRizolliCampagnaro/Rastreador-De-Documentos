@@ -281,6 +281,17 @@
 
   .ia-preencher-status.sucesso { color: var(--status-verde); }
 
+  /* avisar erro da IA */
+  .aviso-ia { margin-top: 6px; }
+  .aviso-ia-link { background: none; border: none; padding: 4px 0; font: inherit; font-size: 12px; color: var(--texto-muted); text-decoration: underline; cursor: pointer; }
+  .aviso-ia-caixa textarea { width: 100%; margin-top: 6px; font: inherit; font-size: 13px; padding: 10px; border: 1px solid var(--borda); border-radius: 10px; background: transparent; color: inherit; resize: vertical; }
+  .aviso-ia-acoes { display: flex; gap: 14px; align-items: center; margin-top: 6px; }
+  .aviso-ia-acoes button { background: none; border: none; padding: 4px 0; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--marca); }
+  .aviso-ia-acoes button.cancelar { color: var(--texto-muted); font-weight: 500; }
+  .aviso-ia-acoes button:disabled { opacity: .6; cursor: default; }
+  .aviso-ia-msg { font-size: 12px; margin-top: 4px; color: var(--status-verde); }
+  .aviso-ia-msg.erro { color: var(--status-vermelho); }
+
   /* checklist / histórico */
 
   .checklist-cabecalho { display: flex; justify-content: space-between; align-items: center; }
@@ -473,6 +484,17 @@
               <span id="texto-ia-preencher">Preencher automaticamente com IA</span>
             </button>
             <p class="ia-preencher-status" id="ia-preencher-status" hidden></p>
+            <div class="aviso-ia" id="aviso-ia" hidden>
+              <button type="button" class="aviso-ia-link" id="aviso-ia-abrir">A IA leu algo errado? Avisar</button>
+              <div class="aviso-ia-caixa" id="aviso-ia-caixa" hidden>
+                <textarea id="aviso-ia-texto" rows="2" maxlength="500" placeholder="Ex.: a data de vencimento veio 10/05/2025, mas o certo é 10/05/2030"></textarea>
+                <div class="aviso-ia-acoes">
+                  <button type="button" id="aviso-ia-enviar">Enviar</button>
+                  <button type="button" class="cancelar" id="aviso-ia-cancelar">Cancelar</button>
+                </div>
+              </div>
+              <p class="aviso-ia-msg" id="aviso-ia-msg" hidden></p>
+            </div>
           </div>
 
           <div class="secao-card">
@@ -879,6 +901,7 @@
         statusIA.className = 'ia-preencher-status sucesso';
         statusIA.textContent = 'Preenchido com IA! Revise os campos antes de salvar — a IA pode errar.';
         statusIA.hidden = false;
+        mostrarAvisoIA(campos, imagens.length);
       } catch (erro) {
         statusIA.className = 'ia-preencher-status erro';
         statusIA.textContent = erro.message || 'Não consegui analisar o arquivo agora. Preencha manualmente.';
@@ -887,6 +910,63 @@
         this.disabled = false;
         textoBotao.textContent = 'Preencher automaticamente com IA';
       }
+    });
+
+    /* ---------- avisar erro da leitura da IA (sem foto: só o que a IA leu + o que a pessoa escreveu) ---------- */
+    let leituraIA = null;
+    const avisoIA = {
+      box: document.getElementById('aviso-ia'),
+      abrir: document.getElementById('aviso-ia-abrir'),
+      caixa: document.getElementById('aviso-ia-caixa'),
+      texto: document.getElementById('aviso-ia-texto'),
+      enviar: document.getElementById('aviso-ia-enviar'),
+      cancelar: document.getElementById('aviso-ia-cancelar'),
+      msg: document.getElementById('aviso-ia-msg'),
+    };
+    function mostrarAvisoIA(campos, qtdFotos) {
+      leituraIA = { campos: campos, fotos: qtdFotos || 0 };
+      avisoIA.box.hidden = false;
+      avisoIA.abrir.hidden = false;
+      avisoIA.caixa.hidden = true;
+      avisoIA.msg.hidden = true;
+      avisoIA.texto.value = '';
+    }
+    function esconderAvisoIA() { leituraIA = null; avisoIA.box.hidden = true; }
+    avisoIA.abrir.addEventListener('click', function () {
+      avisoIA.abrir.hidden = true;
+      avisoIA.caixa.hidden = false;
+      avisoIA.msg.hidden = true;
+      avisoIA.texto.focus();
+    });
+    avisoIA.cancelar.addEventListener('click', function () {
+      avisoIA.caixa.hidden = true;
+      avisoIA.abrir.hidden = false;
+    });
+    avisoIA.enviar.addEventListener('click', async function () {
+      const mensagem = avisoIA.texto.value.trim();
+      if (!mensagem) { avisoIA.texto.focus(); return; }
+      if (!leituraIA) return;
+      avisoIA.enviar.disabled = true;
+      avisoIA.enviar.textContent = 'Enviando...';
+      const corrigido = {
+        nome: form.nome.value, tipo: form.tipo.value, numero_documento: form.numero_documento.value,
+        data_emissao: form.data_emissao.value, data_vencimento: form.data_vencimento.value,
+      };
+      const { error } = await sb.from('avisos_ia').insert({
+        mensagem: mensagem.slice(0, 500), lido: leituraIA.campos, corrigido: corrigido, fotos: leituraIA.fotos,
+      });
+      avisoIA.enviar.disabled = false;
+      avisoIA.enviar.textContent = 'Enviar';
+      if (error) {
+        avisoIA.msg.className = 'aviso-ia-msg erro';
+        avisoIA.msg.textContent = 'Não consegui enviar agora. Tente de novo em instantes.';
+        avisoIA.msg.hidden = false;
+        return;
+      }
+      avisoIA.caixa.hidden = true;
+      avisoIA.msg.className = 'aviso-ia-msg';
+      avisoIA.msg.textContent = 'Obrigado! Seu aviso ajuda a IA a ler melhor.';
+      avisoIA.msg.hidden = false;
     });
 
     document.getElementById('sidebar-nav').innerHTML = [
@@ -1201,6 +1281,7 @@
       aoMudar: function (lista) {
         document.getElementById('btn-ia-preencher').hidden = lista.length === 0;
         document.getElementById('ia-preencher-status').hidden = true;
+        esconderAvisoIA();
       },
     });
 
