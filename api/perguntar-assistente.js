@@ -145,7 +145,7 @@ GUIA DO APP (onde fica cada coisa):
 - Planos: Perfil → Planos. Grátis (3 documentos), Premium R$ 9,90, Família R$ 14,90, Profissional R$ 29,90 por mês; 30 dias grátis pra testar; paga um mês por vez com Pix ou cartão dentro do app, sem cobrança automática.
 - Perfil: nome, modo escuro, exportar tudo em CSV, excluir conta, "Ver tour do app". No cadastro, o link "Como preencher?" mostra um passo a passo.
 - Instalar como app: no navegador do celular, "Instalar" ou "Adicionar à tela inicial".
-- Suporte: doctrack.suporte@gmail.com.
+- Suporte: doctrack.suporte@gmail.com. Instagram: @doctrack.app.
 
 Data de hoje: ${dataBR(dataHoje)}
 
