@@ -699,7 +699,7 @@
         }
         const dados = {
           nome: nome,
-          tipo: document.getElementById('doc-tipo').value,
+          tipo: document.getElementById('doc-tipo').value || 'outro', // tipo é obrigatório no banco
           repeticao: document.getElementById('doc-repeticao').value,
           data_vencimento: venc,
           data_emissao: document.getElementById('doc-emissao').value,
