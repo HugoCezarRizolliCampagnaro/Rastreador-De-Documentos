@@ -109,7 +109,17 @@ Extraia as informações que conseguir identificar COM CLAREZA na imagem e devol
 Datas no documento costumam estar no formato brasileiro DD/MM/AAAA — converta para AAAA-MM-DD.
 Se não tiver certeza de um campo, use null nele em vez de chutar. Nunca invente datas ou números.
 NUNCA use a data de nascimento como data de emissão ou de vencimento. Data de nascimento, nome dos pais, naturalidade e CPF não vão em observacoes.
-Na carteira de identidade (RG/CIN), a validade costuma aparecer como "Validade" e a emissão como "Data de expedição"; se só tiver data de nascimento e validade, data_emissao é null.`;
+Na carteira de identidade (RG/CIN), a validade costuma aparecer como "Validade" e a emissão como "Data de expedição"; se só tiver data de nascimento e validade, data_emissao é null.
+
+Regras por tipo de documento (o vencimento só vale se estiver ESCRITO no documento; nunca calcule):
+- CNH: vencimento = "Validade"; emissão = "Data Emissão". A data da "1ª Habilitação" NÃO é emissão nem vencimento (pode ir em observacoes junto com a categoria). categoria_sugerida = veiculo.
+- CRLV / documento do veículo / IPVA: vencimento = data limite de pagamento ou validade do licenciamento escrita; o "exercício" (ano) sozinho não é data. categoria_sugerida = veiculo.
+- ASO: emissão = data do exame/atestado. Muitos ASOs não têm validade escrita: aí data_vencimento é null e coloque em observacoes o tipo do exame (admissional, periódico, demissional...). categoria_sugerida = trabalho.
+- NR / certificado de curso: emissão = data de conclusão ou emissão do certificado; vencimento só se houver "validade" escrita. Coloque a NR (ex: NR-35) e a carga horária em observacoes.
+- Boleto / conta / fatura: vencimento = campo "Vencimento". "Data do documento", "Data de processamento" e "Data de leitura" NÃO são vencimento. Não use a linha digitável nem o código de barras como numero_documento (use "Nº do documento" ou "Nosso número" se houver). Coloque o valor a pagar em observacoes.
+- DAS / guia de imposto (IPTU, DARF): vencimento = "Pagar até" ou "Data de vencimento"; "Período de apuração" e "competência" NÃO são datas de vencimento (podem ir em observacoes). tipo = imposto.
+- Alvará / licença: vencimento = "Validade" ou "Válido até"; emissão = data de emissão/expedição.
+- Contrato: emissão = data de assinatura ou início; vencimento = fim da vigência/término. Se o prazo for indeterminado, data_vencimento é null e diga isso em observacoes.`;
 
     // pergunta pra IA com um conteúdo (texto do PDF ou 1 foto) e devolve o JSON lido
     async function perguntar(conteudo) {
