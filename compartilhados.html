@@ -277,6 +277,7 @@
       </div>
       <div class="campo">
         <label>Documento novo (opcional)</label>
+        <div id="lugar-anexos-atualizar"><div id="bloco-anexos">
         <div class="anexos-grade" id="anexos-grade"></div>
         <div class="anexos-botoes">
           <button type="button" class="principal" id="btn-tirar-foto">Tirar foto</button>
@@ -285,6 +286,7 @@
         <p class="anexos-dica" id="anexos-dica"></p>
         <input type="file" id="arquivo" accept="application/pdf,image/*" hidden>
         <input type="file" id="arquivo-camera" accept="image/*" capture="environment" hidden>
+        </div></div>
         <p class="campo-dica">Substitui o arquivo anterior.</p>
       </div>
       <p class="folha-erro" id="atualizar-erro" hidden></p>
@@ -349,8 +351,8 @@
         <textarea id="doc-obs" maxlength="2000"></textarea>
       </div>
       <div class="campo">
-        <label for="doc-arquivo" id="doc-arquivo-label">Arquivo (opcional)</label>
-        <input type="file" id="doc-arquivo" accept="application/pdf,image/*">
+        <label id="doc-arquivo-label">Arquivo (opcional)</label>
+        <div id="lugar-anexos-doc"></div>
         <p class="campo-dica" id="doc-arquivo-dica">Foto ou PDF do documento.</p>
       </div>
       <p class="folha-erro" id="doc-erro" hidden></p>
@@ -612,6 +614,7 @@
       const sugestao = doc.repeticao ? Recorrencia.proximaData(doc.data_vencimento, doc.repeticao) : '';
       document.getElementById('atualizar-data').value = sugestao || '';
       document.getElementById('atualizar-dica').textContent = 'Vencimento atual: ' + dataBR(doc.data_vencimento) + (sugestao ? '. Já sugerimos o próximo.' : '.');
+      document.getElementById('lugar-anexos-atualizar').appendChild(document.getElementById('bloco-anexos'));
       Anexos.limpar();
       mostrarErro('atualizar-erro', '');
       const ok = document.getElementById('atualizar-ok');
@@ -664,8 +667,11 @@
       document.getElementById('doc-emissao').value = doc ? doc.data_emissao || '' : '';
       document.getElementById('doc-numero').value = doc ? doc.numero_documento || '' : '';
       document.getElementById('doc-obs').value = doc ? doc.observacoes || '' : '';
-      document.getElementById('doc-arquivo').value = '';
-      document.getElementById('doc-arquivo-dica').textContent = doc && doc.arquivo_path ? 'Já tem um arquivo (' + (doc.arquivo_nome || 'anexo') + '). Escolher outro substitui.' : 'Foto ou PDF do documento.';
+      // o mesmo bloco de fotos vem pra este formulário
+      document.getElementById('lugar-anexos-doc').appendChild(document.getElementById('bloco-anexos'));
+      Anexos.limpar();
+      if (doc && doc.arquivo_path) Anexos.carregar(doc.id, doc);
+      document.getElementById('doc-arquivo-dica').textContent = doc && doc.arquivo_path ? 'Pra trocar o arquivo, toque no X e escolha outro.' : 'Foto ou PDF do documento.';
       mostrarErro('doc-erro', '');
       const ok = document.getElementById('doc-ok');
       ok.disabled = false; ok.textContent = doc ? 'Salvar alterações' : 'Cadastrar';
@@ -683,9 +689,14 @@
       const ok = document.getElementById('doc-ok');
       const textoOk = ok.textContent;
       ok.disabled = true; ok.textContent = 'Salvando...';
-      const arquivo = document.getElementById('doc-arquivo').files[0];
+      const item = Anexos.itens()[0] || null;
       try {
-        const env = arquivo ? await enviarArquivo(formDoc.donoId, arquivo) : null;
+        let env = null;
+        if (item && item.novo) {
+          await Anexos.enviarNovos(formDoc.donoId + '/compartilhado/' + usuarioAtual.id);
+          const it = Anexos.itens()[0];
+          env = { path: it.path, nome: it.nome };
+        }
         const dados = {
           nome: nome,
           tipo: document.getElementById('doc-tipo').value,
