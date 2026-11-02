@@ -75,9 +75,10 @@ const CANDIDATOS = `
   from public.documentos doc
   cross join (select (now() at time zone 'America/Sao_Paulo')::date as d) h
   cross join lateral (
+    -- 0 = aviso no dia do vencimento (sempre, mesmo sem marcar)
     -- faixas negativas = avisos depois de vencer (1, 3 e 7 dias)
     select min(a) as faixa
-    from unnest(coalesce(doc.avisos_dias, '{}') || array[-7, -3, -1]) as a
+    from unnest(coalesce(doc.avisos_dias, '{}') || array[0, -7, -3, -1]) as a
     where a >= (doc.data_vencimento - h.d)
   ) f
   join auth.users u on u.id = doc.user_id
@@ -252,7 +253,9 @@ function montarEmail(itens: Lembrete[]) {
   const intro = unico
     ? primeiro.dias < 0
       ? 'Renove o quanto antes e atualize a nova data no app.'
-      : 'Organize a renovação com antecedência para não ficar com o documento vencido.'
+      : primeiro.dias === 0
+        ? 'Hoje é o último dia. Pague ou renove ainda hoje e atualize a nova data no app.'
+        : 'Organize a renovação com antecedência para não ficar com o documento vencido.'
     : vencidos > 0
       ? `Você tem ${ordenados.length} documentos vencidos ou perto de vencer.`
       : `Você tem ${ordenados.length} documentos perto do vencimento.`
