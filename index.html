@@ -1665,7 +1665,12 @@
         setTimeout(function () { document.getElementById('convite-push').hidden = true; }, 4000);
       } catch (e) {
         console.error('Notificações:', e);
-        texto.textContent = 'Não deu pra ativar agora. Tente de novo ou em Perfil > Avisos de vencimento.';
+        // Brave vem com o serviço de notificação do Google desligado: explica onde ligar
+        let brave = false;
+        try { brave = !!(navigator.brave && await navigator.brave.isBrave()); } catch (x) {}
+        texto.textContent = brave
+          ? 'No Brave, ligue em Configurações > Privacidade e segurança > "Usar os serviços do Google para mensagens push" e tente de novo.'
+          : 'Não deu pra ativar agora. Tente de novo ou em Perfil > Avisos de vencimento.';
         btn.disabled = false;
         btn.textContent = 'Tentar de novo';
       }
