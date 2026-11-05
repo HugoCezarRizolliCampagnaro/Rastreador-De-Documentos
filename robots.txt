@@ -1,0 +1,17 @@
+User-agent: *
+Disallow: /index.html
+Disallow: /pessoas.html
+Disallow: /novo-documento.html
+Disallow: /calendario.html
+Disallow: /perfil.html
+Disallow: /relatorio.html
+Disallow: /gastos.html
+Disallow: /assistente.html
+Disallow: /compartilhados.html
+Disallow: /convite.html
+Disallow: /planos.html
+Disallow: /redefinir-senha.html
+Disallow: /api/
+Allow: /
+
+Sitemap: https://rastreador-de-documentos.vercel.app/sitemap.xml
