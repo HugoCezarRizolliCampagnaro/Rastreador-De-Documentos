@@ -90,6 +90,8 @@ const CANDIDATOS = `
   left join public.clientes cl on cl.id = doc.cliente_id and cl.user_id = doc.user_id
   where doc.data_vencimento >= h.d - 7
     and f.faixa is not null
+    -- "Já estou renovando": pausado até a data (vence hoje e vencido continuam avisando)
+    and (doc.avisos_pausados_ate is null or doc.avisos_pausados_ate < h.d or doc.data_vencimento <= h.d)
     and (coalesce(pr.email_lembretes, true)
          or (cl.avisar_email and cl.email is not null and public.plano_ativo(doc.user_id) = 'profissional')
          or (coalesce(p.avisar_email, false) and p.email is not null and public.plano_ativo(doc.user_id) in ('familia', 'profissional')))

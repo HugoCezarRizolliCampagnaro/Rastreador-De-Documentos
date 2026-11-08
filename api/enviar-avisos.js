@@ -45,13 +45,15 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const documentos = await buscarTudo('documentos?select=id,user_id,nome,data_vencimento,avisos_dias,lembrar_em&data_vencimento=not.is.null');
+    const documentos = await buscarTudo('documentos?select=id,user_id,nome,data_vencimento,avisos_dias,lembrar_em,avisos_pausados_ate&data_vencimento=not.is.null');
 
     const porUsuario = {};
     documentos.forEach(function (d) {
       const dias = push.diasAte(d.data_vencimento, hoje);
       // lembrar_em = pediu "Lembrar amanhã" na notificação
       if (!push.deveAvisar(dias, d.avisos_dias) && d.lembrar_em !== hoje) return;
+      // "Já estou renovando": pausado até a data (vence hoje e vencido continuam avisando)
+      if (d.avisos_pausados_ate && d.avisos_pausados_ate >= hoje && dias > 0 && d.lembrar_em !== hoje) return;
       (porUsuario[d.user_id] = porUsuario[d.user_id] || []).push({ id: d.id, nome: d.nome, dias: dias });
     });
 

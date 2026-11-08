@@ -213,6 +213,12 @@
 
   .dica-repeticao { font-size: 12px; color: var(--texto-muted); margin: 6px 0 0; line-height: 1.45; }
   .dica-repeticao strong { color: var(--texto); }
+  .pausa-avisos { margin-top: 12px; padding: 12px; border: 1px dashed var(--borda); border-radius: 12px; }
+  .pausa-avisos[hidden] { display: none; }
+  .pausa-btn { width: 100%; padding: 10px; border-radius: 10px; border: 1.5px solid var(--borda); background: var(--bg); color: var(--texto); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .pausa-btn:hover { border-color: var(--marca); }
+  .pausa-btn:disabled { opacity: .6; cursor: default; }
+  .pausa-avisos.ativa { border-style: solid; border-color: var(--status-amarelo); }
   .sugestao-venc { margin: -4px 0 14px; }
   .sugestao-venc[hidden] { display: none; }
   .sugestao-venc-titulo { display: block; font-size: 12.5px; font-weight: 600; color: var(--texto-muted); margin-bottom: 6px; }
@@ -627,6 +633,10 @@
                 <label class="aviso-chip"><input type="checkbox" name="avisos" value="1"> 1 dia</label>
               </div>
               <p class="dica-repeticao">No <strong>dia do vencimento</strong> você sempre recebe um aviso, mesmo sem marcar nada.</p>
+              <div class="pausa-avisos" id="pausa-avisos" hidden>
+                <button type="button" class="pausa-btn" id="btn-pausar-avisos">Já estou renovando</button>
+                <p class="dica-repeticao" id="pausa-status"></p>
+              </div>
             </div>
           </div>
 
@@ -1421,6 +1431,7 @@
           dataVencimentoOriginal = data.data_vencimento;
           atualizarPreviewVencimento();
           documentoCarregado = data;
+          atualizarPausa();
           if (repeticaoDisponivel) {
             form.repeticao.value = data.repeticao || '';
             atualizarBlocoRepeticao();
@@ -1517,6 +1528,48 @@
       const nova = await Recorrencia.marcar(sb, documentoCarregado, usuarioAtual.id);
       this.disabled = false;
       if (nova) setTimeout(function () { window.location.reload(); }, 1500);
+    });
+
+    /* ---------- "Já estou renovando": pausa os avisos (vence hoje e vencido continuam avisando) ---------- */
+
+    function hojeLocal() { return new Date().toLocaleDateString('sv-SE'); }
+
+    function atualizarPausa() {
+      const caixa = document.getElementById('pausa-avisos');
+      if (!documentoCarregado || !('avisos_pausados_ate' in documentoCarregado)) { caixa.hidden = true; return; }
+      caixa.hidden = false;
+      const ate = documentoCarregado.avisos_pausados_ate;
+      const btn = document.getElementById('btn-pausar-avisos');
+      const st = document.getElementById('pausa-status');
+      const pausado = !!ate && ate >= hojeLocal();
+      caixa.classList.toggle('ativa', pausado);
+      if (pausado) {
+        btn.textContent = 'Retomar os avisos agora';
+        st.innerHTML = 'Avisos pausados até <strong>' + ate.split('-').reverse().join('/') + '</strong>. Se chegar o dia do vencimento, você é avisado mesmo assim.';
+      } else {
+        btn.textContent = 'Já estou renovando';
+        st.textContent = 'Já agendou o exame ou pediu o documento novo? Pause os avisos por uns dias.';
+      }
+    }
+
+    document.getElementById('btn-pausar-avisos').addEventListener('click', async function () {
+      if (!documentoCarregado || !idEdicao) return;
+      const ate = documentoCarregado.avisos_pausados_ate;
+      let novo = null;
+      if (!(ate && ate >= hojeLocal())) {
+        const dias = await Dialogo.escolher('Pausar os avisos deste documento por quanto tempo?', [
+          { valor: '7', texto: '7 dias' }, { valor: '15', texto: '15 dias', principal: true }, { valor: '30', texto: '30 dias' },
+        ], { titulo: 'Já estou renovando' });
+        if (!dias) return;
+        const p = hojeLocal().split('-').map(Number);
+        novo = new Date(Date.UTC(p[0], p[1] - 1, p[2] + parseInt(dias, 10))).toISOString().slice(0, 10);
+      }
+      this.disabled = true;
+      const { error } = await sb.from('documentos').update({ avisos_pausados_ate: novo }).eq('id', idEdicao);
+      this.disabled = false;
+      if (error) { Dialogo.avisar('Não consegui salvar agora. Tente de novo.'); return; }
+      documentoCarregado.avisos_pausados_ate = novo;
+      atualizarPausa();
     });
 
     /* ---------- salvar ---------- */
