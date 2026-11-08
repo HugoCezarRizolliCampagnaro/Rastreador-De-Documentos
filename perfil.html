@@ -530,6 +530,17 @@
               <span class="slider"></span>
             </label>
           </div>
+          <div class="opcao-linha">
+            <span class="opcao-icone" id="icone-resumo-semanal"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo">Resumo semanal por e-mail</div>
+              <div class="opcao-descricao" id="desc-resumo-semanal">Toda segunda-feira, um e-mail com o que vence nos próximos 30 dias.</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggle-resumo-semanal" disabled>
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
 
         <p class="secao-titulo-grupo">Pessoas</p>
@@ -1054,6 +1065,7 @@
     /* ---------- lembretes por e-mail ---------- */
 
     document.getElementById('icone-email-lembretes').innerHTML = icone('mail', 17);
+    document.getElementById('icone-resumo-semanal').innerHTML = icone('fileText', 17);
     document.getElementById('icone-pessoas').innerHTML = icone('users', 17);
     document.getElementById('seta-pessoas').innerHTML = icone('chevronRight', 16);
     document.getElementById('icone-tour').innerHTML = '<svg class="icone" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>';
@@ -1081,6 +1093,33 @@
           return;
         }
         desc.textContent = toggle.checked ? 'Lembretes por e-mail ativados.' : 'Você não vai mais receber lembretes por e-mail.';
+        setTimeout(function () { desc.textContent = textoPadrao; }, 3000);
+      });
+    }
+
+    async function iniciarResumoSemanal(userId) {
+      const toggle = document.getElementById('toggle-resumo-semanal');
+      const desc = document.getElementById('desc-resumo-semanal');
+      const textoPadrao = desc.textContent;
+      const { data, error: erroLer } = await sb.from('preferencias').select('resumo_semanal').eq('user_id', userId).maybeSingle();
+      if (erroLer) { toggle.closest('.opcao-linha').hidden = true; return; }
+      toggle.checked = !data || data.resumo_semanal !== false;
+      toggle.disabled = false;
+
+      toggle.addEventListener('change', async function () {
+        toggle.disabled = true;
+        const { error } = await sb.from('preferencias').upsert(
+          { user_id: userId, resumo_semanal: toggle.checked, atualizado_em: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        );
+        toggle.disabled = false;
+        if (error) {
+          toggle.checked = !toggle.checked;
+          desc.textContent = 'Não foi possível salvar agora. Tente de novo.';
+          setTimeout(function () { desc.textContent = textoPadrao; }, 4000);
+          return;
+        }
+        desc.textContent = toggle.checked ? 'Resumo semanal ativado.' : 'Você não vai mais receber o resumo semanal.';
         setTimeout(function () { desc.textContent = textoPadrao; }, 3000);
       });
     }
@@ -1306,6 +1345,7 @@
       document.getElementById('sidebar-avatar').textContent = email.charAt(0).toUpperCase();
 
       iniciarEmailLembretes(resultado.data.session.user.id);
+      iniciarResumoSemanal(resultado.data.session.user.id);
       carregarPessoas();
       planoEmVigor().then(function (plano) {
         iniciarClientes(resultado.data.session.user.id, plano);

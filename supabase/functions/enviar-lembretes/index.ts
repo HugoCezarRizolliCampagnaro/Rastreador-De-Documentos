@@ -5,12 +5,16 @@
 // Plano Profissional: também avisa o cliente (se marcado), assinando com o nome da empresa.
 // Planos Família e Profissional: também avisa a pessoa do documento (se tiver e-mail marcado).
 // Também avisa a mensalidade/teste vencendo (5, 1 e 0 dias antes).
+// Segunda-feira: resumo semanal (o que venceu/vence de 30 dias atrás até 30 dias pra frente),
+// pra quem deixou ligado em Minha conta e não recebeu lembrete nesta mesma execução.
 //
 // Modos (campo "modo" no corpo JSON):
 //   (vazio)          envio real
 //   "simular"        só conta o que seria enviado, sem enviar nem registrar
 //   "verificar_smtp" testa login no Gmail, sem enviar nada
 //   "email_exemplo"  manda um email de exemplo para a própria conta do DocTrack
+//   "simular_resumo" conta quantos resumos semanais sairiam hoje (mesmo se não for segunda)
+//   "resumo_exemplo" manda um resumo de exemplo para a própria conta do DocTrack
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import postgres from 'npm:postgres@3.4.5'
@@ -153,6 +157,97 @@ const RESERVAR_MENSALIDADE = `
          to_char(c.plano_valido_ate, 'YYYY-MM-DD') as valido_ate
   from c join r on r.user_id = c.user_id and r.dias = c.faixa
 `
+
+// Resumo semanal: documentos vencidos há até 30 dias ou vencendo nos próximos 30
+const RESUMO = `
+  with h as (select (now() at time zone 'America/Sao_Paulo')::date as d)
+  select doc.user_id::text as user_id, u.email, doc.nome, doc.tipo, p.nome as pessoa,
+         to_char(doc.data_vencimento, 'DD/MM/YYYY') as vencimento_br,
+         (doc.data_vencimento - h.d)::int as dias
+  from public.documentos doc
+  cross join h
+  join auth.users u on u.id = doc.user_id
+  left join public.pessoas p on p.id = doc.pessoa_id and p.user_id = doc.user_id
+  left join public.preferencias pr on pr.user_id = doc.user_id
+  where doc.data_vencimento between h.d - 30 and h.d + 30
+    and coalesce(pr.email_lembretes, true)
+    and coalesce(pr.resumo_semanal, true)
+    and u.email is not null
+    and u.email_confirmed_at is not null
+    and not exists (select 1 from public.resumos_enviados re where re.user_id = doc.user_id and re.semana = h.d)
+  order by doc.data_vencimento
+`
+
+type ItemResumo = { user_id: string; email: string; nome: string; tipo: string | null; pessoa: string | null; vencimento_br: string; dias: number }
+
+function montarResumo(itens: ItemResumo[]) {
+  const vencidos = itens.filter((l) => l.dias < 0).length
+  const assunto = vencidos > 0
+    ? `Resumo da semana: ${itens.length} documento${itens.length > 1 ? 's' : ''} pedem atenção`
+    : `Resumo da semana: ${itens.length} documento${itens.length > 1 ? 's vencem' : ' vence'} nos próximos 30 dias`
+  const intro = vencidos > 0
+    ? `Você tem ${vencidos} vencido${vencidos > 1 ? 's' : ''} e ${itens.length - vencidos} vencendo nos próximos 30 dias.`
+    : 'Tudo o que vence nos próximos 30 dias, num e-mail só.'
+  const mostrar = itens.slice(0, 12)
+  const cartoes = mostrar.map((l) => {
+    const info = [l.tipo, l.pessoa].filter(Boolean).join(' · ')
+    return `
+      <div style="border:1px solid #e6e8f2;border-left:4px solid ${cor(l.dias)};border-radius:12px;padding:12px 14px;margin:0 0 10px;">
+        <p style="margin:0;font-size:15px;font-weight:bold;color:#14162b;">${esc(l.nome)}</p>
+        ${info ? `<p style="margin:3px 0 0;font-size:13px;color:#7b7e96;">${esc(info)}</p>` : ''}
+        <p style="margin:6px 0 0;font-size:14px;font-weight:bold;color:${cor(l.dias)};">${maiuscula(textoDias(l.dias))} · ${l.vencimento_br}</p>
+      </div>`
+  }).join('')
+  const mais = itens.length > mostrar.length ? `<p style="margin:0 0 10px;font-size:13px;color:#7b7e96;">E mais ${itens.length - mostrar.length} no app.</p>` : ''
+  const html = `
+  <div style="background:#f4f5fb;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;">
+    <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px;">
+      <p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;font-weight:bold;color:#3D4FE0;">DOCTRACK · RESUMO DA SEMANA</p>
+      <h1 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:#14162b;">${esc(assunto.replace('Resumo da semana: ', ''))}</h1>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:#4a4d68;">${esc(intro)}</p>
+      ${cartoes}${mais}
+      <a href="${APP_URL}" style="display:inline-block;margin-top:10px;background:#3D4FE0;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 28px;border-radius:12px;">Abrir o DocTrack</a>
+      <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#7b7e96;">Você recebe este resumo toda segunda-feira. Dá pra desligar em Minha conta, em "Resumo semanal por e-mail".</p>
+    </div>
+  </div>`
+  const texto = [assunto, '', intro, '', ...itens.map((l) => `- ${l.nome}: ${textoDias(l.dias)}, em ${l.vencimento_br}`), '', `Abrir o DocTrack: ${APP_URL}`].join('\n')
+  return { assunto, html, texto }
+}
+
+function segundaFeira() {
+  const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+  return agora.getDay() === 1
+}
+
+async function enviarResumos(transporte: ReturnType<typeof criarTransporte>, jaAvisados: Set<string>) {
+  const linhas = (await sql.unsafe(RESUMO)) as unknown as ItemResumo[]
+  const porUsuario = new Map<string, ItemResumo[]>()
+  for (const l of linhas) {
+    if (jaAvisados.has(l.user_id)) continue
+    const lista = porUsuario.get(l.user_id) ?? []
+    lista.push(l)
+    porUsuario.set(l.user_id, lista)
+  }
+  let enviados = 0
+  for (const [userId, itens] of porUsuario) {
+    const r = await sql`
+      insert into public.resumos_enviados (user_id, semana)
+      values (${userId}::uuid, (now() at time zone 'America/Sao_Paulo')::date)
+      on conflict do nothing returning user_id
+    `
+    if (!r.length) continue
+    for (const l of itens) if (l.tipo) l.tipo = TIPOS[l.tipo] ?? l.tipo
+    const m = montarResumo(itens)
+    try {
+      await transporte.sendMail({ from: `"DocTrack" <${REMETENTE}>`, to: itens[0].email, subject: m.assunto, html: m.html, text: m.texto })
+      enviados += 1
+    } catch (e) {
+      console.error('falha ao enviar resumo', e instanceof Error ? e.message : e)
+      await sql`delete from public.resumos_enviados where user_id = ${userId}::uuid and semana = (now() at time zone 'America/Sao_Paulo')::date`
+    }
+  }
+  return enviados
+}
 
 type AvisoMensalidade = {
   user_id: string
@@ -412,6 +507,11 @@ Deno.serve(async (req) => {
   }
   const modo = corpo?.modo ?? 'enviar'
 
+  if (modo === 'simular_resumo') {
+    const linhas = (await sql.unsafe(RESUMO)) as unknown as ItemResumo[]
+    return resposta({ modo, segunda: segundaFeira(), usuarios: new Set(linhas.map((l) => l.user_id)).size, documentos: linhas.length })
+  }
+
   if (modo === 'simular') {
     const pendentes = (await sql.unsafe(CANDIDATOS)) as unknown as Lembrete[]
     return resposta({
@@ -457,6 +557,21 @@ Deno.serve(async (req) => {
     }
   }
 
+  if (modo === 'resumo_exemplo') {
+    const em = (d: number) => new Date(Date.now() + d * 86400000).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+    const m = montarResumo([
+      { user_id: '0', email: REMETENTE, nome: 'Alvará de funcionamento', tipo: 'Alvará', pessoa: null, vencimento_br: em(-2), dias: -2 },
+      { user_id: '0', email: REMETENTE, nome: 'ASO', tipo: 'ASO', pessoa: 'João', vencimento_br: em(5), dias: 5 },
+      { user_id: '0', email: REMETENTE, nome: 'CNH', tipo: 'CNH', pessoa: null, vencimento_br: em(21), dias: 21 },
+    ])
+    try {
+      await transporte.sendMail({ from: `"DocTrack" <${REMETENTE}>`, to: REMETENTE, subject: `[Exemplo] ${m.assunto}`, html: m.html, text: m.texto })
+      return resposta({ modo, enviado: true })
+    } catch (e) {
+      return resposta({ modo, enviado: false, detalhe: e instanceof Error ? e.message : String(e) }, 500)
+    }
+  }
+
   // Envio real — 1) avisos de mensalidade
   const avisos = (await sql.unsafe(RESERVAR_MENSALIDADE)) as unknown as AvisoMensalidade[]
   let mensalidades = 0
@@ -477,7 +592,10 @@ Deno.serve(async (req) => {
   // 2) lembretes de documentos
   const reservados = (await sql.unsafe(RESERVAR)) as unknown as Lembrete[]
   for (const l of reservados) if (l.tipo) l.tipo = TIPOS[l.tipo] ?? l.tipo
-  if (reservados.length === 0) return resposta({ modo, emails: 0, lembretes: 0, mensalidades })
+  if (reservados.length === 0) {
+    const resumos = segundaFeira() ? await enviarResumos(transporte, new Set()) : 0
+    return resposta({ modo, emails: 0, lembretes: 0, mensalidades, resumos })
+  }
 
   const porUsuario = new Map<string, Lembrete[]>()
   for (const l of reservados) {
@@ -573,6 +691,9 @@ Deno.serve(async (req) => {
     }
   }
 
-  console.log('lembretes', { emails, falhas, clientes, pessoas, lembretes: reservados.length, mensalidades })
-  return resposta({ modo, emails, falhas, clientes, pessoas, lembretes: reservados.length, mensalidades })
+  // 3) resumo semanal (segunda-feira), menos pra quem já recebeu lembrete agora
+  const resumos = segundaFeira() ? await enviarResumos(transporte, new Set(porUsuario.keys())) : 0
+
+  console.log('lembretes', { emails, falhas, clientes, pessoas, lembretes: reservados.length, mensalidades, resumos })
+  return resposta({ modo, emails, falhas, clientes, pessoas, lembretes: reservados.length, mensalidades, resumos })
 })
