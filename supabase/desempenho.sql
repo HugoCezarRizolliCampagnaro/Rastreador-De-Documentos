@@ -46,3 +46,16 @@ alter policy "atualizar proprias inscricoes" on public.push_inscricoes using ((s
 alter policy "apagar proprias inscricoes"    on public.push_inscricoes using ((select auth.uid()) = user_id);
 
 commit;
+
+-- QR code por funcionário (plano Profissional) — aplicado em 08/11/2026
+alter table public.pessoas add column if not exists qr_token uuid;
+create unique index if not exists pessoas_qr_token_idx on public.pessoas (qr_token) where qr_token is not null;
+create or replace function public.status_qr(t uuid) returns json language sql stable security definer set search_path = public as $$
+  select json_build_object('nome', pe.nome, 'cargo', pe.cargo, 'documentos', coalesce((
+      select json_agg(json_build_object('nome', d.nome, 'tipo', d.tipo, 'vencimento', d.data_vencimento) order by d.data_vencimento)
+      from documentos d where d.pessoa_id = pe.id and d.user_id = pe.user_id and d.data_vencimento is not null), '[]'::json))
+  from pessoas pe join perfis pf on pf.user_id = pe.user_id
+  where pe.qr_token = t and pf.plano = 'profissional' and pf.plano_valido_ate >= (now() at time zone 'America/Sao_Paulo')::date
+$$;
+revoke all on function public.status_qr(uuid) from public;
+grant execute on function public.status_qr(uuid) to anon, authenticated;

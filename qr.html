@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<!-- QR do funcionário (plano Profissional): quem escaneia vê nome, cargo e se cada documento está em dia. Sem arquivos, sem números. -->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<meta name="theme-color" content="#0B0E14">
+<title>Situação dos documentos — DocTrack</title>
+<script>
+  if (localStorage.getItem('modo-escuro') !== 'false') document.documentElement.classList.add('escuro');
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --marca: #3D4FE0; --bg: #F7F8FA; --superficie: #FFFFFF;
+    --texto: #14161A; --texto-muted: #6B7280; --borda: #E3E5E9;
+    --verde: #1F9D55; --amarelo: #B7791F; --vermelho: #E5484D;
+  }
+  html.escuro {
+    --marca: #5B6EF5; --bg: #0B0E14; --superficie: #141821;
+    --texto: #F1F2F4; --texto-muted: #8A93A3; --borda: #232833;
+    --verde: #22C55E; --amarelo: #F5A524; --vermelho: #F2555C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; min-height: 100dvh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px 16px;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg); color: var(--texto); -webkit-font-smoothing: antialiased;
+  }
+  .cartao { width: 100%; max-width: 420px; background: var(--superficie); border: 1px solid var(--borda); border-radius: 18px; padding: 22px 20px; }
+  .topo { display: flex; align-items: center; gap: 12px; }
+  .avatar { width: 46px; height: 46px; border-radius: 50%; background: rgba(91, 110, 245, 0.15); color: var(--marca); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 19px; flex-shrink: 0; }
+  .nome { font-size: 19px; font-weight: 700; line-height: 1.25; }
+  .cargo { font-size: 13.5px; color: var(--texto-muted); margin-top: 2px; }
+  .geral { margin: 18px 0 6px; padding: 12px 14px; border-radius: 12px; font-weight: 600; font-size: 15px; }
+  .geral.ok { background: rgba(34, 197, 94, 0.12); color: var(--verde); }
+  .geral.atencao { background: rgba(245, 165, 36, 0.14); color: var(--amarelo); }
+  .geral.vencido { background: rgba(242, 85, 92, 0.13); color: var(--vermelho); }
+  ul { list-style: none; margin: 10px 0 0; padding: 0; }
+  li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--borda); }
+  li:first-child { border-top: none; }
+  .doc-nome { font-size: 14.5px; font-weight: 500; }
+  .doc-data { font-size: 12.5px; color: var(--texto-muted); margin-top: 2px; }
+  .selo { font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .selo.ok { background: rgba(34, 197, 94, 0.12); color: var(--verde); }
+  .selo.atencao { background: rgba(245, 165, 36, 0.14); color: var(--amarelo); }
+  .selo.vencido { background: rgba(242, 85, 92, 0.13); color: var(--vermelho); }
+  .vazio, .msg { color: var(--texto-muted); font-size: 14px; line-height: 1.5; }
+  .msg strong { display: block; color: var(--texto); font-size: 17px; margin-bottom: 6px; }
+  .rodape { margin-top: 16px; font-size: 12px; color: var(--texto-muted); text-align: center; line-height: 1.6; }
+  .rodape a { color: var(--marca); text-decoration: none; font-weight: 600; }
+</style>
+</head>
+<body>
+  <main class="cartao" id="cartao"><p class="msg">Carregando...</p></main>
+  <p class="rodape" id="rodape"></p>
+  <script>
+    (function () {
+      var SUPABASE_URL = 'https://qybgrfdvpptnauyqtdxu.supabase.co';
+      var SUPABASE_ANON_KEY = 'sb_publishable_brDnSPSCu4ry9QTe-pYwag_zRqB6hkL';
+      var cartao = document.getElementById('cartao');
+      var token = new URLSearchParams(location.search).get('t') || '';
+
+      function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+      function plural(n, s, p) { return n + ' ' + (n === 1 ? s : p); }
+      function dataBR(iso) { var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+      function hojeISO() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+      function dias(iso) { return Math.round((Date.parse(iso + 'T12:00:00') - Date.parse(hojeISO() + 'T12:00:00')) / 86400000); }
+
+      function mensagem(titulo, texto) { cartao.innerHTML = '<p class="msg"><strong>' + esc(titulo) + '</strong>' + esc(texto) + '</p>'; }
+
+      function mostrar(d) {
+        var docs = (d.documentos || []).map(function (x) {
+          var n = dias(x.vencimento);
+          var st = n < 0 ? 'vencido' : n <= 30 ? 'atencao' : 'ok';
+          var selo = n < 0 ? 'Vencido' : n === 0 ? 'Vence hoje' : n <= 30 ? 'Vence em ' + plural(n, 'dia', 'dias') : 'Em dia';
+          return { nome: x.nome, venc: x.vencimento, st: st, selo: selo };
+        });
+        var vencidos = docs.filter(function (x) { return x.st === 'vencido'; }).length;
+        var atencao = docs.filter(function (x) { return x.st === 'atencao'; }).length;
+        var geral = !docs.length ? '' : vencidos
+          ? '<div class="geral vencido">' + plural(vencidos, 'documento vencido', 'documentos vencidos') + '</div>'
+          : atencao
+            ? '<div class="geral atencao">Em dia · ' + plural(atencao, 'vence', 'vencem') + ' nos próximos 30 dias</div>'
+            : '<div class="geral ok">Todos os documentos em dia</div>';
+        var nome = String(d.nome || '').trim();
+        cartao.innerHTML =
+          '<div class="topo"><span class="avatar">' + esc((nome[0] || '?').toUpperCase()) + '</span><div>' +
+          '<div class="nome">' + esc(nome) + '</div>' + (d.cargo ? '<div class="cargo">' + esc(d.cargo) + '</div>' : '') + '</div></div>' +
+          geral +
+          (docs.length
+            ? '<ul>' + docs.map(function (x) {
+                return '<li><div><div class="doc-nome">' + esc(x.nome) + '</div><div class="doc-data">Vencimento: ' + dataBR(x.venc) + '</div></div><span class="selo ' + x.st + '">' + x.selo + '</span></li>';
+              }).join('') + '</ul>'
+            : '<p class="vazio">Nenhum documento com vencimento cadastrado.</p>');
+        var agora = new Date();
+        document.getElementById('rodape').innerHTML = 'Consultado em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) +
+          '<br>Controle feito com o <a href="inicio.html">DocTrack</a>';
+      }
+
+      if (!/^[0-9a-f-]{36}$/i.test(token)) { mensagem('QR code inválido', 'Confira se o código foi escaneado inteiro.'); return; }
+      fetch(SUPABASE_URL + '/rest/v1/rpc/status_qr', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ t: token }),
+      }).then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (d) {
+          if (!d) { mensagem('QR code desativado', 'Esse código não está mais ativo. Fale com a empresa responsável.'); return; }
+          mostrar(d);
+        })
+        .catch(function () { mensagem('Não foi possível consultar agora', 'Verifique a internet e tente de novo.'); });
+    })();
+  </script>
+</body>
+</html>
