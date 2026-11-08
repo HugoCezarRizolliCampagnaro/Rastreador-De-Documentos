@@ -213,6 +213,12 @@
 
   .dica-repeticao { font-size: 12px; color: var(--texto-muted); margin: 6px 0 0; line-height: 1.45; }
   .dica-repeticao strong { color: var(--texto); }
+  .sugestao-venc { margin: -4px 0 14px; }
+  .sugestao-venc[hidden] { display: none; }
+  .sugestao-venc-titulo { display: block; font-size: 12.5px; font-weight: 600; color: var(--texto-muted); margin-bottom: 6px; }
+  .sugestao-venc-opcoes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sugestao-venc-opcoes button { padding: 7px 11px; border: 1.5px solid var(--borda); border-radius: 999px; background: var(--bg); color: var(--texto); font: inherit; font-size: 12.5px; cursor: pointer; }
+  .sugestao-venc-opcoes button:hover { border-color: var(--marca); color: var(--marca); }
   .btn-recorrente {
     display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 10px;
     padding: 12px; font: inherit; font-size: 14px; font-weight: 700; color: #FFFFFF;
@@ -527,6 +533,11 @@
                   <option value="alvara">Alvará</option>
                   <option value="contrato">Contrato</option>
                   <option value="certificacao">Certificação</option>
+                  <option value="cnh">CNH</option>
+                  <option value="passaporte">Passaporte</option>
+                  <option value="certidao">Certidão (CND, FGTS...)</option>
+                  <option value="certificado_digital">Certificado digital</option>
+                  <option value="licenca_sanitaria">Licença sanitária</option>
                   <option value="conta">Conta / boleto</option>
                   <option value="imposto">Imposto / taxa</option>
                   <option value="outro">Outro</option>
@@ -587,6 +598,11 @@
                 <input type="date" id="data_vencimento" name="data_vencimento" required>
                 <p class="preview-vencimento" id="preview-vencimento"></p>
               </div>
+            </div>
+            <div class="sugestao-venc" id="sugestao-venc" hidden>
+              <span class="sugestao-venc-titulo">Calcular vencimento pela emissão:</span>
+              <div class="sugestao-venc-opcoes" id="sugestao-venc-opcoes"></div>
+              <p class="dica-repeticao" id="sugestao-venc-nota"></p>
             </div>
             <div class="campo" id="campo-repeticao" hidden>
               <label for="repeticao">Repete <span class="opcional">(contas, mensalidades, exames anuais…)</span></label>
@@ -878,11 +894,11 @@
         }
 
         const campos = dados.extraido;
-        const tiposValidos = ['aso', 'nr', 'alvara', 'contrato', 'certificacao', 'conta', 'imposto', 'outro'];
+        const tiposValidos = ['aso', 'nr', 'alvara', 'contrato', 'certificacao', 'cnh', 'passaporte', 'certidao', 'certificado_digital', 'licenca_sanitaria', 'conta', 'imposto', 'outro'];
         const categoriasValidas = ['pessoal', 'veiculo', 'trabalho', 'casa', 'outro'];
 
         if (campos.nome) form.nome.value = campos.nome;
-        if (campos.tipo && tiposValidos.includes(campos.tipo)) form.tipo.value = campos.tipo;
+        if (campos.tipo && tiposValidos.includes(campos.tipo)) { form.tipo.value = campos.tipo; aoMudarTipo(); }
         if (campos.numero_documento) form.numero_documento.value = campos.numero_documento;
         if (campos.data_emissao && /^\d{4}-\d{2}-\d{2}$/.test(campos.data_emissao)) form.data_emissao.value = campos.data_emissao;
         if (campos.data_vencimento && /^\d{4}-\d{2}-\d{2}$/.test(campos.data_vencimento)) {
@@ -1056,6 +1072,72 @@
     form.data_emissao.addEventListener('change', validarDatas);
     form.data_vencimento.addEventListener('change', validarDatas);
 
+    /* ---------- vencimento sugerido pelo tipo (a pessoa sempre pode mudar) ---------- */
+
+    const REGRAS_VALIDADE = {
+      aso: [{ t: '1 ano (exposto a risco)', a: 1 }, { t: '2 anos (demais)', a: 2 }],
+      nr: [{ t: 'NR-10 ou NR-35 · 2 anos', a: 2 }, { t: 'NR-33 · 1 ano', a: 1 }],
+      cnh: [{ t: 'Até 49 anos · 10 anos', a: 10 }, { t: '50 a 69 anos ou categoria C/D/E · 5 anos', a: 5 }, { t: '70 anos ou mais · 3 anos', a: 3 }],
+      passaporte: [{ t: 'Adulto · 10 anos', a: 10 }],
+      certidao: [{ t: 'CND federal ou trabalhista · 180 dias', d: 180 }, { t: 'FGTS (CRF) · 30 dias', d: 30 }],
+      certificado_digital: [{ t: 'A1 · 1 ano', a: 1 }, { t: 'A3 · 1 ano', a: 1 }, { t: 'A3 · 2 anos', a: 2 }],
+      licenca_sanitaria: [{ t: '1 ano', a: 1 }],
+      alvara: [{ t: '1 ano', a: 1 }],
+    };
+
+    // avisos que já vêm marcados num documento novo desses tipos (só se a pessoa não mexeu nos avisos)
+    const AVISOS_PADRAO = {
+      cnh: [60, 30, 7], passaporte: [60, 30], certificado_digital: [60, 30, 7],
+      certidao: [14, 7], licenca_sanitaria: [60, 30],
+    };
+    let avisosMexidos = false;
+    form.querySelectorAll('input[name="avisos"]').forEach(function (cb) {
+      cb.addEventListener('change', function () { avisosMexidos = true; });
+    });
+
+    function somarPeriodo(iso, regra) {
+      const p = iso.split('-').map(Number);
+      const d = regra.a ? new Date(Date.UTC(p[0] + regra.a, p[1] - 1, p[2])) : new Date(Date.UTC(p[0], p[1] - 1, p[2] + regra.d));
+      return d.toISOString().slice(0, 10);
+    }
+
+    function atualizarSugestaoVenc() {
+      const regras = REGRAS_VALIDADE[form.tipo.value];
+      const caixa = document.getElementById('sugestao-venc');
+      document.getElementById('sugestao-venc-nota').textContent = '';
+      caixa.hidden = !regras;
+      if (!regras) return;
+      document.getElementById('sugestao-venc-opcoes').innerHTML = regras.map(function (r, i) {
+        return '<button type="button" data-i="' + i + '">' + escapeHtml(r.t) + '</button>';
+      }).join('');
+    }
+
+    document.getElementById('sugestao-venc-opcoes').addEventListener('click', function (e) {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const nota = document.getElementById('sugestao-venc-nota');
+      if (!form.data_emissao.value) {
+        nota.textContent = 'Preencha a data de emissão primeiro.';
+        form.data_emissao.focus();
+        return;
+      }
+      const regra = REGRAS_VALIDADE[form.tipo.value][parseInt(btn.dataset.i, 10)];
+      const venc = somarPeriodo(form.data_emissao.value, regra);
+      form.data_vencimento.value = venc;
+      form.data_vencimento.dispatchEvent(new Event('input', { bubbles: true }));
+      form.data_vencimento.dispatchEvent(new Event('change', { bubbles: true }));
+      nota.textContent = 'Vencimento calculado: ' + venc.split('-').reverse().join('/') + '. Confira se bate com o documento.';
+    });
+
+    function aoMudarTipo() {
+      atualizarSugestaoVenc();
+      const padrao = AVISOS_PADRAO[form.tipo.value];
+      if (padrao && !idEdicao && !avisosMexidos) {
+        form.querySelectorAll('input[name="avisos"]').forEach(function (cb) { cb.checked = padrao.indexOf(parseInt(cb.value, 10)) !== -1; });
+      }
+    }
+    document.getElementById('tipo').addEventListener('change', aoMudarTipo);
+
     /* ---------- seção de custos condicional ---------- */
 
     document.getElementById('custo_valor').addEventListener('input', function () {
@@ -1079,6 +1161,11 @@
       alvara: ['Reunir documentos exigidos', 'Protocolar pedido de renovação', 'Pagar taxas', 'Receber alvará novo', 'Anexar novo documento'],
       contrato: ['Revisar termos', 'Negociar renovação', 'Assinar novo contrato', 'Anexar novo documento'],
       certificacao: ['Agendar avaliação ou prova', 'Realizar avaliação', 'Receber certificado', 'Anexar novo documento'],
+      cnh: ['Agendar o exame médico no Detran', 'Fazer o exame', 'Pagar a taxa', 'Baixar a CNH nova no app', 'Atualizar validade'],
+      passaporte: ['Preencher o pedido no site da PF', 'Pagar a taxa (GRU)', 'Agendar o atendimento', 'Retirar o passaporte novo', 'Atualizar validade'],
+      certidao: ['Emitir a certidão nova no site do órgão', 'Conferir se saiu negativa', 'Anexar a certidão', 'Atualizar validade'],
+      certificado_digital: ['Comprar a renovação antes de vencer', 'Fazer a validação (vídeo ou presencial)', 'Instalar o certificado novo', 'Atualizar validade'],
+      licenca_sanitaria: ['Pagar a taxa de fiscalização', 'Reunir os documentos exigidos', 'Pedir a renovação', 'Receber a licença nova', 'Anexar novo documento'],
       conta: ['Conferir o valor', 'Gerar boleto ou Pix', 'Pagar', 'Guardar o comprovante'],
       imposto: ['Emitir a guia', 'Conferir o valor', 'Pagar até o vencimento', 'Guardar o comprovante'],
       outro: ['Verificar requisitos de renovação', 'Providenciar renovação', 'Anexar novo documento', 'Atualizar validade'],
@@ -1274,6 +1361,7 @@
         else if (r.campos[nome] !== '' || !els[0].value) els[0].value = r.campos[nome];
       });
       atualizarPreviewVencimento();
+      atualizarSugestaoVenc();
     }
 
     Anexos.iniciar({
@@ -1321,6 +1409,7 @@
           form.nome.value = data.nome;
           form.numero_documento.value = data.numero_documento || '';
           form.tipo.value = data.tipo;
+          atualizarSugestaoVenc();
           form.categoria.value = data.categoria || 'outro';
           if (data.pessoa_id) carregarPessoas(data.pessoa_id);
           form.cliente.value = data.cliente || '';

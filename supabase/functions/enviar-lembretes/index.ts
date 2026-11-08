@@ -24,6 +24,7 @@ const REMETENTE = Deno.env.get('GMAIL_USER') ?? 'doctrack.suporte@gmail.com'
 // nomes dos tipos como aparecem no app (no banco ficam sem acento/minúsculos)
 const TIPOS: Record<string, string> = {
   aso: 'ASO', nr: 'NR', alvara: 'Alvará', contrato: 'Contrato', certificacao: 'Certificação',
+  cnh: 'CNH', passaporte: 'Passaporte', certidao: 'Certidão', certificado_digital: 'Certificado digital', licenca_sanitaria: 'Licença sanitária',
   conta: 'Conta / boleto', imposto: 'Imposto / taxa', outro: 'Outro',
 }
 

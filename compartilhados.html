@@ -316,6 +316,11 @@
             <option value="alvara">Alvará</option>
             <option value="contrato">Contrato</option>
             <option value="certificacao">Certificação</option>
+            <option value="cnh">CNH</option>
+            <option value="passaporte">Passaporte</option>
+            <option value="certidao">Certidão (CND, FGTS...)</option>
+            <option value="certificado_digital">Certificado digital</option>
+            <option value="licenca_sanitaria">Licença sanitária</option>
             <option value="conta">Conta / boleto</option>
             <option value="imposto">Imposto / taxa</option>
             <option value="outro">Outro</option>
@@ -431,7 +436,7 @@
       return 'vence em ' + d + (d === 1 ? ' dia' : ' dias');
     }
     function dataBR(iso) { return iso ? new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR') : ''; }
-    const TIPOS = { aso: 'ASO', nr: 'NR', alvara: 'Alvará', contrato: 'Contrato', certificacao: 'Certificação', conta: 'Conta / boleto', imposto: 'Imposto / taxa', outro: 'Outro' };
+    const TIPOS = { aso: 'ASO', nr: 'NR', alvara: 'Alvará', contrato: 'Contrato', certificacao: 'Certificação', cnh: 'CNH', passaporte: 'Passaporte', certidao: 'Certidão', certificado_digital: 'Certificado digital', licenca_sanitaria: 'Licença sanitária', conta: 'Conta / boleto', imposto: 'Imposto / taxa', outro: 'Outro' };
     const PERMISSAO_TXT = { ver: 'Só ver', atualizar: 'Ver e atualizar', gerenciar: 'Gerente: cadastra e edita' };
 
     function avisoRapido(texto) {

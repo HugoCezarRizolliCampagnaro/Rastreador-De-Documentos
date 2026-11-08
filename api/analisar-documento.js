@@ -98,7 +98,7 @@ Extraia as informações que conseguir identificar COM CLAREZA na imagem e devol
 
 {
   "nome": "nome curto e comum pro documento, como as pessoas falam (ex: 'RG', 'CNH', 'ASO - João Silva', 'Alvará de Funcionamento', 'DAS - outubro')",
-  "tipo": "um destes valores exatos: aso, nr, alvara, contrato, certificacao, conta, imposto, outro (conta = boleto ou fatura; imposto = guia de imposto ou taxa)",
+  "tipo": "um destes valores exatos: aso, nr, alvara, contrato, certificacao, cnh, passaporte, certidao, certificado_digital, licenca_sanitaria, conta, imposto, outro (conta = boleto ou fatura; imposto = guia de imposto ou taxa; certidao = certidão negativa de débitos, CNDT ou certificado de regularidade do FGTS)",
   "numero_documento": "número ou código do documento, ou null se não encontrar",
   "data_emissao": "data de EMISSÃO ou EXPEDIÇÃO do documento, no formato AAAA-MM-DD, ou null se não estiver escrita como emissão/expedição",
   "data_vencimento": "no formato AAAA-MM-DD, ou null se não encontrar",
@@ -112,7 +112,7 @@ NUNCA use a data de nascimento como data de emissão ou de vencimento. Data de n
 Na carteira de identidade (RG/CIN), a validade costuma aparecer como "Validade" e a emissão como "Data de expedição"; se só tiver data de nascimento e validade, data_emissao é null.
 
 Regras por tipo de documento (o vencimento só vale se estiver ESCRITO no documento; nunca calcule):
-- RG/CIN, CNH, passaporte, CRLV, título de eleitor e outros documentos pessoais: tipo = outro (NUNCA certificacao — certificacao é só certificado de curso/qualificação).
+- CNH: tipo = cnh. Passaporte: tipo = passaporte. RG/CIN, CRLV, título de eleitor e outros documentos pessoais: tipo = outro (NUNCA certificacao — certificacao é só certificado de curso/qualificação).
 - CNH: vencimento = "Validade"; emissão = "Data Emissão". A data da "1ª Habilitação" NÃO é emissão nem vencimento (pode ir em observacoes junto com a categoria). categoria_sugerida = veiculo.
 - CRLV / documento do veículo / IPVA: vencimento = data limite de pagamento ou validade do licenciamento escrita; o "exercício" (ano) sozinho não é data. categoria_sugerida = veiculo.
 - ASO: emissão = data do exame/atestado. Muitos ASOs não têm validade escrita: aí data_vencimento é null e coloque em observacoes o tipo do exame (admissional, periódico, demissional...). categoria_sugerida = trabalho.
