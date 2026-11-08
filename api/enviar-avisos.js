@@ -45,13 +45,14 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const documentos = await buscarTudo('documentos?select=id,user_id,nome,data_vencimento,avisos_dias&data_vencimento=not.is.null');
+    const documentos = await buscarTudo('documentos?select=id,user_id,nome,data_vencimento,avisos_dias,lembrar_em&data_vencimento=not.is.null');
 
     const porUsuario = {};
     documentos.forEach(function (d) {
       const dias = push.diasAte(d.data_vencimento, hoje);
-      if (!push.deveAvisar(dias, d.avisos_dias)) return;
-      (porUsuario[d.user_id] = porUsuario[d.user_id] || []).push({ nome: d.nome, dias: dias });
+      // lembrar_em = pediu "Lembrar amanhã" na notificação
+      if (!push.deveAvisar(dias, d.avisos_dias) && d.lembrar_em !== hoje) return;
+      (porUsuario[d.user_id] = porUsuario[d.user_id] || []).push({ id: d.id, nome: d.nome, dias: dias });
     });
 
     let enviadas = 0;

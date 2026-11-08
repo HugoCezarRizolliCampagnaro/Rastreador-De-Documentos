@@ -9,6 +9,7 @@
 //   CRON_SECRET                            texto secreto; a Vercel o envia sozinha ao agendador
 
 const webpush = require('web-push');
+const crypto = require('crypto');
 
 function configurado() {
   return !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
@@ -65,15 +66,32 @@ function frase(doc) {
   return doc.nome + ' vence em ' + doc.dias + ' dias';
 }
 
-// docs: [{ nome, dias }] já filtrados e ordenados do mais urgente
+// Token do botão "Lembrar amanhã": prova que o pedido veio de uma notificação nossa (o aparelho não tem a sessão).
+function tokenAdiar(docId) {
+  return crypto.createHmac('sha256', process.env.CRON_SECRET || '').update('adiar:' + docId).digest('hex').slice(0, 32);
+}
+
+function tokenAdiarValido(docId, token) {
+  if (!process.env.CRON_SECRET || typeof token !== 'string' || token.length !== 32) return false;
+  return crypto.timingSafeEqual(Buffer.from(tokenAdiar(docId)), Buffer.from(token));
+}
+
+// docs: [{ id, nome, dias }] já filtrados e ordenados do mais urgente
 function montarMensagem(docs) {
   if (docs.length === 1) {
     const d = docs[0];
-    return { title: d.dias < 0 ? 'Documento vencido' : 'Vencimento próximo', body: frase(d) + '.', url: '/index.html' };
+    const msg = { title: d.dias < 0 ? 'Documento vencido' : 'Vencimento próximo', body: frase(d) + '.', url: '/index.html' };
+    // botões (Android/Chrome; no iPhone não aparecem e o toque abre o app normal)
+    if (d.id) {
+      msg.docId = d.id;
+      msg.token = tokenAdiar(d.id);
+      msg.actions = [{ action: 'renovei', title: 'Já renovei' }, { action: 'amanha', title: 'Lembrar amanhã' }];
+    }
+    return msg;
   }
   const lista = docs.slice(0, 3).map(frase).join('; ');
   const resto = docs.length > 3 ? ' e mais ' + (docs.length - 3) : '';
   return { title: docs.length + ' documentos pedem atenção', body: lista + resto + '.', url: '/index.html' };
 }
 
-module.exports = { configurado, configurar, enviar, hojeBrasilia, diasAte, deveAvisar, montarMensagem };
+module.exports = { configurado, configurar, enviar, hojeBrasilia, diasAte, deveAvisar, montarMensagem, tokenAdiarValido };

@@ -4,6 +4,7 @@
 // Feito no servidor para funcionar mesmo se o aparelho já estava ligado a outra conta.
 
 const { supabaseAdmin, usuarioDaRequisicao } = require('./_comum');
+const push = require('./_push');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -17,6 +18,25 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    const corpoAcao = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+
+    // botão "Lembrar amanhã" da notificação (vem do service worker, sem sessão: vale o token)
+    if (corpoAcao.acao === 'adiar') {
+      const doc = String(corpoAcao.doc || '');
+      if (!/^[0-9a-f-]{36}$/i.test(doc) || !push.tokenAdiarValido(doc, corpoAcao.t)) {
+        res.status(403).json({ erro: 'Pedido inválido.' });
+        return;
+      }
+      const amanha = new Date(Date.parse(push.hojeBrasilia() + 'T12:00:00Z') + 86400000).toISOString().slice(0, 10);
+      await supabaseAdmin('documentos?id=eq.' + doc, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: { lembrar_em: amanha },
+      });
+      res.status(200).json({ ok: true, lembrar_em: amanha });
+      return;
+    }
+
     const usuario = await usuarioDaRequisicao(req);
     if (!usuario) {
       res.status(401).json({ erro: 'Sessão inválida. Entre de novo na sua conta.' });
