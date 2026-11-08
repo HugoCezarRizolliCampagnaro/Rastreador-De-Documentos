@@ -1404,6 +1404,18 @@
 
       if (!idEdicao) restaurarRascunho();
 
+      // veio do "Por onde começar?" do Início: já preenche nome, tipo, categoria e repetição
+      if (!idEdicao) {
+        const q = new URLSearchParams(window.location.search);
+        if (q.get('nome') && !form.nome.value) form.nome.value = q.get('nome').slice(0, 80);
+        if (q.get('tipo') && !form.tipo.value && form.tipo.querySelector('option[value="' + q.get('tipo').replace(/[^a-z_]/g, '') + '"]')) {
+          form.tipo.value = q.get('tipo');
+          aoMudarTipo();
+        }
+        if (q.get('categoria') && form.categoria.querySelector('option[value="' + q.get('categoria').replace(/[^a-z_]/g, '') + '"]')) form.categoria.value = q.get('categoria');
+        if (q.get('repeticao') && repeticaoDisponivel && !form.repeticao.value) { form.repeticao.value = q.get('repeticao'); atualizarBlocoRepeticao(); }
+      }
+
       let jaViuTourDocumento = true;
       try { jaViuTourDocumento = localStorage.getItem('tour-documento-visto') === 'true'; } catch (e) {}
       if (!idEdicao && !jaViuTourDocumento) setTimeout(abrirTourDocumento, 500);

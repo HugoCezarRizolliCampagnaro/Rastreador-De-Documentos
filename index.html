@@ -608,6 +608,25 @@
   .doc-menu button.destaque { color: var(--status-verde); font-weight: 700; }
   .doc-recorrente { color: var(--marca); display: inline-flex; flex-shrink: 0; }
 
+  /* ---------- "Por onde começar?" ---------- */
+  .comecar { margin-bottom: 14px; padding: 16px; background: var(--superficie); border: 1px solid var(--borda); border-radius: 14px; }
+  .comecar[hidden] { display: none; }
+  .comecar-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+  .comecar-topo strong { font-size: 15px; }
+  .comecar-topo button { background: none; border: none; color: var(--texto-muted); font: inherit; font-size: 12.5px; cursor: pointer; }
+  .comecar p { margin: 0 0 12px; font-size: 13px; color: var(--texto-muted); line-height: 1.45; }
+  .comecar-perfis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .comecar-perfis button { padding: 12px 10px; border-radius: 12px; border: 1.5px solid var(--borda); background: var(--bg); color: var(--texto); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; text-align: left; line-height: 1.3; }
+  .comecar-perfis button span { display: block; font-size: 12px; font-weight: 400; color: var(--texto-muted); margin-top: 2px; }
+  .comecar-perfis button:hover { border-color: var(--marca); }
+  .comecar-lista { display: flex; flex-direction: column; gap: 8px; }
+  .comecar-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--borda); background: var(--bg); color: var(--texto); text-decoration: none; font-size: 14px; font-weight: 600; }
+  .comecar-item small { display: block; font-size: 12px; font-weight: 400; color: var(--texto-muted); }
+  .comecar-item .acao { color: var(--marca); font-size: 13px; white-space: nowrap; }
+  .comecar-item.feito { opacity: .55; }
+  .comecar-item.feito .acao { color: var(--status-verde); }
+  .comecar-trocar { margin-top: 10px; background: none; border: none; color: var(--marca); font: inherit; font-size: 13px; cursor: pointer; padding: 0; }
+
   .vazio, .erro {
     text-align: center;
     color: var(--texto-muted);
@@ -892,6 +911,7 @@
             <button type="button" class="convite-push-fechar" id="convite-push-fechar">Agora não</button>
           </span>
         </div>
+        <div class="comecar" id="comecar" hidden></div>
         <div class="busca-wrap">
           <span id="icone-busca"></span>
           <input type="search" class="busca" id="busca" placeholder="Buscar por nome ou cliente...">
@@ -1334,6 +1354,8 @@
         documentos = documentos.filter(function (doc) { return diasRestantes(doc.data_vencimento) < 0; });
       }
 
+      renderComecar();
+
       if (documentosCarregados.length === 0) {
         resumoEl.textContent = 'Nenhum documento cadastrado ainda';
         listaEl.innerHTML = '<p class="vazio">Cadastre seu primeiro documento no botão "+"</p>';
@@ -1497,6 +1519,69 @@
         excluirComDesfazer(idExcluir);
       }
     }
+
+    /* ---------- "Por onde começar?": sugestões de documentos por perfil (some com 3+ documentos ou ao esconder) ---------- */
+
+    const PERFIS_COMECAR = {
+      pessoal: { titulo: 'Meus documentos', sub: 'CNH, RG, passaporte', itens: [
+        { nome: 'CNH', tipo: 'cnh', categoria: 'pessoal', dica: 'O app calcula a validade pela idade' },
+        { nome: 'RG', tipo: 'outro', categoria: 'pessoal', dica: 'Se tiver validade escrita' },
+        { nome: 'Passaporte', tipo: 'passaporte', categoria: 'pessoal', dica: 'Vale 10 anos (adulto)' },
+      ] },
+      mei: { titulo: 'Sou MEI / autônomo', sub: 'Certidões, alvará, DAS', itens: [
+        { nome: 'DAS do MEI', tipo: 'imposto', categoria: 'trabalho', repeticao: 'mensal', dica: 'Repete todo mês' },
+        { nome: 'Certificado digital', tipo: 'certificado_digital', categoria: 'trabalho', dica: 'Renove antes de vencer' },
+        { nome: 'CND federal', tipo: 'certidao', categoria: 'trabalho', dica: 'Vale 180 dias' },
+        { nome: 'Alvará de funcionamento', tipo: 'alvara', categoria: 'trabalho', dica: 'Confira a validade no alvará' },
+      ] },
+      empresa: { titulo: 'Tenho funcionários', sub: 'ASO, NR, licenças', itens: [
+        { nome: 'ASO', tipo: 'aso', categoria: 'trabalho', dica: 'Um por funcionário (escolha a pessoa)' },
+        { nome: 'NR-35 (trabalho em altura)', tipo: 'nr', categoria: 'trabalho', dica: 'Reciclagem a cada 2 anos' },
+        { nome: 'NR-10 (eletricidade)', tipo: 'nr', categoria: 'trabalho', dica: 'Reciclagem a cada 2 anos' },
+        { nome: 'Licença sanitária', tipo: 'licenca_sanitaria', categoria: 'trabalho', dica: 'Normalmente 1 ano' },
+      ] },
+      familia: { titulo: 'Família', sub: 'Documentos de todos', itens: [
+        { nome: 'CNH', tipo: 'cnh', categoria: 'pessoal', dica: 'Escolha de quem é no cadastro' },
+        { nome: 'Passaporte', tipo: 'passaporte', categoria: 'pessoal', dica: 'Um por pessoa' },
+        { nome: 'Licenciamento do carro', tipo: 'outro', categoria: 'veiculo', repeticao: 'anual', dica: 'Repete todo ano' },
+      ] },
+    };
+
+    function lerComecar() { try { return JSON.parse(localStorage.getItem('comecar') || '{}'); } catch (e) { return {}; } }
+    function salvarComecar(v) { try { localStorage.setItem('comecar', JSON.stringify(v)); } catch (e) {} }
+
+    function renderComecar() {
+      const caixa = document.getElementById('comecar');
+      const estado = lerComecar();
+      if (estado.escondido || documentosCarregados.length >= 3) { caixa.hidden = true; return; }
+      caixa.hidden = false;
+      const perfil = PERFIS_COMECAR[estado.perfil];
+      const topo = '<div class="comecar-topo"><strong>Por onde começar?</strong><button type="button" data-comecar="esconder">Esconder</button></div>';
+      if (!perfil) {
+        caixa.innerHTML = topo + '<p>Escolha o que você quer controlar e a gente sugere os documentos mais comuns.</p><div class="comecar-perfis">' +
+          Object.keys(PERFIS_COMECAR).map(function (k) { return '<button type="button" data-perfil="' + k + '">' + PERFIS_COMECAR[k].titulo + '<span>' + PERFIS_COMECAR[k].sub + '</span></button>'; }).join('') + '</div>';
+        return;
+      }
+      const nomes = documentosCarregados.map(function (d) { return (d.nome || '').toLowerCase(); });
+      caixa.innerHTML = topo + '<p>Toque pra cadastrar. O tipo e a categoria já vêm preenchidos.</p><div class="comecar-lista">' +
+        perfil.itens.map(function (it) {
+          const feito = nomes.some(function (n) { return n.indexOf(it.nome.toLowerCase().split(' (')[0]) !== -1; });
+          const q = new URLSearchParams({ nome: it.nome, tipo: it.tipo, categoria: it.categoria });
+          if (it.repeticao) q.set('repeticao', it.repeticao);
+          return '<a class="comecar-item' + (feito ? ' feito' : '') + '" href="novo-documento.html?' + q.toString() + '"><span>' + escapeHtml(it.nome) + '<small>' + escapeHtml(it.dica) + '</small></span><span class="acao">' + (feito ? '✓ Feito' : 'Cadastrar') + '</span></a>';
+        }).join('') + '</div><button type="button" class="comecar-trocar" data-comecar="trocar">Trocar de perfil</button>';
+    }
+
+    document.getElementById('comecar').addEventListener('click', function (e) {
+      const b = e.target.closest('[data-perfil],[data-comecar]');
+      if (!b) return;
+      const estado = lerComecar();
+      if (b.dataset.perfil) estado.perfil = b.dataset.perfil;
+      else if (b.dataset.comecar === 'trocar') delete estado.perfil;
+      else if (b.dataset.comecar === 'esconder') estado.escondido = true;
+      salvarComecar(estado);
+      renderComecar();
+    });
 
     /* ---------- filtro por pessoa (Família) e por cliente (Profissional) ---------- */
 
