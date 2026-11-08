@@ -541,6 +541,13 @@
               <span class="slider"></span>
             </label>
           </div>
+          <button type="button" class="opcao-linha" id="btn-agenda">
+            <span class="opcao-icone" id="icone-agenda"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo">Vencimentos na agenda do celular</div>
+              <div class="opcao-descricao" id="desc-agenda">Veja os vencimentos no Google Agenda ou no Calendário do iPhone.</div>
+            </div>
+          </button>
         </div>
 
         <p class="secao-titulo-grupo">Pessoas</p>
@@ -1066,6 +1073,7 @@
 
     document.getElementById('icone-email-lembretes').innerHTML = icone('mail', 17);
     document.getElementById('icone-resumo-semanal').innerHTML = icone('fileText', 17);
+    document.getElementById('icone-agenda').innerHTML = icone('calendar', 17);
     document.getElementById('icone-pessoas').innerHTML = icone('users', 17);
     document.getElementById('seta-pessoas').innerHTML = icone('chevronRight', 16);
     document.getElementById('icone-tour').innerHTML = '<svg class="icone" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>';
@@ -1094,6 +1102,49 @@
         }
         desc.textContent = toggle.checked ? 'Lembretes por e-mail ativados.' : 'Você não vai mais receber lembretes por e-mail.';
         setTimeout(function () { desc.textContent = textoPadrao; }, 3000);
+      });
+    }
+
+    /* ---------- agenda (.ics): link privado; trocar o link desliga o antigo ---------- */
+    function iniciarAgenda(userId) {
+      const URL_AGENDA = 'https://qybgrfdvpptnauyqtdxu.supabase.co/functions/v1/agenda?t=';
+      const btn = document.getElementById('btn-agenda');
+
+      async function obterToken(novo) {
+        if (!novo) {
+          const { data, error } = await sb.from('preferencias').select('agenda_token').eq('user_id', userId).maybeSingle();
+          if (error) throw error;
+          if (data && data.agenda_token) return data.agenda_token;
+        }
+        const token = crypto.randomUUID();
+        const { error } = await sb.from('preferencias').upsert({ user_id: userId, agenda_token: token, atualizado_em: new Date().toISOString() }, { onConflict: 'user_id' });
+        if (error) throw error;
+        return token;
+      }
+
+      btn.addEventListener('click', async function () {
+        let token;
+        try { token = await obterToken(false); } catch (e) { Dialogo.avisar('Não consegui criar o link agora. Tente de novo.'); return; }
+        const link = URL_AGENDA + token;
+        const iphone = /iphone|ipad|ipod|macintosh/i.test(navigator.userAgent);
+        const escolha = await Dialogo.escolher(
+          'Seus vencimentos aparecem como eventos na agenda e atualizam sozinhos (o Google pode levar algumas horas pra atualizar). Os avisos do DocTrack continuam iguais.',
+          [
+            { valor: 'apple', texto: 'Abrir no Calendário (iPhone/Mac)', principal: iphone },
+            { valor: 'google', texto: 'Copiar link pro Google Agenda', principal: !iphone },
+            { valor: 'trocar', texto: 'Trocar o link (desliga o antigo)' },
+          ],
+          { titulo: 'Agenda do celular' }
+        );
+        if (escolha === 'apple') {
+          window.location.href = link.replace('https://', 'webcal://');
+        } else if (escolha === 'google') {
+          try { await navigator.clipboard.writeText(link); } catch (e) { await Dialogo.pedir('Copie o link:', link, { titulo: 'Link da agenda' }); return; }
+          Dialogo.avisar('Link copiado! No computador, abra o Google Agenda, clique no + ao lado de "Outras agendas", escolha "Do URL" e cole o link. Depois aparece no celular também.', { titulo: 'Google Agenda' });
+        } else if (escolha === 'trocar') {
+          try { await obterToken(true); } catch (e) { Dialogo.avisar('Não consegui trocar o link agora.'); return; }
+          Dialogo.avisar('Link trocado. O link antigo parou de funcionar; adicione o novo na agenda.');
+        }
       });
     }
 
@@ -1346,6 +1397,7 @@
 
       iniciarEmailLembretes(resultado.data.session.user.id);
       iniciarResumoSemanal(resultado.data.session.user.id);
+      iniciarAgenda(resultado.data.session.user.id);
       carregarPessoas();
       planoEmVigor().then(function (plano) {
         iniciarClientes(resultado.data.session.user.id, plano);
