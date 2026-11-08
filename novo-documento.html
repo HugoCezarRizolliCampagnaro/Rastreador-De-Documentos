@@ -1543,6 +1543,22 @@
           confirmacao.scrollIntoView({ behavior: 'smooth' });
           return;
         }
+
+        // já tem um documento com o mesmo nome pra mesma pessoa? pergunta antes de criar outro
+        const nomeNovo = form.nome.value.trim();
+        const pessoaNova = (form.pessoa.value && form.pessoa.value !== '__novo__') ? form.pessoa.value : null;
+        const { data: parecidos } = await sb.from('documentos').select('id, nome, data_vencimento, pessoa_id')
+          .ilike('nome', nomeNovo.replace(/[\\%_]/g, '\\$&')).limit(5);
+        const repetido = (parecidos || []).find(function (d) { return (d.pessoa_id || null) === pessoaNova; });
+        if (repetido && window.Dialogo) {
+          const quando = repetido.data_vencimento ? ' (vence em ' + repetido.data_vencimento.split('-').reverse().join('/') + ')' : '';
+          const escolha = await Dialogo.escolher('Você já tem "' + repetido.nome + '"' + quando + '. Quer cadastrar outro mesmo assim?', [
+            { valor: 'abrir', texto: 'Abrir o que já existe' },
+            { valor: 'criar', texto: 'Cadastrar outro', principal: true },
+          ], { titulo: 'Documento repetido?' });
+          if (escolha === 'abrir') { window.location.href = 'novo-documento.html?id=' + encodeURIComponent(repetido.id); return; }
+          if (escolha !== 'criar') return;
+        }
       }
 
       botao.disabled = true;
