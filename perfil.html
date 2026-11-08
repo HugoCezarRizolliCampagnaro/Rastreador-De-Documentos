@@ -600,6 +600,14 @@
               <div class="opcao-descricao">Baixe seus documentos em formato CSV</div>
             </div>
           </button>
+          <button type="button" class="opcao-linha" id="btn-importar">
+            <span class="opcao-icone" id="icone-importar"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo" id="texto-importar">Importar planilha (CSV)</div>
+              <div class="opcao-descricao">Cadastre vários documentos de uma vez, a partir do Excel ou Google Planilhas</div>
+            </div>
+          </button>
+          <input type="file" id="arquivo-importar" accept=".csv,text/csv" hidden>
           <a href="planos.html" class="opcao-linha">
             <span class="opcao-icone" id="icone-planos"></span>
             <div class="opcao-texto">
@@ -766,6 +774,7 @@
 
     document.getElementById('icone-aparencia').innerHTML = icone('moon', 17);
     document.getElementById('icone-exportar').innerHTML = icone('download', 17);
+    document.getElementById('icone-importar').innerHTML = icone('fileText', 17);
     document.getElementById('icone-planos').innerHTML = icone('creditCard', 17);
     document.getElementById('icone-instalar-app').innerHTML = icone('smartphone', 17);
     document.getElementById('icone-suporte').innerHTML = icone('helpCircle', 17);
@@ -1068,6 +1077,205 @@
 
       textoEl.textContent = textoOriginal;
     });
+
+    /* ---------- importar planilha (CSV) ---------- */
+
+    (function () {
+      const btn = document.getElementById('btn-importar');
+      const input = document.getElementById('arquivo-importar');
+      const textoEl = document.getElementById('texto-importar');
+      const textoOriginal = textoEl.textContent;
+
+      function norm(t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+
+      // CSV com aspas, separador ; ou , (o Excel em português usa ;)
+      function lerCsv(texto) {
+        texto = texto.replace(/^\uFEFF/, '');
+        const primeira = texto.split(/\r?\n/)[0] || '';
+        const sep = (primeira.match(/;/g) || []).length >= (primeira.match(/,/g) || []).length ? ';' : ',';
+        const linhas = []; let linha = []; let campo = ''; let aspas = false;
+        for (let i = 0; i < texto.length; i++) {
+          const c = texto[i];
+          if (aspas) {
+            if (c === '"' && texto[i + 1] === '"') { campo += '"'; i++; }
+            else if (c === '"') aspas = false;
+            else campo += c;
+          } else if (c === '"') aspas = true;
+          else if (c === sep) { linha.push(campo); campo = ''; }
+          else if (c === '\n' || c === '\r') {
+            if (c === '\r' && texto[i + 1] === '\n') i++;
+            linha.push(campo); campo = '';
+            if (linha.some(function (v) { return v.trim() !== ''; })) linhas.push(linha);
+            linha = [];
+          } else campo += c;
+        }
+        linha.push(campo);
+        if (linha.some(function (v) { return v.trim() !== ''; })) linhas.push(linha);
+        return linhas;
+      }
+
+      function data(v) {
+        v = String(v || '').trim();
+        let m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (m) return m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0');
+        m = v.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);
+        if (!m) return null;
+        const ano = m[3].length === 2 ? '20' + m[3] : m[3];
+        const iso = ano + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+        return isNaN(Date.parse(iso + 'T12:00:00Z')) ? null : iso;
+      }
+
+      function tipo(v) {
+        const t = norm(v).replace(/[\s\-_]+/g, ' ');
+        if (!t) return 'outro';
+        const diretos = ['aso', 'nr', 'alvara', 'contrato', 'certificacao', 'cnh', 'passaporte', 'certidao', 'conta', 'imposto', 'outro'];
+        if (diretos.indexOf(t) !== -1) return t;
+        if (t.indexOf('certificado digital') !== -1 || t === 'certificado_digital' || t === 'e cnpj' || t === 'e cpf') return 'certificado_digital';
+        if (t.indexOf('licenca sanit') !== -1 || t.indexOf('alvara sanit') !== -1) return 'licenca_sanitaria';
+        if (/^nr ?\d/.test(t)) return 'nr';
+        if (t.indexOf('aso') === 0) return 'aso';
+        if (t.indexOf('alvara') !== -1) return 'alvara';
+        if (t.indexOf('cnd') !== -1 || t.indexOf('certidao') !== -1 || t.indexOf('fgts') !== -1) return 'certidao';
+        if (t.indexOf('habilitacao') !== -1) return 'cnh';
+        if (t.indexOf('boleto') !== -1 || t.indexOf('conta') === 0) return 'conta';
+        if (t.indexOf('imposto') !== -1 || t.indexOf('taxa') !== -1 || t.indexOf('das') === 0) return 'imposto';
+        if (t.indexOf('contrato') !== -1) return 'contrato';
+        if (t.indexOf('certifica') !== -1 || t.indexOf('curso') !== -1) return 'certificacao';
+        return 'outro';
+      }
+
+      function categoria(v) {
+        const c = norm(v);
+        if (c.indexOf('veic') === 0 || c === 'carro') return 'veiculo';
+        if (['pessoal', 'trabalho', 'casa', 'outro'].indexOf(c) !== -1) return c;
+        return null;
+      }
+
+      const COLUNAS = {
+        nome: ['nome', 'documento', 'nome do documento'],
+        numero_documento: ['numero_documento', 'numero', 'numero do documento', 'n'],
+        tipo: ['tipo'],
+        categoria: ['categoria'],
+        pessoa: ['pessoa', 'funcionario', 'colaborador', 'dono'],
+        cliente: ['cliente', 'empresa', 'cliente / empresa'],
+        data_emissao: ['data_emissao', 'emissao', 'data de emissao'],
+        data_vencimento: ['data_vencimento', 'vencimento', 'validade', 'data de vencimento', 'vence em'],
+        observacoes: ['observacoes', 'observacao', 'obs'],
+      };
+
+      function baixarModelo() {
+        const csv = '\uFEFF' + [
+          'nome;tipo;pessoa;vencimento;emissao;observacoes',
+          'ASO;ASO;João Silva;15/03/2027;15/03/2026;Periódico',
+          'NR-35;NR;João Silva;10/08/2027;10/08/2025;8 horas',
+          'Alvará de funcionamento;Alvará;;31/12/2026;;',
+        ].join('\r\n');
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        a.download = 'modelo-doctrack.csv';
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      }
+
+      btn.addEventListener('click', async function () {
+        const escolha = await Dialogo.escolher(
+          'Salve a planilha como CSV com uma linha por documento. Colunas: nome, tipo, pessoa, vencimento (DD/MM/AAAA), emissão e observações. Só nome e vencimento são obrigatórios.',
+          [{ valor: 'arquivo', texto: 'Escolher o arquivo CSV', principal: true }, { valor: 'modelo', texto: 'Baixar planilha modelo' }],
+          { titulo: 'Importar planilha' }
+        );
+        if (escolha === 'modelo') baixarModelo();
+        else if (escolha === 'arquivo') input.click();
+      });
+
+      input.addEventListener('change', async function () {
+        const arquivo = input.files && input.files[0];
+        input.value = '';
+        if (!arquivo) return;
+        if (arquivo.size > 2 * 1024 * 1024) { Dialogo.avisar('Arquivo grande demais (máximo 2 MB).'); return; }
+
+        let texto = await arquivo.text();
+        if (texto.indexOf('\uFFFD') !== -1) { // não era UTF-8 (Excel antigo salva em Windows-1252)
+          texto = new TextDecoder('windows-1252').decode(await arquivo.arrayBuffer());
+        }
+        const linhas = lerCsv(texto);
+        if (linhas.length < 2) { Dialogo.avisar('Não achei linhas de documentos nesse arquivo.'); return; }
+
+        const cab = linhas[0].map(norm);
+        const idx = {};
+        Object.keys(COLUNAS).forEach(function (k) { idx[k] = cab.findIndex(function (h) { return COLUNAS[k].indexOf(h) !== -1; }); });
+        if (idx.nome < 0 || idx.data_vencimento < 0) {
+          Dialogo.avisar('A planilha precisa ter as colunas "nome" e "vencimento" na primeira linha. Baixe o modelo pra ver o formato.');
+          return;
+        }
+
+        const pegar = function (l, k) { return idx[k] >= 0 ? String(l[idx[k]] || '').trim() : ''; };
+        const validos = []; let invalidos = 0;
+        linhas.slice(1).forEach(function (l) {
+          const nome = pegar(l, 'nome').slice(0, 120);
+          const venc = data(pegar(l, 'data_vencimento'));
+          if (!nome || !venc) { invalidos++; return; }
+          validos.push({
+            nome: nome, tipo: tipo(pegar(l, 'tipo')), categoria: categoria(pegar(l, 'categoria')),
+            numero_documento: pegar(l, 'numero_documento') || null, cliente: pegar(l, 'cliente') || null,
+            data_emissao: data(pegar(l, 'data_emissao')), data_vencimento: venc,
+            observacoes: pegar(l, 'observacoes').slice(0, 500) || null, pessoa: pegar(l, 'pessoa').slice(0, 80),
+          });
+        });
+        if (!validos.length) { Dialogo.avisar('Nenhuma linha com nome e vencimento válidos. Confira as datas (DD/MM/AAAA).'); return; }
+
+        const ok = await Dialogo.confirmar(
+          'Encontrei ' + validos.length + ' documento' + (validos.length > 1 ? 's' : '') + ' pra importar' +
+          (invalidos ? ' (' + invalidos + ' linha' + (invalidos > 1 ? 's' : '') + ' sem nome ou vencimento válido vão ficar de fora)' : '') + '.',
+          { titulo: 'Importar planilha', ok: 'Importar' }
+        );
+        if (!ok) return;
+
+        textoEl.textContent = 'Importando...';
+        btn.disabled = true;
+        const sessao = (await sb.auth.getSession()).data.session;
+        const userId = sessao && sessao.user.id;
+
+        // pessoas: usa as que já existem pelo nome; cria as que faltam (se o plano permitir)
+        const { data: pessoasExistentes } = await sb.from('pessoas').select('id, nome');
+        const mapaPessoas = {};
+        (pessoasExistentes || []).forEach(function (p) { mapaPessoas[norm(p.nome)] = p.id; });
+        const faltando = Array.from(new Set(validos.map(function (v) { return v.pessoa; }).filter(function (n) { return n && !mapaPessoas[norm(n)]; })));
+        for (const nomeP of faltando) {
+          const { data: nova } = await sb.from('pessoas').insert({ user_id: userId, nome: nomeP }).select('id').single();
+          if (nova) mapaPessoas[norm(nomeP)] = nova.id;
+        }
+
+        const registros = validos.map(function (v) {
+          const r = {
+            user_id: userId, nome: v.nome, tipo: v.tipo, categoria: v.categoria || (v.pessoa ? 'trabalho' : 'outro'),
+            numero_documento: v.numero_documento, cliente: v.cliente, data_emissao: v.data_emissao,
+            data_vencimento: v.data_vencimento, observacoes: v.observacoes, pessoa_id: null,
+          };
+          if (v.pessoa) {
+            if (mapaPessoas[norm(v.pessoa)]) r.pessoa_id = mapaPessoas[norm(v.pessoa)];
+            else r.observacoes = ('Pessoa: ' + v.pessoa + (r.observacoes ? ' · ' + r.observacoes : '')).slice(0, 500);
+          }
+          return r;
+        });
+
+        let importados = 0; let falhas = 0; let limite = false;
+        for (let i = 0; i < registros.length; i += 50) {
+          const lote = registros.slice(i, i + 50);
+          const { error } = await sb.from('documentos').insert(lote);
+          if (!error) { importados += lote.length; continue; }
+          for (const r of lote) { // um por um pra salvar o que der
+            const { error: e1 } = await sb.from('documentos').insert(r);
+            if (e1) { falhas++; if (/limite|plano/i.test(e1.message || '')) limite = true; } else importados++;
+          }
+        }
+
+        btn.disabled = false;
+        textoEl.textContent = textoOriginal;
+        let msg = importados + ' documento' + (importados === 1 ? '' : 's') + ' importado' + (importados === 1 ? '' : 's') + '.';
+        if (falhas) msg += ' ' + falhas + ' não entr' + (falhas === 1 ? 'ou' : 'aram') + (limite ? ' por causa do limite do seu plano (veja em Planos e assinatura).' : '.');
+        await Dialogo.avisar(msg, { titulo: 'Importação concluída' });
+      });
+    })();
 
     /* ---------- lembretes por e-mail ---------- */
 
