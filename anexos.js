@@ -29,6 +29,7 @@
     check: '<polyline points="20 6 9 17 4 12"/>',
     edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>',
     refresh: '<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+    share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>',
   };
   function svg(nome, tam, extra) {
     return '<svg width="' + (tam || 18) + '" height="' + (tam || 18) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"' + (extra || '') + '>' + (ICONES[nome] || '') + '</svg>';
@@ -62,6 +63,9 @@
     '.anexos-botoes button { white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--borda, #232833); background: var(--bg, #0B0E14); color: var(--texto, #F1F2F4); }',
     '.anexos-botoes button.principal { background: var(--marca, #5B6EF5); border-color: var(--marca, #5B6EF5); color: #FFFFFF; }',
     '.anexos-botoes button:disabled { opacity: .5; cursor: default; }',
+    '.anexos-enviar { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; padding: 11px; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--borda, #232833); background: transparent; color: var(--texto, #F1F2F4); }',
+    '.anexos-enviar[hidden] { display: none; }',
+    '.anexos-enviar:disabled { opacity: .6; cursor: default; }',
     '.anexos-dica { font-size: 12px; color: var(--texto-muted, #8A93A3); margin: 8px 0 0; line-height: 1.45; }',
     /* visualizador */
     '.anx-ver { position: fixed; inset: 0; z-index: 1100; background: #000000; display: flex; flex-direction: column; }',
@@ -131,6 +135,7 @@
       document.getElementById(id).addEventListener('cancel', limparSaida);
     });
     document.getElementById('anexos-grade').addEventListener('click', cliqueGrade);
+    prepararEnvio();
 
     // o banco já tem a lista de arquivos? (senão aceita 1, como antes)
     // opcoes.umArquivo: só 1 arquivo, sem nome Frente/Verso (ex.: renovação feita pelo convidado)
@@ -235,6 +240,69 @@
     else dica.textContent = itens.length + ' de ' + lim + ' arquivos. Toque na imagem pra ver grande.';
     document.getElementById('btn-tirar-foto').disabled = itens.length >= lim;
     document.getElementById('btn-galeria').disabled = itens.length >= lim;
+    var btnEnviar = document.getElementById('btn-enviar-anexos');
+    if (btnEnviar) {
+      btnEnviar.hidden = !podeEnviar || !itens.length;
+      if (!btnEnviar.hidden) preCarregar();
+    }
+  }
+
+  /* ---------- enviar os arquivos (WhatsApp, e-mail...) pelo compartilhar do celular ---------- */
+  var podeEnviar = false;
+  var baixados = {}; // url -> Blob (baixa antes, pro toque abrir o compartilhar na hora)
+
+  function prepararEnvio() {
+    try { podeEnviar = !!(navigator.canShare && navigator.canShare({ files: [new File(['x'], 't.pdf', { type: 'application/pdf' })] })); } catch (e) { podeEnviar = false; }
+    if (!podeEnviar || document.getElementById('btn-enviar-anexos')) return;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'btn-enviar-anexos';
+    b.className = 'anexos-enviar';
+    b.hidden = true;
+    b.innerHTML = svg('share', 17) + ' Enviar (WhatsApp, e-mail...)';
+    document.getElementById('anexos-dica').insertAdjacentElement('afterend', b);
+    b.addEventListener('click', enviarArquivos);
+  }
+
+  function preCarregar() {
+    itens.forEach(function (it) {
+      if (it.file || !it.url || baixados[it.url]) return;
+      fetch(it.url).then(function (r) { return r.ok ? r.blob() : null; }).then(function (bl) { if (bl) baixados[it.url] = bl; }).catch(function () {});
+    });
+  }
+
+  function nomeEnvio(i, tipo) {
+    var campo = document.getElementById('nome');
+    var base = (campo && campo.value.trim()) || 'documento';
+    var ext = tipo.indexOf('pdf') !== -1 ? '.pdf' : tipo.indexOf('png') !== -1 ? '.png' : '.jpg';
+    return (base + (itens.length > 1 ? ' - ' + rotulo(i) : '')).replace(/[\\/:*?"<>|]+/g, '').slice(0, 80) + ext;
+  }
+
+  async function enviarArquivos() {
+    var b = document.getElementById('btn-enviar-anexos');
+    try {
+      var arquivos = [];
+      for (var i = 0; i < itens.length; i++) {
+        var it = itens[i];
+        var bl = it.file || baixados[it.url];
+        if (!bl) {
+          b.disabled = true;
+          var r = await fetch(it.url);
+          if (!r.ok) throw new Error('baixar');
+          bl = baixados[it.url] = await r.blob();
+        }
+        var tipo = bl.type || it.mime || (ehPdf(it) ? 'application/pdf' : 'image/jpeg');
+        arquivos.push(new File([bl], nomeEnvio(i, tipo), { type: tipo }));
+      }
+      b.disabled = false;
+      var campo = document.getElementById('nome');
+      await navigator.share({ files: arquivos, title: (campo && campo.value.trim()) || 'Documento' });
+    } catch (e) {
+      b.disabled = false;
+      if (e && e.name === 'AbortError') return; // a pessoa fechou o compartilhar
+      if (e && e.name === 'NotAllowedError') { if (window.Dialogo) Dialogo.avisar('Arquivos prontos. Toque em Enviar de novo.'); return; }
+      if (window.Dialogo) Dialogo.avisar('Não consegui preparar os arquivos pra enviar. Tente de novo.');
+    }
   }
 
   async function cliqueGrade(e) {
