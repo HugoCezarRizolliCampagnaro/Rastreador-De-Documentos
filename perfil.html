@@ -424,6 +424,7 @@
   a.sidebar-marca { text-decoration: none; color: inherit; border-radius: 10px; }
   a.sidebar-marca:hover .sidebar-titulo { color: var(--marca); }
 </style>
+  <script src="bloqueio.js"></script>
 </head>
 <body>
 
@@ -548,6 +549,17 @@
               <div class="opcao-descricao" id="desc-agenda">Veja os vencimentos no Google Agenda ou no Calendário do iPhone.</div>
             </div>
           </button>
+          <div class="opcao-linha" id="linha-bloqueio" hidden>
+            <span class="opcao-icone" id="icone-bloqueio"></span>
+            <div class="opcao-texto">
+              <div class="opcao-titulo">Bloquear com digital ou rosto</div>
+              <div class="opcao-descricao" id="desc-bloqueio">Pede a digital ou o rosto ao abrir o app neste aparelho.</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggle-bloqueio">
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
 
         <p class="secao-titulo-grupo">Pessoas</p>
@@ -1282,6 +1294,7 @@
     document.getElementById('icone-email-lembretes').innerHTML = icone('mail', 17);
     document.getElementById('icone-resumo-semanal').innerHTML = icone('fileText', 17);
     document.getElementById('icone-agenda').innerHTML = icone('calendar', 17);
+    document.getElementById('icone-bloqueio').innerHTML = icone('shield', 17);
     document.getElementById('icone-pessoas').innerHTML = icone('users', 17);
     document.getElementById('seta-pessoas').innerHTML = icone('chevronRight', 16);
     document.getElementById('icone-tour').innerHTML = '<svg class="icone" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>';
@@ -1353,6 +1366,29 @@
           try { await obterToken(true); } catch (e) { Dialogo.avisar('Não consegui trocar o link agora.'); return; }
           Dialogo.avisar('Link trocado. O link antigo parou de funcionar; adicione o novo na agenda.');
         }
+      });
+    }
+
+    async function iniciarBloqueio(email) {
+      if (!window.Bloqueio || !(await Bloqueio.disponivel())) return;
+      const linha = document.getElementById('linha-bloqueio');
+      const toggle = document.getElementById('toggle-bloqueio');
+      const desc = document.getElementById('desc-bloqueio');
+      const textoPadrao = desc.textContent;
+      linha.hidden = false;
+      toggle.checked = Bloqueio.ativo();
+      function avisar(t) { desc.textContent = t; setTimeout(function () { desc.textContent = textoPadrao; }, 4000); }
+      toggle.addEventListener('change', async function () {
+        if (!toggle.checked) { Bloqueio.desativar(); avisar('Bloqueio desligado.'); return; }
+        toggle.disabled = true;
+        try {
+          await Bloqueio.ativar(email);
+          avisar('Pronto! Na próxima vez que abrir o app, vai pedir a digital ou o rosto.');
+        } catch (e) {
+          toggle.checked = false;
+          avisar('Não foi possível ativar agora. Tente de novo.');
+        }
+        toggle.disabled = false;
       });
     }
 
@@ -1606,6 +1642,7 @@
       iniciarEmailLembretes(resultado.data.session.user.id);
       iniciarResumoSemanal(resultado.data.session.user.id);
       iniciarAgenda(resultado.data.session.user.id);
+      iniciarBloqueio(email);
       carregarPessoas();
       planoEmVigor().then(function (plano) {
         iniciarClientes(resultado.data.session.user.id, plano);
